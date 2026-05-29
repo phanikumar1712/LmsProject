@@ -1,0 +1,198 @@
+import { useState } from 'react';
+import { CheckCircle, Ban, MoreVertical } from 'lucide-react';
+import { usersAPI } from '../../../services/api';
+import toast from 'react-hot-toast';
+import { useAsyncData } from '../../../hooks/useAsyncData';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { SearchInput, FilterBar } from '../../../components/ui/SearchInput';
+import { DataTable, UserCell } from '../../../components/ui/DataTable';
+import { useAuth } from '../../../contexts/AuthContext';
+
+export default function AdminUsers() {
+    const { isSuperAdmin } = useAuth();
+    const [activeTab, setActiveTab] = useState('users');
+    const [searchTerm, setSearchTerm] = useState('');
+    const { data: users, loading, reload: reloadUsers } = useAsyncData(() => usersAPI.getAll(), []);
+    const { data: requests, loading: loadingRequests, reload: reloadRequests } = useAsyncData(() => usersAPI.getInstructorRequests(), []);
+
+    const handleRoleChange = async (userId, newRole) => {
+        try {
+            await usersAPI.updateRole(userId, newRole);
+            reloadUsers();
+            toast.success(`User role updated to ${newRole}`);
+        } catch {
+            toast.error('Failed to update role');
+        }
+    };
+
+    const handleRequestAction = async (id, action) => {
+        try {
+            await usersAPI.approveInstructorRequest(id, action);
+            reloadRequests();
+            reloadUsers();
+            toast.success(`Application ${action.toLowerCase()}`);
+        } catch {
+            toast.error(`Failed to ${action.toLowerCase()} application`);
+        }
+    };
+
+    const handleToggleStatus = async (userId) => {
+        try {
+            await usersAPI.toggleStatus(userId);
+            reloadUsers();
+            toast.success('User status updated');
+        } catch {
+            toast.error('Failed to update status');
+        }
+    };
+
+    const safeUsers = users ?? [];
+    const filteredUsers = safeUsers.filter(u =>
+        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+        <div className="space-y-6 max-w-7xl mx-auto">
+            <PageHeader
+                title="User Management"
+                subtitle="Manage user roles, statuses, and approve instructor requests."
+                action={
+                    <button
+                        onClick={() => {
+                            const csv = "Name,Email,Role,Joined,Status\n" +
+                                filteredUsers.map(u => `"${u.name}","${u.email}","${u.role}","${new Date(u.createdAt).toLocaleDateString()}",${u.active !== false ? 'Active' : 'Suspended'}`).join("\n");
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `Users_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                            a.click();
+                        }}
+                        className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-slate-50 transition-colors"
+                    >
+                        Export CSV
+                    </button>
+                }
+            />
+
+            <div className="flex border-b border-slate-200 gap-6">
+                <button
+                    onClick={() => setActiveTab('users')}
+                    className={`pb-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+                >
+                    All Users ({safeUsers.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab('requests')}
+                    className={`pb-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'requests' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+                >
+                    Instructor Requests
+                    {requests?.length > 0 && (
+                        <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-0.5 rounded-full">{requests.length}</span>
+                    )}
+                </button>
+            </div>
+
+            {activeTab === 'users' && (
+                <>
+                    <FilterBar className="mb-6">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            placeholder="Search users by name or email..."
+                        />
+                    </FilterBar>
+
+                    <DataTable
+                        columns={['User', 'Role', 'Joined Date', 'Status', 'Actions']}
+                        loading={loading}
+                        loadingText="Loading users..."
+                        empty={!loading && filteredUsers.length === 0}
+                        emptyText="No users found matching your search."
+                    >
+                        {filteredUsers.map((user) => (
+                            <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-4 px-4">
+                                    <UserCell name={user.name} email={user.email} avatar={user.avatar} />
+                                </td>
+                                <td className="py-4 px-4">
+                                    <select
+                                        value={user.role}
+                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                        className="bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 shadow-sm transition-colors cursor-pointer"
+                                    >
+                                        <option value="STUDENT">Student</option>
+                                        <option value="INSTRUCTOR">Instructor</option>
+                                        {isSuperAdmin() && (
+                                            <>
+                                                <option value="ADMIN">Admin</option>
+                                                <option value="SUPER_ADMIN">Super Admin</option>
+                                            </>
+                                        )}
+                                    </select>
+                                </td>
+                                <td className="py-4 px-4 text-slate-600 font-medium text-[13px]">
+                                    {new Date(user.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="py-4 px-4">
+                                    <button
+                                        onClick={() => handleToggleStatus(user.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm ${user.active !== false
+                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
+                                            : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'}`}
+                                    >
+                                        {user.active !== false
+                                            ? <><CheckCircle size={14} /> Active</>
+                                            : <><Ban size={14} /> Suspended</>}
+                                    </button>
+                                </td>
+                                <td className="py-4 px-4 text-right">
+                                    <button className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">
+                                        <MoreVertical size={18} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </DataTable>
+                </>
+            )}
+
+            {activeTab === 'requests' && (
+                <DataTable
+                    columns={['Applicant', 'Details', 'Sample Topic', 'Applied Date', 'Actions']}
+                    loading={loadingRequests}
+                    loadingText="Loading requests..."
+                    empty={!loadingRequests && (!requests || requests.length === 0)}
+                    emptyText="No pending instructor requests."
+                >
+                    {requests?.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-4 px-4">
+                                <UserCell name={req.userName} email={req.userEmail} />
+                            </td>
+                            <td className="py-4 px-4">
+                                <div className="text-sm">
+                                    <p className="font-bold text-slate-900">{req.expertise}</p>
+                                    <p className="text-xs text-slate-500">{req.experience} experience</p>
+                                </div>
+                            </td>
+                            <td className="py-4 px-4 text-sm text-slate-600">
+                                {req.sampleTopic}
+                            </td>
+                            <td className="py-4 px-4 text-slate-600 font-medium text-[13px]">
+                                {new Date(req.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                    <button onClick={() => handleRequestAction(req.id, 'APPROVE')} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Approve</button>
+                                    <button onClick={() => handleRequestAction(req.id, 'REJECT')} className="bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Reject</button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </DataTable>
+            )}
+        </div>
+    );
+}
