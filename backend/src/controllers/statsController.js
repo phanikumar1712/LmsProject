@@ -3,7 +3,7 @@ const { createError } = require('../middleware/errorHandler');
 
 // GET /api/stats/platform
 const getPlatform = async (req, res) => {
-    const [users, courses, enrollments, revenue, premiumSubs] = await Promise.all([
+    const [users, courses, enrollments, revenue, premiumSubs, avgRatingQuery] = await Promise.all([
         query('SELECT COUNT(*) FROM users'),
         query(`SELECT COUNT(*) as total,
                       COUNT(*) FILTER (WHERE status='PUBLISHED') as published,
@@ -14,6 +14,7 @@ const getPlatform = async (req, res) => {
                FROM enrollments e 
                JOIN courses c ON e.course_id = c.id`),
         query(`SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE'`),
+        query(`SELECT ROUND(AVG(stars)::numeric, 1) as avg_rating FROM ratings`),
     ]);
 
     const usersCount = parseInt(users.rows[0].count);
@@ -60,6 +61,7 @@ const getPlatform = async (req, res) => {
         totalUsers: usersCount,
         activeStudents: Math.floor(usersCount * 0.8),
         premiumSubscribers: parseInt(premiumSubs.rows[0].count),
+        avgRating: parseFloat(avgRatingQuery.rows[0].avg_rating) || 0,
         totalCourses: parseInt(courses.rows[0].total),
         approvedCourses: parseInt(courses.rows[0].published),
         pendingCourses: parseInt(courses.rows[0].pending),
@@ -201,11 +203,17 @@ const getPublicStats = async (req, res) => {
         const students = await query("SELECT COUNT(*) FROM users WHERE role = 'STUDENT'");
         const instructors = await query("SELECT COUNT(*) FROM users WHERE role = 'INSTRUCTOR'");
         const courses = await query("SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED'");
+        const ratings = await query("SELECT ROUND(COALESCE(AVG(stars), 4.9), 1) as avg_rating FROM ratings");
+
+        const avg = parseFloat(ratings.rows[0]?.avg_rating || 4.9);
+        const satisfactionRate = Math.round((avg / 5) * 100);
 
         res.json({
             totalStudents: parseInt(students.rows[0].count),
             totalInstructors: parseInt(instructors.rows[0].count),
             totalCourses: parseInt(courses.rows[0].count),
+            avgRating: avg,
+            satisfactionRate: satisfactionRate
         });
     } catch (err) {
         // Fallback to approximate numbers if DB is down to avoid breaking the homepage
@@ -213,6 +221,8 @@ const getPublicStats = async (req, res) => {
             totalStudents: 10000,
             totalInstructors: 200,
             totalCourses: 50,
+            avgRating: 4.9,
+            satisfactionRate: 98,
             isFallback: true
         });
     }

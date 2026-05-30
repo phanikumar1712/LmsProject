@@ -11,7 +11,15 @@ const http = async (method, path, body = null, token = null) => {
 
     const res = await fetch(`${BASE_URL}${path}`, options);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+
+    if (!res.ok) {
+        if (res.status === 401 || data.error === 'Invalid token' || data.error === 'Token expired') {
+            console.error('Authentication Error Details:', data);
+            // localStorage.removeItem('lms_token'); // Don't clear yet
+            // window.location.href = '/login?expired=true';
+        }
+        throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    }
     return data;
 };
 
@@ -37,6 +45,14 @@ export const authAPI = {
 
     changePassword: async (userId, currentPassword, newPassword) => {
         return http('PUT', '/auth/change-password', { currentPassword, newPassword }, getToken());
+    },
+
+    requestPasswordReset: async (email) => {
+        return http('POST', '/auth/reset-password/request', { email });
+    },
+
+    resetPassword: async (email, otp, newPassword) => {
+        return http('POST', '/auth/reset-password', { email, otp, newPassword });
     },
 
     loginWithDemo: async (role = 'STUDENT') => {
@@ -84,8 +100,20 @@ export const coursesAPI = {
     createSection: async (courseId, data) =>
         http('POST', `/courses/${courseId}/sections`, data, getToken()),
 
+    updateSection: async (sectionId, data) =>
+        http('PUT', `/courses/sections/${sectionId}`, data, getToken()),
+
+    deleteSection: async (sectionId) =>
+        http('DELETE', `/courses/sections/${sectionId}`, null, getToken()),
+
     createLesson: async (courseId, data) =>
         http('POST', `/courses/${courseId}/lessons`, data, getToken()),
+
+    updateLesson: async (lessonId, data) =>
+        http('PUT', `/courses/lessons/${lessonId}`, data, getToken()),
+
+    deleteLesson: async (lessonId) =>
+        http('DELETE', `/courses/lessons/${lessonId}`, null, getToken()),
 };
 
 // ─── ENROLLMENTS ─────────────────────────────────────────────────────────────
@@ -134,6 +162,9 @@ export const ratingsAPI = {
 
     getByCourse: async (courseId) =>
         http('GET', `/ratings/course/${courseId}`),
+
+    getMyRating: async (courseId) =>
+        http('GET', `/ratings/my/${courseId}`, null, getToken()),
 
     create: async (courseId, studentId, stars, comment) =>
         http('POST', '/ratings', { courseId, stars, comment }, getToken()),
@@ -260,5 +291,21 @@ export const uploadAPI = {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
         return data; // Returns { url, public_id, format, resource_type }
+    },
+
+    uploadProfilePhoto: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`${BASE_URL}/upload/profile-photo`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        return data;
     }
 };

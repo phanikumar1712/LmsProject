@@ -14,12 +14,16 @@ const authenticate = async (req, res, next) => {
             'SELECT id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, created_at FROM users WHERE id = $1',
             [decoded.userId]
         );
-        if (!result.rows.length) return res.status(401).json({ error: 'User not found' });
+        if (!result.rows.length) {
+            console.warn(`[Auth] User ${decoded.userId} from token not found in DB`);
+            return res.status(401).json({ error: 'User not found' });
+        }
         const user = result.rows[0];
         if (!user.active) return res.status(403).json({ error: 'Account suspended' });
         req.user = user;
         next();
     } catch (err) {
+        console.error(`[Auth] JWT Verification failed: ${err.message}`);
         if (err.name === 'TokenExpiredError') return res.status(401).json({ error: 'Token expired' });
         return res.status(401).json({ error: 'Invalid token' });
     }

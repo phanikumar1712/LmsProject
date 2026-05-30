@@ -1,21 +1,20 @@
 const { Pool } = require('pg');
-const { URL } = require('url');
-const dns = require('dns');
+const net = require('net');
 
-dns.setDefaultResultOrder('ipv4first');
-
-const parsed = new URL(process.env.DATABASE_URL);
+// Deep monkey-patch Node's networking to absolutely force IPv4.
+// Node 20+ Happy Eyeballs races IPv6/IPv4, and when IPv6 throws ENETUNREACH, 
+// it aborts the entire TCP handshake causing sporadic ETIMEDOUT on NeonDB.
+const originalConnect = net.Socket.prototype.connect;
+net.Socket.prototype.connect = function (...args) {
+    if (args[0] && typeof args[0] === 'object') {
+        args[0].family = 4;
+    }
+    return originalConnect.apply(this, args);
+};
 
 const pool = new Pool({
-    host: parsed.hostname,
-    port: parsed.port || 5432,
-    database: parsed.pathname.slice(1),
-    user: parsed.username,
-    password: parsed.password,
-    ssl: {
-        rejectUnauthorized: false,
-        servername: parsed.hostname
-    },
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 30000,

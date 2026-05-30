@@ -2,8 +2,31 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     GraduationCap, Menu, X, Search, LogOut, User,
-    LayoutDashboard, BookOpen, ChevronDown, Bell, Flame, Moon
+    LayoutDashboard, BookOpen, ChevronDown, Bell, Flame, Moon, Sun
 } from 'lucide-react';
+
+// ── Dark mode hook ────────────────────────────────────────────────────────────
+function useDarkMode() {
+    const [dark, setDark] = useState(() => {
+        try {
+            const saved = localStorage.getItem('lms_dark_mode');
+            if (saved !== null) return saved === 'true';
+        } catch { }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        const root = document.documentElement;
+        if (dark) {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+        try { localStorage.setItem('lms_dark_mode', String(dark)); } catch { }
+    }, [dark]);
+
+    return [dark, () => setDark(d => !d)];
+}
 import { useAuth } from '../../contexts/AuthContext';
 import { notificationsAPI, statsAPI } from '../../services/api';
 
@@ -16,6 +39,7 @@ const ROLE_DASHBOARDS = {
 
 export function Navbar({ onMobileMenuClick }) {
     const { user, logout, isAuthenticated } = useAuth();
+    const [isDark, toggleDark] = useDarkMode();
     const navigate = useNavigate();
     const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -129,7 +153,13 @@ export function Navbar({ onMobileMenuClick }) {
 
                         {!isAuthenticated ? (
                             <div className="flex items-center gap-3">
-                                <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors hidden lg:block"><Moon size={18} /></button>
+                                <button
+                                    onClick={toggleDark}
+                                    className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors hidden lg:block"
+                                    title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                                >
+                                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
                                 <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors px-2">Log in</Link>
                                 <Link to="/register" className="bg-slate-900 text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-slate-800 transition-all hover:shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] active:scale-95">Sign up</Link>
                             </div>
@@ -143,7 +173,13 @@ export function Navbar({ onMobileMenuClick }) {
                                     </div>
                                 )}
 
-                                <button className="p-1.5 text-slate-400 hover:text-slate-900 transition-colors hidden lg:block"><Moon size={18} /></button>
+                                <button
+                                    onClick={toggleDark}
+                                    className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors hidden lg:block"
+                                    title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                                >
+                                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
 
                                 {/* Notifications */}
                                 <div className="relative" ref={notifRef}>

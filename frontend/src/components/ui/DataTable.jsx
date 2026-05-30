@@ -64,14 +64,19 @@ export function DataTable({
  * UserCell – avatar + name + email table cell content.
  */
 export function UserCell({ name, email, avatar }) {
-    const avatarSrc = avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
     return (
         <div className="flex items-center gap-3">
-            <img
-                src={avatarSrc}
-                alt={name}
-                className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm flex-shrink-0"
-            />
+            {avatar ? (
+                <img
+                    src={avatar}
+                    alt={name}
+                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm flex-shrink-0"
+                />
+            ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 border border-slate-200 shadow-sm">
+                    <span className="text-white text-sm font-bold">{name?.charAt(0)?.toUpperCase()}</span>
+                </div>
+            )}
             <div>
                 <p className="text-slate-900 font-bold">{name}</p>
                 {email && <p className="text-slate-500 text-xs font-medium">{email}</p>}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle, Clock, Award, Play } from 'lucide-react';
 import { coursesAPI, statsAPI, quizzesAPI, uploadAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -37,7 +37,10 @@ export default function CreateCourseForm() {
 
         if (editId) {
             setLoading(true);
-            coursesAPI.getById(editId).then(course => {
+            Promise.all([
+                coursesAPI.getById(editId),
+                coursesAPI.getLessons(editId)
+            ]).then(([course, curriculumData]) => {
                 setFormData({
                     title: course.title || '',
                     description: course.description || '',
@@ -54,9 +57,33 @@ export default function CreateCourseForm() {
                     learningOutcomes: course.learningOutcomes?.join('\n') || ''
                 });
                 setThumbnailPreview(course.thumbnail || '');
-                toast.success('Loaded course details. Curriculum structure is ready to be edited!');
-            }).catch(() => {
-                toast.error('Course not found');
+
+                // Map curriculum data for the UI
+                if (curriculumData.sections && curriculumData.sections.length > 0) {
+                    const mappedCurr = curriculumData.sections.map(sec => ({
+                        id: sec.id,
+                        dbId: sec.id, // Track real DB ID
+                        title: sec.title,
+                        isExpanded: true,
+                        lessons: curriculumData.lessons
+                            .filter(l => l.section_id === sec.id)
+                            .map(l => ({
+                                id: l.id,
+                                dbId: l.id, // Track real DB ID
+                                title: l.title,
+                                type: l.type,
+                                contentUrl: l.contentUrl,
+                                duration: l.duration,
+                                preview: l.preview
+                            }))
+                    }));
+                    setCurriculum(mappedCurr);
+                }
+
+                toast.success('Course details and curriculum loaded!');
+            }).catch((err) => {
+                console.error(err);
+                toast.error('Failed to load course data');
                 navigate('/instructor/courses');
             }).finally(() => setLoading(false));
         }
@@ -236,54 +263,71 @@ export default function CreateCourseForm() {
                 status: type === 'DRAFT' ? 'DRAFT' : 'PENDING'
             };
 
+            let targetCourseId = editId;
             if (editId) {
                 await coursesAPI.update(editId, dbFormat);
-                toast.success(`Course updated successfully!`);
             } else {
                 const newCourse = await coursesAPI.create(dbFormat);
-                const courseId = newCourse.id;
+                targetCourseId = newCourse.id;
+            }
 
-                // Create curriculum iteratively
-                for (let sIdx = 0; sIdx < curriculum.length; sIdx++) {
-                    const section = curriculum[sIdx];
-                    const secRes = await coursesAPI.createSection(courseId, { title: section.title, order: sIdx + 1 });
-                    const sectionId = secRes.id;
+            // Sync curriculum
+            for (let sIdx = 0; sIdx < curriculum.length; sIdx++) {
+                const section = curriculum[sIdx];
+                let sectionId = section.dbId;
 
-                    for (let lIdx = 0; lIdx < section.lessons.length; lIdx++) {
-                        const lesson = section.lessons[lIdx];
-                        const lessonRes = await coursesAPI.createLesson(courseId, {
-                            section_id: sectionId,
+                if (sectionId) {
+                    await coursesAPI.updateSection(sectionId, { title: section.title, order: sIdx + 1 });
+                } else {
+                    const secRes = await coursesAPI.createSection(targetCourseId, { title: section.title, order: sIdx + 1 });
+                    sectionId = secRes.id;
+                }
+
+                for (let lIdx = 0; lIdx < section.lessons.length; lIdx++) {
+                    const lesson = section.lessons[lIdx];
+                    let lessonId = lesson.dbId;
+
+                    const lessonData = {
+                        section_id: sectionId,
+                        title: lesson.title,
+                        type: lesson.type,
+                        content_url: lesson.contentUrl || '',
+                        duration: lesson.duration || '',
+                        preview: lesson.preview || false,
+                        order: lIdx + 1
+                    };
+
+                    if (lessonId) {
+                        await coursesAPI.updateLesson(lessonId, lessonData);
+                    } else {
+                        const lessonRes = await coursesAPI.createLesson(targetCourseId, lessonData);
+                        lessonId = lessonRes.id;
+                    }
+
+                    // Handle Quizzes (simplified for now: always update/create if type is quiz)
+                    if (lesson.type === 'quiz' && lesson.questions && lesson.questions.length > 0) {
+                        const formattedQuestions = lesson.questions.map(q => ({
+                            id: q.id,
+                            text: q.text,
+                            type: q.type,
+                            options: q.options || [],
+                            correctAnswer: q.type === 'FILL_BLANK' ? (q.correctAnswers[0] || '') : q.correctAnswers[0]
+                        }));
+
+                        await quizzesAPI.createQuiz({
+                            courseId: targetCourseId,
+                            lessonId: lessonId,
                             title: lesson.title,
-                            type: lesson.type,
-                            content_url: lesson.contentUrl || '',
-                            duration: lesson.duration || '',
-                            preview: lesson.preview || false,
-                            order: lIdx + 1
+                            instructions: 'Please complete this quiz to proceed.',
+                            passingScore: 70,
+                            timeLimit: 30,
+                            questions: formattedQuestions
                         });
-
-                        if (lesson.type === 'quiz' && lesson.questions && lesson.questions.length > 0) {
-                            const formattedQuestions = lesson.questions.map(q => ({
-                                id: q.id,
-                                text: q.text,
-                                type: q.type,
-                                options: q.options,
-                                correctAnswer: q.type === 'FILL_BLANK' ? (q.correctAnswers[0] || '') : q.correctAnswers[0]
-                            }));
-
-                            await quizzesAPI.createQuiz({
-                                courseId: courseId,
-                                lessonId: lessonRes.id,
-                                title: lesson.title,
-                                instructions: 'Please complete this quiz to proceed.',
-                                passingScore: 70,
-                                timeLimit: 30,
-                                questions: formattedQuestions
-                            });
-                        }
                     }
                 }
-                toast.success(`Course created successfully and is pending approval!`);
             }
+
+            toast.success(editId ? `Course and curriculum updated successfully!` : `Course created successfully and is pending approval!`);
             navigate('/instructor/courses');
         } catch (err) {
             toast.error('Failed to save course: ' + err.message);
@@ -448,119 +492,193 @@ export default function CreateCourseForm() {
                                 {section.isExpanded && (
                                     <div className="p-5 space-y-4 bg-white">
                                         {section.lessons.map((lesson, lIdx) => (
-                                            <div key={lesson.id} className="ml-8 border border-slate-200 bg-slate-50/50 rounded-xl p-5 flex flex-col gap-4 shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <GripVertical size={16} className="text-slate-400 cursor-move" />
-                                                    <select
-                                                        value={lesson.type}
-                                                        onChange={e => updateLesson(sIdx, lIdx, 'type', e.target.value)}
-                                                        className="bg-white shadow-sm text-[13px] font-bold rounded-lg border border-slate-200 text-slate-700 px-3 py-2 outline-none focus:border-indigo-500 w-36"
-                                                    >
-                                                        <option value="video">Video</option>
-                                                        <option value="lecture">Document/Text</option>
-                                                        <option value="quiz">Quiz</option>
-                                                    </select>
-                                                    <input
-                                                        type="text"
-                                                        value={lesson.title}
-                                                        onChange={e => updateLesson(sIdx, lIdx, 'title', e.target.value)}
-                                                        className="flex-1 bg-white shadow-sm border border-slate-200 focus:border-indigo-500 outline-none text-[14px] font-bold text-slate-900 px-3 py-2 rounded-lg"
-                                                        placeholder="Lesson title..."
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={lesson.duration}
-                                                        onChange={e => updateLesson(sIdx, lIdx, 'duration', e.target.value)}
-                                                        className="w-24 bg-white shadow-sm border border-slate-200 focus:border-indigo-500 outline-none text-[13px] font-semibold text-slate-600 px-3 py-2 rounded-lg text-center"
-                                                        placeholder="e.g 4:30"
-                                                    />
-                                                    <button type="button" onClick={() => deleteLesson(sIdx, lIdx)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                            <div key={lesson.id} className={`ml-4 md:ml-12 border rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${lesson.type === 'video' ? 'border-blue-100 bg-blue-50/20' : lesson.type === 'quiz' ? 'border-purple-100 bg-purple-50/20' : 'border-emerald-100 bg-emerald-50/20'}`}>
+                                                <div className="p-4 flex flex-col md:flex-row items-center gap-4 bg-white/60 backdrop-blur-sm">
+                                                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                                        <GripVertical size={18} className="text-slate-300 cursor-move" />
+                                                        <div className={`p-2 rounded-lg ${lesson.type === 'video' ? 'bg-blue-100 text-blue-600' : lesson.type === 'quiz' ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                            {lesson.type === 'video' && <Play size={18} />}
+                                                            {lesson.type === 'quiz' && <HelpCircle size={18} />}
+                                                            {lesson.type === 'lecture' && <FileText size={18} />}
+                                                        </div>
+                                                        <select
+                                                            value={lesson.type}
+                                                            onChange={e => updateLesson(sIdx, lIdx, 'type', e.target.value)}
+                                                            className="bg-slate-50 border-0 text-[13px] font-bold rounded-lg text-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-100 w-32 md:w-36 transition-all"
+                                                        >
+                                                            <option value="video">Video</option>
+                                                            <option value="lecture">Document</option>
+                                                            <option value="quiz">Quiz</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex-1 w-full relative">
+                                                        <input
+                                                            type="text"
+                                                            value={lesson.title}
+                                                            onChange={e => updateLesson(sIdx, lIdx, 'title', e.target.value)}
+                                                            className="w-full bg-transparent border-b-2 border-transparent focus:border-indigo-500 outline-none text-[15px] font-bold text-slate-900 py-1 transition-all"
+                                                            placeholder="Lesson title (e.g., Intro to React)"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                                                        <div className="relative group">
+                                                            <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                            <input
+                                                                type="text"
+                                                                value={lesson.duration}
+                                                                onChange={e => updateLesson(sIdx, lIdx, 'duration', e.target.value)}
+                                                                className="w-24 pl-8 pr-3 py-2 bg-slate-50 border-0 text-[13px] font-semibold text-slate-600 rounded-lg outline-none focus:ring-2 focus:ring-indigo-100 text-center transition-all"
+                                                                placeholder="Duration"
+                                                            />
+                                                        </div>
+                                                        <button type="button" onClick={() => deleteLesson(sIdx, lIdx)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm md:shadow-none hover:shadow-md"><Trash2 size={18} /></button>
+                                                    </div>
                                                 </div>
 
-                                                <div className="ml-7 flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                <div className="p-4 md:p-6 bg-white/40 border-t border-slate-100">
                                                     {lesson.type !== 'quiz' ? (
-                                                        <div className="flex-1 flex flex-col gap-4">
+                                                        <div className="space-y-6">
                                                             <div>
-                                                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Content Source / Upload</label>
-                                                                <div className="flex flex-wrap gap-3 items-center">
-                                                                    <label className="cursor-pointer bg-white border border-slate-200 hover:bg-slate-50 px-4 py-2 rounded-lg text-[13px] text-slate-700 font-bold flex items-center gap-2 whitespace-nowrap shadow-sm transition-colors">
-                                                                        <Upload size={14} className="text-indigo-600" /> Upload File
-                                                                        <input type="file" className="hidden" onChange={(e) => handleLessonFileUpload(e, sIdx, lIdx)} accept={lesson.type === 'video' ? 'video/*' : 'application/pdf,.doc,.docx'} />
-                                                                    </label>
-                                                                    <span className="text-[11px] font-bold text-slate-400">OR</span>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={lesson.contentUrl || ''}
-                                                                        onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
-                                                                        className="flex-1 min-w-[200px] bg-white border border-slate-200 shadow-sm text-[13px] rounded-lg px-3 py-2 text-slate-900 disabled:opacity-50 disabled:bg-slate-50 focus:border-indigo-500 outline-none"
-                                                                        placeholder={lesson.fileName ? `Uploaded: ${lesson.fileName}` : "Enter external link (YouTube, Vimeo, PDF URL)"}
-                                                                        disabled={!!lesson.fileName}
-                                                                    />
+                                                                <div className="flex items-center gap-2 mb-3">
+                                                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
+                                                                    <label className="text-[12px] font-extrabold text-slate-700 uppercase tracking-widest">Content Resource</label>
+                                                                </div>
+                                                                <div className="flex flex-col sm:flex-row gap-4">
+                                                                    <div className="flex-1 flex flex-col gap-2">
+                                                                        <div className="flex flex-wrap gap-3 items-center">
+                                                                            <label className="cursor-pointer bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-md px-5 py-2.5 rounded-xl text-[13px] text-slate-700 font-bold flex items-center gap-2.5 transition-all group">
+                                                                                <Upload size={16} className="text-indigo-600 group-hover:scale-110 transition-transform" />
+                                                                                <span>Upload {lesson.type === 'video' ? 'Video' : 'Document'}</span>
+                                                                                <input type="file" className="hidden" onChange={(e) => handleLessonFileUpload(e, sIdx, lIdx)} accept={lesson.type === 'video' ? 'video/*' : 'application/pdf,.doc,.docx'} />
+                                                                            </label>
+                                                                            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+                                                                            <div className="relative flex-1 group">
+                                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500">
+                                                                                    {lesson.type === 'video' ? <Play size={14} /> : <FileText size={14} />}
+                                                                                </div>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={lesson.contentUrl || ''}
+                                                                                    onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
+                                                                                    className="w-full bg-slate-100 border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                                                                                    placeholder={lesson.fileName ? `File: ${lesson.fileName}` : lesson.type === 'video' ? "Paste YouTube/Vimeo link" : "Paste shareable document link"}
+                                                                                    disabled={!!lesson.fileName}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        {lesson.fileName && <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-1 ml-1"><CheckCircle size={12} /> {lesson.fileName} ready for upload</p>}
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={lesson.preview}
-                                                                    onChange={e => updateLesson(sIdx, lIdx, 'preview', e.target.checked)}
-                                                                    id={`prev-${lesson.id}`}
-                                                                    className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                                                                />
-                                                                <label htmlFor={`prev-${lesson.id}`} className="text-[13px] font-semibold text-slate-600 cursor-pointer">Free Preview (Allow guests to view)</label>
+                                                            <div className="flex items-center gap-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50 w-max">
+                                                                <div className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={lesson.preview}
+                                                                        onChange={e => updateLesson(sIdx, lIdx, 'preview', e.target.checked)}
+                                                                        id={`prev-${lesson.id}`}
+                                                                        className="sr-only peer"
+                                                                    />
+                                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                                </div>
+                                                                <label htmlFor={`prev-${lesson.id}`} className="text-[13px] font-bold text-slate-600 cursor-pointer select-none">Make this lesson Free Preview</label>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="flex-1 w-full space-y-4">
-                                                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                                                                <label className="text-[13px] text-indigo-600 uppercase font-bold flex items-center gap-2">
-                                                                    <FileText size={16} /> Quiz Questions Configurator
-                                                                </label>
-                                                                <button type="button" onClick={() => addLessonQuestion(sIdx, lIdx)} className="text-[12px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors">
-                                                                    <Plus size={14} /> Add Question
+                                                        <div className="space-y-6">
+                                                            <div className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                                                                <div>
+                                                                    <h4 className="text-purple-900 font-extrabold text-sm flex items-center gap-2">
+                                                                        <Award size={18} /> SMART ASSESSMENT BUILDER
+                                                                    </h4>
+                                                                    <p className="text-purple-600 text-[11px] font-bold mt-1 uppercase tracking-wider">Configure questions, options, and passing criteria</p>
+                                                                </div>
+                                                                <button type="button" onClick={() => addLessonQuestion(sIdx, lIdx)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl text-[13px] shadow-lg shadow-purple-200 transition-all flex items-center gap-2 hover:scale-105 active:scale-95">
+                                                                    <Plus size={16} /> ADD QUESTION
                                                                 </button>
                                                             </div>
 
                                                             {(lesson.questions || []).length === 0 ? (
-                                                                <p className="text-[13px] text-slate-500 text-center py-6 font-medium">No questions added yet. Click 'Add Question' to start building this quiz assessment.</p>
+                                                                <div className="text-center py-12 px-4 border-2 border-dashed border-slate-200 rounded-3xl">
+                                                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                                        <HelpCircle size={32} className="text-slate-300" />
+                                                                    </div>
+                                                                    <h5 className="text-slate-900 font-bold mb-1">No Questions Yet</h5>
+                                                                    <p className="text-slate-500 text-[13px] max-w-[280px] mx-auto font-medium">Add some multiple-choice or fill-in-the-blank questions to test your students' knowledge.</p>
+                                                                </div>
                                                             ) : (
-                                                                <div className="space-y-4">
+                                                                <div className="space-y-6">
                                                                     {(lesson.questions || []).map((q, qIdx) => (
-                                                                        <div key={q.id} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-4 relative">
-                                                                            <button type="button" onClick={() => deleteLessonQuestion(sIdx, lIdx, qIdx)} className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 bg-white p-1 rounded-md shadow-sm border border-slate-100"><Trash2 size={14} /></button>
-                                                                            <div className="flex flex-col sm:flex-row gap-3 w-full pr-8">
-                                                                                <select value={q.type} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'type', e.target.value)} className="bg-white border border-slate-200 shadow-sm rounded-lg px-3 py-2.5 text-[12px] font-bold uppercase text-slate-700 outline-none w-max focus:border-indigo-500">
-                                                                                    <option value="MCQ_SINGLE">Single Choice</option>
-                                                                                    <option value="MCQ_MULTI">Multiple Choice</option>
-                                                                                    <option value="FILL_BLANK">Fill Blank</option>
-                                                                                </select>
-                                                                                <input type="text" value={q.text} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'text', e.target.value)} className="flex-1 bg-white shadow-sm border border-slate-200 rounded-lg px-3 py-2.5 text-[13px] font-bold text-slate-900 outline-none focus:border-indigo-500" placeholder="Enter question text..." />
+                                                                        <div key={q.id} className="group relative bg-white border border-slate-200 rounded-3xl p-6 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-300">
+                                                                            <div className="absolute -left-3 top-6 w-8 h-8 bg-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shadow-purple-200 border-2 border-white">
+                                                                                {qIdx + 1}
                                                                             </div>
 
-                                                                            {q.type.includes('MCQ') && (
-                                                                                <div className="space-y-3 bg-white p-3 rounded-lg border border-slate-100">
-                                                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Options & Correct Answer</label>
-                                                                                    {q.options.map((opt, oIdx) => (
-                                                                                        <div key={oIdx} className="flex items-center gap-3">
-                                                                                            <button type="button" onClick={() => toggleCorrectOptionInline(sIdx, lIdx, qIdx, oIdx)} className={`w-6 h-6 rounded flex items-center justify-center font-bold text-[12px] transition-colors shadow-sm ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white border border-emerald-600' : 'bg-slate-50 border border-slate-200 text-transparent hover:border-indigo-300'}`}>✓</button>
-                                                                                            <input type="text" value={opt} onChange={e => updateQuestionOption(sIdx, lIdx, qIdx, oIdx, e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-[13px] font-medium text-slate-900 outline-none transition-colors" placeholder={`Option ${oIdx + 1}`} />
-                                                                                            <button type="button" onClick={() => removeQuestionOption(sIdx, lIdx, qIdx, oIdx)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14} /></button>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                    <button type="button" onClick={() => addQuestionOption(sIdx, lIdx, qIdx)} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1 mt-2 inline-flex"><Plus size={14} /> Add Choice</button>
-                                                                                </div>
-                                                                            )}
+                                                                            <button type="button" onClick={() => deleteLessonQuestion(sIdx, lIdx, qIdx)} className="absolute -right-3 -top-3 w-8 h-8 bg-white text-slate-400 hover:text-rose-600 rounded-full flex items-center justify-center shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <Trash2 size={14} />
+                                                                            </button>
 
-                                                                            {q.type === 'FILL_BLANK' && (
-                                                                                <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-100">
-                                                                                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Exact Text Match</label>
-                                                                                    <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
-                                                                                        const newCurr = [...curriculum];
-                                                                                        newCurr[sIdx].lessons[lIdx].questions[qIdx].correctAnswers = [e.target.value];
-                                                                                        setCurriculum(newCurr);
-                                                                                    }} className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-[13px] font-bold text-slate-900 outline-none" placeholder="Valid correct answer..." />
+                                                                            <div className="space-y-5 ml-2">
+                                                                                <div className="flex flex-col md:flex-row gap-4">
+                                                                                    <div className="md:w-1/3">
+                                                                                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Question Type</label>
+                                                                                        <select value={q.type} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'type', e.target.value)} className="w-full bg-slate-50 border-0 rounded-xl px-4 py-3 text-[13px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-100 transition-all">
+                                                                                            <option value="MCQ_SINGLE">Single Choice</option>
+                                                                                            <option value="MCQ_MULTI">Multiple Choice</option>
+                                                                                            <option value="FILL_BLANK">Fill in the Blank</option>
+                                                                                        </select>
+                                                                                    </div>
+                                                                                    <div className="flex-1">
+                                                                                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Question Prompt</label>
+                                                                                        <input type="text" value={q.text} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'text', e.target.value)} className="w-full bg-slate-100 border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-purple-100 transition-all" placeholder="Ask your question here..." />
+                                                                                    </div>
                                                                                 </div>
-                                                                            )}
+
+                                                                                {q.type.includes('MCQ') && (
+                                                                                    <div className="pt-2">
+                                                                                        <label className="text-[11px] font-extrabold text-purple-600 uppercase tracking-widest mb-3 block ml-1">Options & Correct Answers</label>
+                                                                                        <div className="grid gap-3">
+                                                                                            {q.options.map((opt, oIdx) => (
+                                                                                                <div key={oIdx} className="group/opt flex items-center gap-3">
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={() => toggleCorrectOptionInline(sIdx, lIdx, qIdx, oIdx)}
+                                                                                                        className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-slate-100 text-transparent hover:bg-slate-200 group-hover/opt:text-slate-300'}`}
+                                                                                                    >
+                                                                                                        <CheckCircle size={20} />
+                                                                                                    </button>
+                                                                                                    <div className="flex-1 relative">
+                                                                                                        <input
+                                                                                                            type="text"
+                                                                                                            value={opt}
+                                                                                                            onChange={e => updateQuestionOption(sIdx, lIdx, qIdx, oIdx, e.target.value)}
+                                                                                                            className={`w-full border-0 rounded-2xl px-4 py-2.5 text-[14px] font-semibold transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-50 text-emerald-900 selection:bg-emerald-200' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 focus:bg-white focus:ring-2 focus:ring-purple-100'}`}
+                                                                                                            placeholder={`Option ${oIdx + 1}`}
+                                                                                                        />
+                                                                                                        <button type="button" onClick={() => removeQuestionOption(sIdx, lIdx, qIdx, oIdx)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover/opt:opacity-100"><Trash2 size={16} /></button>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                            <button type="button" onClick={() => addQuestionOption(sIdx, lIdx, qIdx)} className="w-full h-11 border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-extrabold text-slate-400 hover:text-purple-600 transition-all mt-1">
+                                                                                                <Plus size={16} /> ADD ANOTHER OPTION
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {q.type === 'FILL_BLANK' && (
+                                                                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                                                                                        <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Acceptable Correct Answer</label>
+                                                                                        <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
+                                                                                            const newCurr = [...curriculum];
+                                                                                            newCurr[sIdx].lessons[lIdx].questions[qIdx].correctAnswers = [e.target.value];
+                                                                                            setCurriculum(newCurr);
+                                                                                        }} className="w-full bg-white border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-slate-900 focus:ring-2 focus:ring-purple-100 outline-none shadow-sm" placeholder="e.g., React Context API" />
+                                                                                        <p className="text-[10px] text-slate-400 font-bold mt-2 ml-1 uppercase">Note: Answer comparison is case-insensitive and ignores leading/trailing whitespace.</p>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     ))}
                                                                 </div>

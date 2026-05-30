@@ -261,6 +261,23 @@ const createSection = async (req, res) => {
     res.status(201).json(result.rows[0]);
 };
 
+// PUT /api/courses/sections/:id
+const updateSection = async (req, res) => {
+    const { title, order } = req.body;
+    const result = await query(
+        `UPDATE sections SET title = COALESCE($1, title), "order" = COALESCE($2, "order"), updated_at = NOW() WHERE id = $3 RETURNING *`,
+        [title, order, req.params.id]
+    );
+    if (!result.rows.length) throw createError('Section not found', 404);
+    res.json(result.rows[0]);
+};
+
+// DELETE /api/courses/sections/:id
+const deleteSection = async (req, res) => {
+    await query('DELETE FROM sections WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+};
+
 // POST /api/courses/:id/lessons
 const createLesson = async (req, res) => {
     const { section_id, title, type = 'video', content_url = '', duration = '', preview = false, order = 1 } = req.body;
@@ -273,4 +290,39 @@ const createLesson = async (req, res) => {
     res.status(201).json(result.rows[0]);
 };
 
-module.exports = { getAll, getById, getLessons, getByInstructor, create, update, approve, reject, deleteCourse, createSection, createLesson };
+// PUT /api/courses/lessons/:id
+const updateLesson = async (req, res) => {
+    const { title, type, content_url, duration, preview, order } = req.body;
+    const { id } = req.params;
+
+    const updates = [];
+    const values = [];
+    let i = 1;
+
+    const fields = { title, type, content_url, duration, preview, "order": order };
+    for (const [key, val] of Object.entries(fields)) {
+        if (val !== undefined) {
+            updates.push(`"${key}" = $${i++}`);
+            values.push(val);
+        }
+    }
+
+    if (!updates.length) throw createError('No fields to update', 400);
+    values.push(id);
+
+    const result = await query(
+        `UPDATE lessons SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`,
+        values
+    );
+
+    if (!result.rows.length) throw createError('Lesson not found', 404);
+    res.json(result.rows[0]);
+};
+
+// DELETE /api/courses/lessons/:id
+const deleteLesson = async (req, res) => {
+    await query('DELETE FROM lessons WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+};
+
+module.exports = { getAll, getById, getLessons, getByInstructor, create, update, approve, reject, deleteCourse, createSection, updateSection, deleteSection, createLesson, updateLesson, deleteLesson };

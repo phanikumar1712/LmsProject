@@ -1,4 +1,4 @@
-import { TrendingUp, Users, BookOpen, DollarSign } from 'lucide-react';
+import { TrendingUp, Users, BookOpen, DollarSign, Star } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -18,7 +18,7 @@ export default function SuperAdminAnalytics() {
         { label: 'Total Revenue', value: stats.totalRevenue >= 100000 ? `₹${(stats.totalRevenue / 100000).toFixed(1)}L` : `₹${stats.totalRevenue?.toLocaleString()}`, icon: DollarSign, color: '#16a34a', bg: 'bg-emerald-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% this month` },
         { label: 'Active Students', value: stats.activeStudents?.toLocaleString() || '0', icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
         { label: 'Total Courses', value: stats.totalCourses || '0', icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published` },
-        { label: 'Platform Growth', value: `${stats.platformGrowth >= 0 ? '+' : ''}${stats.platformGrowth || 0}%`, icon: TrendingUp, color: '#d97706', bg: 'bg-amber-50', change: 'MoM growth rate' },
+        { label: 'Platform Rating', value: stats.avgRating?.toFixed(1) || '0.0', icon: Star, color: '#f59e0b', bg: 'bg-amber-50', change: 'Global avg course rating' },
     ] : [];
 
     if (loading) return (

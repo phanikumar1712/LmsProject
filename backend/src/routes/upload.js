@@ -15,9 +15,22 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
 }
 
 const storage = multer.memoryStorage();
-const upload = multer({
+
+const uploadGeneral = multer({
     storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit for general uploads (videos)
+});
+
+const uploadProfilePhoto = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB for profile photos
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed for profile photos'), false);
+        }
+    }
 });
 
 const uploadToCloudinary = (fileBuffer, options) => {
@@ -40,12 +53,35 @@ const uploadToCloudinary = (fileBuffer, options) => {
     });
 };
 
-router.post('/', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), upload.single('file'), asyncHandler(async (req, res) => {
+// POST /api/upload/profile-photo — Any authenticated user can upload a profile photo
+router.post('/profile-photo', authenticate, uploadProfilePhoto.single('file'), asyncHandler(async (req, res) => {
+    if (!req.file) throw createError('No file uploaded', 400);
+
+    const options = {
+        resource_type: 'image',
+        folder: 'lms_profile_photos',
+        transformation: [
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+            { quality: 'auto', fetch_format: 'auto' }
+        ]
+    };
+
+    const result = await uploadToCloudinary(req.file.buffer, options);
+
+    res.json({
+        url: result.secure_url,
+        public_id: result.public_id,
+        format: result.format,
+        resource_type: result.resource_type
+    });
+}));
+
+// POST /api/upload — Instructors / Admins can upload course media
+router.post('/', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), uploadGeneral.single('file'), asyncHandler(async (req, res) => {
     if (!req.file) throw createError('No file uploaded', 400);
 
     const isVideo = req.file.mimetype.startsWith('video/');
 
-    // Cloudinary resource_type: 'auto' is generally best
     const options = {
         resource_type: isVideo ? 'video' : 'auto',
         folder: 'lms_uploads'

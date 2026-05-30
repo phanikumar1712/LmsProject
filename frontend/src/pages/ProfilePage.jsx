@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { User, Lock, Camera, Save, Shield, Mail, Calendar, CreditCard, CheckCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { User, Lock, Camera, Save, Shield, Mail, Calendar, CreditCard, CheckCircle, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI } from '../services/api';
+import { authAPI, uploadAPI } from '../services/api';
 import toast from 'react-hot-toast';
-
-const AVATAR_SEEDS = ['Alex', 'Sarah', 'James', 'Emily', 'Michael', 'Priya', 'Luna', 'Felix', 'Zoe', 'Omar', 'Nina', 'Leo'];
 
 const PLAN_COLORS = {
     FREE: { text: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200' },
@@ -26,7 +24,8 @@ export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState('profile');
     const [saving, setSaving] = useState(false);
     const [changingPwd, setChangingPwd] = useState(false);
-    const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const fileInputRef = useRef(null);
 
     const [form, setForm] = useState({
         name: user?.name || '',
@@ -45,18 +44,29 @@ export default function ProfilePage() {
         setForm(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleFileChange = (e) => {
+    const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error('File size must be less than 5MB');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setForm(prev => ({ ...prev, avatar: reader.result }));
-            };
-            reader.readAsDataURL(file);
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('File size must be less than 5MB');
+            return;
+        }
+
+        setUploadingPhoto(true);
+        try {
+            const result = await uploadAPI.uploadProfilePhoto(file);
+            setForm(prev => ({ ...prev, avatar: result.url }));
+            toast.success('Photo uploaded!');
+        } catch (err) {
+            toast.error(err.message || 'Failed to upload photo');
+        } finally {
+            setUploadingPhoto(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -105,10 +115,8 @@ export default function ProfilePage() {
         }
     };
 
-    const selectAvatar = (seed) => {
-        const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-        setForm(prev => ({ ...prev, avatar: url }));
-        setShowAvatarPicker(false);
+    const handleRemovePhoto = () => {
+        setForm(prev => ({ ...prev, avatar: '' }));
     };
 
     const inputCls = 'w-full bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow';
@@ -131,44 +139,35 @@ export default function ProfilePage() {
 
             {/* Profile header card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                {/* Avatar */}
+                {/* Profile Photo */}
                 <div className="relative flex-shrink-0">
-                    <img
-                        src={form.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`}
-                        alt={user?.name}
-                        className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200 shadow-sm bg-slate-100"
-                    />
-                    <button
-                        onClick={() => setShowAvatarPicker(v => !v)}
-                        className="absolute -bottom-2 -right-2 w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-md transition-colors"
-                        title="Change avatar"
-                    >
-                        <Camera size={14} />
-                    </button>
-
-                    {/* Avatar picker dropdown */}
-                    {showAvatarPicker && (
-                        <div className="absolute left-0 top-28 z-20 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 w-72">
-                            <p className="text-slate-700 font-bold text-sm mb-3">Choose an avatar style</p>
-                            <div className="grid grid-cols-6 gap-2">
-                                {AVATAR_SEEDS.map(seed => (
-                                    <button
-                                        key={seed}
-                                        onClick={() => selectAvatar(seed)}
-                                        className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition-all hover:scale-110 ${form.avatar?.includes(`seed=${seed}`) ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-100 hover:border-indigo-300'}`}
-                                    >
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt={seed} className="w-full h-full object-cover bg-slate-50" />
-                                    </button>
-                                ))}
-                            </div>
-                            <button
-                                onClick={() => setShowAvatarPicker(false)}
-                                className="mt-3 w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
-                            >
-                                Cancel
-                            </button>
+                    {form.avatar ? (
+                        <img
+                            src={form.avatar}
+                            alt={user?.name}
+                            className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200 shadow-sm bg-slate-100"
+                        />
+                    ) : (
+                        <div className="w-24 h-24 rounded-2xl border-2 border-slate-200 shadow-sm bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                            <span className="text-white text-3xl font-extrabold">{user?.name?.charAt(0)?.toUpperCase()}</span>
                         </div>
                     )}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id="profile-photo-input"
+                    />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                        className="absolute -bottom-2 -right-2 w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-full flex items-center justify-center shadow-md transition-colors"
+                        title="Upload profile photo"
+                    >
+                        {uploadingPhoto ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                    </button>
                 </div>
 
                 <div className="flex-1 text-center sm:text-left">
@@ -224,14 +223,28 @@ export default function ProfilePage() {
                         </div>
 
                         <div>
-                            <label className="text-[12px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Upload Custom Avatar</label>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors shadow-sm cursor-pointer"
-                            />
-                            <p className="text-[11px] text-slate-400 font-medium mt-1.5">Upload a local image (max 5MB), or click the camera icon on your picture to use a preset avatar.</p>
+                            <label className="text-[12px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Profile Photo</label>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={uploadingPhoto}
+                                    className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 text-indigo-700 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors border border-indigo-200"
+                                >
+                                    {uploadingPhoto ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                                </button>
+                                {form.avatar && (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                                    >
+                                        Remove Photo
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 font-medium mt-1.5">Upload a profile photo (max 5MB). Supported: JPG, PNG, WebP.</p>
                         </div>
 
                         <div>
@@ -277,8 +290,7 @@ export default function ProfilePage() {
 
             {activeTab === 'security' && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-                    <h3 className="text-lg font-extrabold text-slate-900 mb-2">Change Password</h3>
-                    <p className="text-slate-500 text-sm font-medium mb-6">For demo accounts the default password is <span className="font-bold text-slate-700">demo123</span></p>
+                    <h3 className="text-lg font-extrabold text-slate-900 mb-6">Change Password</h3>
                     <form onSubmit={handlePasswordChange} className="space-y-5">
                         <div>
                             <label className="text-[12px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Current Password *</label>

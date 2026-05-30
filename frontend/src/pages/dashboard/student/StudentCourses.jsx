@@ -17,7 +17,10 @@ export default function StudentCourses() {
     );
 
     const enrolledCourses = (enrollments ?? []).map(e =>
-        e.course ? { ...e.course, progress: e.progress, isEnrolled: true } : null
+        e.course ? {
+            course: { ...e.course },
+            enrollment: e  // pass full enrollment so CourseCard shows price & progress correctly
+        } : null
     ).filter(Boolean);
 
     if (loading) return <LoadingContainer height="h-64" />;
@@ -41,8 +44,8 @@ export default function StudentCourses() {
             <PageHeader title="My Learning" subtitle="Jump back in and continue your progress" />
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {enrolledCourses.map(course => (
-                    <CourseCard key={course.id} course={course} progress={course.progress} />
+                {enrolledCourses.map(({ course, enrollment }) => (
+                    <CourseCard key={course.id} course={course} enrollment={enrollment} />
                 ))}
             </div>
         </div>

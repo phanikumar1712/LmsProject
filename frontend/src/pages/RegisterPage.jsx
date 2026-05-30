@@ -3,10 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { GraduationCap, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const ROLES = [
-    { value: 'STUDENT', label: 'Student', desc: 'Learn and grow', icon: '🎓', color: '#4f46e5' },
-    { value: 'INSTRUCTOR', label: 'Instructor', desc: 'Teach & earn', icon: '👨‍🏫', color: '#0891b2' },
-];
 
 export default function RegisterPage() {
     const { register } = useAuth();
@@ -68,7 +64,7 @@ export default function RegisterPage() {
                         </span>
                     </Link>
                     <h1 className="text-2xl font-bold text-slate-900 mb-1">Create your account</h1>
-                    <p className="text-slate-500 text-sm">Join 15,000+ learners today — it's free</p>
+                    <p className="text-slate-500 text-sm">Join EduNexus and start learning today</p>
                 </div>
 
                 <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
@@ -78,25 +74,6 @@ export default function RegisterPage() {
                             <p className="text-sm font-medium">{error}</p>
                         </div>
                     )}
-
-                    {/* Role selection */}
-                    <div className="mb-6">
-                        <label className="text-sm text-slate-700 font-medium block mb-2">I want to join as a...</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {ROLES.map(role => (
-                                <button
-                                    key={role.value}
-                                    type="button"
-                                    onClick={() => setForm(f => ({ ...f, role: role.value }))}
-                                    className={`p-4 rounded-xl border border-slate-200 text-left transition-all ${form.role === role.value ? 'ring-2 ring-indigo-600 bg-indigo-50 border-transparent' : 'hover:border-slate-300 hover:bg-slate-50'}`}
-                                >
-                                    <span className="text-2xl block mb-2">{role.icon}</span>
-                                    <p className="text-slate-900 text-sm font-bold block">{role.label}</p>
-                                    <p className="text-slate-500 text-xs mt-0.5">{role.desc}</p>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>

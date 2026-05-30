@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Search, Users, Eye, TrendingUp, BarChart2 } from 'lucide-react';
+import { DollarSign, Search, Users, Eye, TrendingUp, BarChart2, Star } from 'lucide-react';
 import { statsAPI, coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
@@ -55,7 +55,7 @@ export default function InstructorAnalytics() {
                 <p className="text-slate-500 font-medium">Deep dive into your revenue and course performance</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full blur-3xl -mr-10 -mt-10 transition-transform group-hover:scale-110" />
                     <div className="relative">
@@ -96,6 +96,19 @@ export default function InstructorAnalytics() {
                         </div>
                         <p className="text-slate-500 font-bold text-[13px] uppercase tracking-wider mb-1">Total Students Reach</p>
                         <p className="text-4xl font-black text-slate-900">{stats?.totalEnrollments?.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+                    <div className="relative">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center border border-amber-200">
+                                <Star size={24} className="text-amber-500" fill="currentColor" />
+                            </div>
+                        </div>
+                        <p className="text-slate-500 font-bold text-[13px] uppercase tracking-wider mb-1">Average Course Rating</p>
+                        <p className="text-4xl font-black text-slate-900">{stats?.avgRating?.toFixed(1) || '0.0'}</p>
                     </div>
                 </div>
             </div>

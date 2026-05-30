@@ -26,11 +26,10 @@ const register = async (req, res) => {
     if (existing.rows.length) throw createError('Email already registered', 409);
 
     const hashed = await bcrypt.hash(password, 12);
-    const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
 
     const result = await query(
-        `INSERT INTO users (name, email, password, role, avatar) VALUES ($1,$2,$3,$4,$5) RETURNING ${userFields}`,
-        [name, email.toLowerCase(), hashed, userRole, avatar]
+        `INSERT INTO users (name, email, password, role) VALUES ($1,$2,$3,$4) RETURNING ${userFields}`,
+        [name, email.toLowerCase(), hashed, userRole]
     );
     const user = result.rows[0];
     user.wishlist = await getWishlistIds(user.id);
@@ -122,6 +121,43 @@ const changePassword = async (req, res) => {
     res.json({ success: true, message: 'Password updated successfully' });
 };
 
+// POST /api/auth/reset-password/request
+const requestPasswordReset = async (req, res) => {
+    const { email } = req.body;
+    if (!email) throw createError('Email is required', 400);
+
+    // In a real app, we'd verify email exists, generate a random OTP, save to DB/Redis, and email it.
+    // For this demo platform, we just simulate success so the frontend moves to the OTP step.
+    res.json({ success: true, message: 'If registered, an OTP has been sent. (Demo: use 123456)' });
+};
+
+// POST /api/auth/reset-password
+const resetPasswordByEmail = async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) throw createError('Email, OTP, and new password are required', 400);
+    if (newPassword.length < 8) throw createError('Password must be at least 8 characters', 400);
+
+    // Demo hardcoded OTP verification
+    if (otp !== '123456') {
+        throw createError('Invalid OTP', 400);
+    }
+
+    const result = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (!result.rows.length) {
+        return res.json({ success: true, message: 'Password has been reset successfully.' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hashed, result.rows[0].id]);
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
+        [result.rows[0].id, 'PASSWORD_RESET', 'users', result.rows[0].id]
+    ).catch(() => { });
+
+    res.json({ success: true, message: 'Password has been reset successfully.' });
+};
+
 // POST /api/auth/demo
 const demoLogin = async (req, res) => {
     const { role = 'STUDENT' } = req.body;
@@ -144,4 +180,4 @@ const demoLogin = async (req, res) => {
     res.json({ user: safeUser, token });
 };
 
-module.exports = { register, login, getMe, updateProfile, changePassword, demoLogin };
+module.exports = { register, login, getMe, updateProfile, changePassword, requestPasswordReset, resetPasswordByEmail, demoLogin };
