@@ -4,14 +4,14 @@ import {
     AlertTriangle, X, Clock, Shield, ChevronLeft, ChevronRight,
     CheckCircle, XCircle, Maximize2, Eye, EyeOff
 } from 'lucide-react';
-import { quizzesAPI } from '../services/api';
+import { quizzesAPI, enrollmentsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const MAX_VIOLATIONS = 3;
 
 export default function QuizPage() {
-    const { quizId } = useParams();
+    const { courseId, quizId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
 
@@ -39,12 +39,14 @@ export default function QuizPage() {
         quizzesAPI.getById(quizId).then(q => {
             setQuiz(q);
             // Randomize questions
-            const shuffled = [...q.questions].sort(() => Math.random() - 0.5);
+            const shuffled = [...(q.questions || [])].sort(() => Math.random() - 0.5);
             setQuestions(shuffled);
-            setTimeLeft(q.timeLimit * 60);
-        }).catch(() => navigate(-1))
-            .finally(() => setLoading(false));
-    }, [quizId]);
+            setTimeLeft((q.timeLimit || 10) * 60);
+        }).catch((err) => {
+            toast.error(err.message || 'Failed to load quiz. Redirecting back...');
+            navigate(`/courses/${courseId}/learn`);
+        }).finally(() => setLoading(false));
+    }, [quizId, courseId, navigate]);
 
     const submitQuiz = useCallback(async (finalAnswers, finalViolations, auto = false) => {
         if (submittingRef.current) return;
@@ -73,6 +75,13 @@ export default function QuizPage() {
             if (auto) toast.error('Quiz auto-submitted due to violations!');
             // Exit fullscreen
             if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+
+            // Mark the quiz lesson as complete in enrollment progress
+            if (quiz.lessonId && courseId && user?.id) {
+                try {
+                    await enrollmentsAPI.markLessonComplete(user.id, courseId, quiz.lessonId);
+                } catch { /* non-blocking */ }
+            }
         } catch (err) {
             toast.error('Failed to submit: ' + err.message);
         }

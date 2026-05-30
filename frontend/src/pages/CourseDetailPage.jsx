@@ -27,6 +27,7 @@ export default function CourseDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
     const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
     const [submittingRating, setSubmittingRating] = useState(false);
+    const [editingRating, setEditingRating] = useState(false);
     const [wishlisted, setWishlisted] = useState(false);
 
     useEffect(() => {
@@ -47,13 +48,22 @@ export default function CourseDetailPage() {
                 const e = enrolls.find(e => e.courseId === id);
                 if (e) setEnrollment(e);
             });
+            // Load existing rating for this student
+            ratingsAPI.getMyRating(id)
+                .then(existing => {
+                    if (existing) {
+                        setMyRating({ stars: existing.stars, comment: existing.comment || '' });
+                    }
+                })
+                .catch(() => { });
         }
     }, [id, user]);
 
     const requiredPlan = course?.requiredPlan || 'FREE';
     const canAccess = user && (PLAN_ORDER[user.subscriptionPlan || 'FREE'] >= PLAN_ORDER[requiredPlan]);
     const isEnrolled = !!enrollment;
-    const hasRated = ratings.some(r => r.studentId === user?.id);
+    const existingRating = ratings.find(r => r.studentId === user?.id);
+    const hasRated = !!existingRating;
 
     const handleEnroll = async () => {
         if (!user) { navigate('/login'); return; }
@@ -77,13 +87,17 @@ export default function CourseDetailPage() {
     };
 
     const handleSubmitRating = async () => {
-        if (!myRating.stars) { toast.error('Please select a rating'); return; }
+        if (!myRating.stars) { toast.error('Please select a star rating'); return; }
         setSubmittingRating(true);
         try {
             const r = await ratingsAPI.create(id, user.id, myRating.stars, myRating.comment);
-            setRatings(prev => [r, ...prev]);
-            setMyRating({ stars: 0, comment: '' });
-            toast.success('Review submitted! ⭐');
+            // Update ratings list: replace if existing, prepend if new
+            setRatings(prev => {
+                const filtered = prev.filter(x => x.studentId !== user.id);
+                return [r, ...filtered];
+            });
+            setEditingRating(false);
+            toast.success(hasRated ? 'Review updated! ⭐' : 'Review submitted! ⭐');
         } catch (err) {
             toast.error(err.message);
         } finally { setSubmittingRating(false); }
@@ -292,12 +306,15 @@ export default function CourseDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Write review */}
-                            {isEnrolled && !hasRated && (
+                            {/* Write / Edit review */}
+                            {isEnrolled && (!hasRated || editingRating) && (
                                 <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 mb-8">
-                                    <h4 className="text-slate-900 font-bold text-lg mb-4">Leave a Review</h4>
+                                    <h4 className="text-slate-900 font-bold text-lg mb-4">
+                                        {hasRated ? 'Edit Your Review' : 'Leave a Review'}
+                                    </h4>
                                     <div className="mb-4">
-                                        <RatingStars rating={myRating.stars} size={28} interactive onRate={s => setMyRating(r => ({ ...r, stars: s }))} />
+                                        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Your Rating</p>
+                                        <RatingStars rating={myRating.stars} size={32} interactive onRate={s => setMyRating(r => ({ ...r, stars: s }))} />
                                     </div>
                                     <textarea
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-[15px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all resize-none h-28 mb-4 shadow-sm"
@@ -305,9 +322,36 @@ export default function CourseDetailPage() {
                                         value={myRating.comment}
                                         onChange={e => setMyRating(r => ({ ...r, comment: e.target.value }))}
                                     />
-                                    <button onClick={handleSubmitRating} disabled={submittingRating}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg text-[15px] shadow-sm disabled:opacity-60 transition-colors">
-                                        {submittingRating ? 'Submitting...' : 'Submit Review'}
+                                    <div className="flex gap-3">
+                                        <button onClick={handleSubmitRating} disabled={submittingRating}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg text-[15px] shadow-sm disabled:opacity-60 transition-colors">
+                                            {submittingRating ? 'Saving...' : hasRated ? 'Update Review' : 'Submit Review'}
+                                        </button>
+                                        {hasRated && (
+                                            <button onClick={() => setEditingRating(false)}
+                                                className="px-6 py-2.5 rounded-lg text-slate-600 text-[15px] font-semibold border border-slate-200 hover:bg-slate-50 transition-colors">
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Prompt to edit existing review */}
+                            {isEnrolled && hasRated && !editingRating && (
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 mb-8 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-indigo-800 font-bold text-sm">You've reviewed this course</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <RatingStars rating={existingRating?.stars || myRating.stars} size={14} />
+                                            <span className="text-indigo-600 text-xs font-semibold">{existingRating?.stars || myRating.stars}/5</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setEditingRating(true)}
+                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-bold border border-indigo-200 bg-white hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors"
+                                    >
+                                        Edit Review
                                     </button>
                                 </div>
                             )}

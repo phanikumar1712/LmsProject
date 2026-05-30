@@ -187,7 +187,7 @@ export default function AdminReports() {
                         {[
                             { label: 'Avg Enrollment Fee', value: stats?.totalEnrollments > 0 ? `₹${Math.round(stats.totalRevenue / stats.totalEnrollments)}` : '₹0', sub: 'Per student', color: 'text-indigo-600' },
                             { label: 'Student Growth', value: stats?.totalUsers > 0 ? '+14.2%' : '0%', sub: 'Last 30 days', color: 'text-emerald-600' },
-                            { label: 'Course Completion', value: stats?.totalEnrollments > 0 ? '68%' : '0%', sub: 'Average rate', color: 'text-blue-600' },
+                            { label: 'Platform Rating', value: stats?.avgRating?.toFixed(1) || '0.0', sub: 'Out of 5.0', color: 'text-amber-500' },
                             { label: 'Retention Rate', value: stats?.totalUsers > 0 ? '82%' : '0%', sub: 'Active monthly students', color: 'text-orange-600' }
                         ].map(item => (
                             <div key={item.label} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-200 transition-colors">

@@ -102,9 +102,8 @@ export default function ModerateReviews() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline cursor-pointer">
-                                            <span>#ID-{r.courseId}</span>
-                                            <ExternalLink size={12} />
+                                        <div className="text-sm font-semibold text-slate-800 max-w-xs truncate" title={r.courseTitle}>
+                                            {r.courseTitle || `#${String(r.courseId).slice(0, 8)}…`}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

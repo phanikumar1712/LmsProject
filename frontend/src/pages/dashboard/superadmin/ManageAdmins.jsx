@@ -96,8 +96,14 @@ export default function ManageAdmins() {
                         <div className="divide-y divide-slate-100 min-w-[700px]">
                             {filtered.map(user => (
                                 <div key={user.id} className="flex items-center gap-4 px-6 py-5 hover:bg-slate-50 transition-colors">
-                                    <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`}
-                                        alt={user.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                                    {user.avatar ? (
+                                        <img src={user.avatar}
+                                            alt={user.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                                    ) : (
+                                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 border border-slate-200">
+                                            <span className="text-white text-sm font-bold">{user.name?.charAt(0)?.toUpperCase()}</span>
+                                        </div>
+                                    )}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-slate-900 font-bold text-sm">{user.name}</p>
                                         <p className="text-slate-500 text-xs font-medium">{user.email}</p>

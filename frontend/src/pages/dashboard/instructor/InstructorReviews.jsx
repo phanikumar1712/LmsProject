@@ -56,7 +56,13 @@ export default function InstructorReviews() {
                         <div key={review.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <div className="flex items-start justify-between gap-4 mb-4">
                                 <div className="flex items-center gap-3">
-                                    <img src={review.studentAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${review.studentName}`} alt="" className="w-10 h-10 rounded-full bg-slate-100" />
+                                    {review.studentAvatar ? (
+                                        <img src={review.studentAvatar} alt="" className="w-10 h-10 rounded-full bg-slate-100 object-cover" />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white text-sm font-bold">{review.studentName?.charAt(0)?.toUpperCase()}</span>
+                                        </div>
+                                    )}
                                     <div>
                                         <p className="font-bold text-slate-900 text-sm">{review.studentName}</p>
                                         <p className="text-xs text-slate-500">{review.courseTitle || 'Course'}</p>

@@ -6,7 +6,7 @@ const { mapEnrollment } = require('../utils/formatters');
 const getByStudent = async (req, res) => {
     const studentId = req.params.studentId || req.user.id;
     // Only allow students to see their own, admins can see any
-    if (req.user.role === 'STUDENT' && studentId !== req.user.id) {
+    if (req.user.role === 'STUDENT' && String(studentId) !== String(req.user.id)) {
         throw createError('Forbidden', 403);
     }
     const result = await query(`

@@ -683,7 +683,9 @@ export default function HomePage() {
                                     <div className="hp-hero__stat-label">Courses Available</div>
                                 </div>
                                 <div className="hp-hero__stat-item">
-                                    <div className="hp-hero__stat-num">4.9★</div>
+                                    <div className="hp-hero__stat-num">
+                                        {stats?.avgRating ? `${stats.avgRating}★` : '4.9★'}
+                                    </div>
                                     <div className="hp-hero__stat-label">Avg. Rating</div>
                                 </div>
                             </div>
@@ -748,7 +750,7 @@ export default function HomePage() {
                             { icon: <Users size={20} />, num: stats?.totalStudents ? `${stats.totalStudents.toLocaleString()}+` : '10,000+', label: 'Happy Learners' },
                             { icon: <BookOpen size={20} />, num: stats?.totalCourses ? `${stats.totalCourses}+` : '50+', label: 'Courses Published' },
                             { icon: <GraduationCap size={20} />, num: stats?.totalInstructors ? `${stats.totalInstructors}+` : '20+', label: 'Expert Instructors' },
-                            { icon: <Award size={20} />, num: '98%', label: 'Satisfaction Rate' },
+                            { icon: <Award size={20} />, num: stats?.satisfactionRate ? `${stats.satisfactionRate}%` : '98%', label: 'Satisfaction Rate' },
                         ].map((s, i) => (
                             <motion.div
                                 key={i}
