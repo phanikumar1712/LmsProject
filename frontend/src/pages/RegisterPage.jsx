@@ -52,22 +52,22 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50">
+        <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background transition-colors duration-300">
             <div className="w-full max-w-lg relative z-10">
                 <div className="text-center mb-8">
-                    <Link to="/" className="inline-flex items-center gap-2 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+                    <Link to="/" className="inline-flex items-center gap-2 mb-4 group">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                             <GraduationCap size={22} className="text-white" />
                         </div>
-                        <span className="text-2xl font-bold text-slate-900 tracking-tight">
+                        <span className="text-2xl font-bold text-foreground tracking-tight">
                             EduNexus
                         </span>
                     </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 mb-1">Create your account</h1>
-                    <p className="text-slate-500 text-sm">Join EduNexus and start learning today</p>
+                    <h1 className="text-2xl font-bold text-foreground mb-1">Create your account</h1>
+                    <p className="text-muted-foreground text-sm">Join EduNexus and start learning today</p>
                 </div>
 
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
+                <div className="bg-card border border-border shadow-2xl rounded-2xl p-8">
                     {error && (
                         <div className="flex items-center gap-2 bg-red-50 text-red-600 border border-red-100 rounded-lg px-4 py-3 mb-5">
                             <AlertCircle size={15} className="flex-shrink-0" />
@@ -77,32 +77,32 @@ export default function RegisterPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="text-sm text-slate-700 font-medium block mb-1.5">Full Name</label>
+                            <label className="text-sm text-foreground font-medium block mb-1.5">Full Name</label>
                             <div className="relative">
-                                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input id="reg-name" type="text" placeholder="John Doe"
                                     value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400" autoComplete="name" />
+                                    className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground" autoComplete="name" />
                             </div>
                         </div>
                         <div>
-                            <label className="text-sm text-slate-700 font-medium block mb-1.5">Email Address</label>
+                            <label className="text-sm text-foreground font-medium block mb-1.5">Email Address</label>
                             <div className="relative">
-                                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input id="reg-email" type="email" placeholder="you@example.com"
                                     value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400" autoComplete="email" />
+                                    className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground" autoComplete="email" />
                             </div>
                         </div>
                         <div>
-                            <label className="text-sm text-slate-700 font-medium block mb-1.5">Password</label>
+                            <label className="text-sm text-foreground font-medium block mb-1.5">Password</label>
                             <div className="relative">
-                                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input id="reg-password" type={showPass ? 'text' : 'password'} placeholder="Min. 6 characters"
+                                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input id="reg-password" type={showPass ? 'text' : 'password'} placeholder="Min. 8 characters"
                                     value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400" autoComplete="new-password" />
+                                    className="w-full bg-background border border-border rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground" autoComplete="new-password" />
                                 <button type="button" onClick={() => setShowPass(s => !s)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 outline-none">
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground outline-none">
                                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                                 </button>
                             </div>
@@ -118,12 +118,12 @@ export default function RegisterPage() {
                             )}
                         </div>
                         <div>
-                            <label className="text-sm text-slate-700 font-medium block mb-1.5">Confirm Password</label>
+                            <label className="text-sm text-foreground font-medium block mb-1.5">Confirm Password</label>
                             <div className="relative">
-                                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input id="reg-confirm" type="password" placeholder="Re-enter password"
                                     value={form.confirm} onChange={e => setForm(f => ({ ...f, confirm: e.target.value }))}
-                                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400" autoComplete="new-password" />
+                                    className="w-full bg-background border border-border rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground" autoComplete="new-password" />
                                 {form.confirm && (
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                         {form.password === form.confirm
@@ -141,9 +141,9 @@ export default function RegisterPage() {
                         </button>
                     </form>
 
-                    <p className="text-center text-slate-600 text-sm mt-6">
+                    <p className="text-center text-muted-foreground text-sm mt-6">
                         Already have an account?{' '}
-                        <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">Sign in</Link>
+                        <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-bold">Sign in</Link>
                     </p>
                 </div>
             </div>

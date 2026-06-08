@@ -3,11 +3,24 @@ const { mapNotification } = require('../utils/formatters');
 
 // GET /api/notifications
 const getByUser = async (req, res) => {
+    const { limit = 20, offset = 0 } = req.query;
+    const { getPagination } = require('../utils/pagination');
+
+    const countRes = await query('SELECT COUNT(*)::int as total FROM notifications WHERE user_id = $1', [req.user.id]);
+    const total = countRes.rows[0].total;
+
     const result = await query(
-        'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
-        [req.user.id]
+        'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        [req.user.id, parseInt(limit), parseInt(offset)]
     );
-    res.json(result.rows.map(mapNotification));
+
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+
+    res.json({
+        success: true,
+        data: result.rows.map(mapNotification),
+        pagination: getPagination(total, pageNum, limit)
+    });
 };
 
 // PUT /api/notifications/:id/read

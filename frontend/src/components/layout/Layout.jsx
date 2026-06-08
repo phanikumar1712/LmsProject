@@ -12,7 +12,7 @@ export function DashboardLayout() {
     if (!isAuthenticated) return null;
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-background transition-colors duration-300">
             <Navbar onMobileMenuClick={() => setMobileOpen(true)} />
 
             {mobileOpen && (

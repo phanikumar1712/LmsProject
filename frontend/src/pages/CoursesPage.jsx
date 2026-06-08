@@ -67,12 +67,12 @@ export default function CoursesPage() {
         <div className="max-w-7xl mx-auto px-4 py-12 w-full">
             {/* Header */}
             <div className="mb-10 text-center sm:text-left">
-                <h1 className="text-4xl font-extrabold text-slate-900 mb-3 tracking-tight">All Courses</h1>
-                <p className="text-slate-500 font-medium text-lg max-w-2xl">Discover expert-led courses across all domains to advance your career.</p>
+                <h1 className="text-4xl font-extrabold text-foreground mb-3 tracking-tight">All Courses</h1>
+                <p className="text-muted-foreground font-medium text-lg max-w-2xl">Discover expert-led courses across all domains to advance your career.</p>
             </div>
 
             {/* Search & Filters Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-card p-2 rounded-2xl border border-border shadow-sm">
                 <div className="relative flex-1">
                     <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -80,7 +80,7 @@ export default function CoursesPage() {
                         placeholder="Search courses, instructors..."
                         value={filters.search}
                         onChange={e => updateFilter('search', e.target.value)}
-                        className="w-full bg-slate-50 border-none outline-none text-slate-900 placeholder:text-slate-400 rounded-xl py-3.5 pl-11 pr-10 focus:ring-2 focus:ring-indigo-100 transition-shadow"
+                        className="w-full bg-muted border-none outline-none text-foreground placeholder:text-muted-foreground rounded-xl py-3.5 pl-11 pr-10 focus:ring-2 focus:ring-indigo-100 transition-shadow"
                         id="course-search"
                     />
                     {filters.search && (
@@ -94,16 +94,16 @@ export default function CoursesPage() {
                         <select
                             value={filters.sort}
                             onChange={e => updateFilter('sort', e.target.value)}
-                            className="h-full bg-slate-50 border-none outline-none text-slate-700 font-medium appearance-none pl-4 pr-10 rounded-xl cursor-pointer min-w-40 focus:ring-2 focus:ring-indigo-100 transition-shadow"
+                            className="h-full bg-muted border-none outline-none text-foreground font-medium appearance-none pl-4 pr-10 rounded-xl cursor-pointer min-w-40 focus:ring-2 focus:ring-indigo-100 transition-shadow"
                             id="course-sort"
                         >
                             {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
-                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     </div>
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`px-5 rounded-xl flex items-center justify-center gap-2 text-[15px] font-bold transition-colors ${showFilters ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                        className={`px-5 rounded-xl flex items-center justify-center gap-2 text-[15px] font-bold transition-colors ${showFilters ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
                     >
                         <SlidersHorizontal size={18} /> Filters {hasActiveFilters && <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />}
                     </button>
@@ -112,7 +112,7 @@ export default function CoursesPage() {
 
             {/* Filter panel */}
             {showFilters && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 mb-8 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-8 shadow-sm text-card-foreground">
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Categories */}
                         <div className="flex-1 min-w-48">
@@ -157,8 +157,8 @@ export default function CoursesPage() {
 
             {/* Results count */}
             <div className="flex items-center justify-between mb-6">
-                <p className="text-slate-500 font-medium text-[15px]">
-                    {loading ? 'Finding courses...' : <><span className="text-slate-900 font-bold">{courses.length}</span> course{courses.length !== 1 ? 's' : ''} available</>}
+                <p className="text-muted-foreground font-medium text-[15px]">
+                    {loading ? 'Finding courses...' : <><span className="text-foreground font-bold">{courses.length}</span> course{courses.length !== 1 ? 's' : ''} available</>}
                 </p>
             </div>
 
@@ -168,10 +168,10 @@ export default function CoursesPage() {
                     {Array(8).fill(0).map((_, i) => <SkeletonCard key={i} />)}
                 </div>
             ) : courses.length === 0 ? (
-                <div className="text-center py-24 bg-white border border-slate-200 border-dashed rounded-3xl mx-auto max-w-2xl">
-                    <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner shadow-slate-100">🔍</div>
-                    <h3 className="text-slate-900 font-bold text-xl mb-3">No courses found</h3>
-                    <p className="text-slate-500 font-medium mb-8">We couldn't find any courses matching your current active filters.</p>
+                <div className="text-center py-24 bg-card border border-border border-dashed rounded-3xl mx-auto max-w-2xl">
+                    <div className="w-20 h-20 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner shadow-slate-100">🔍</div>
+                    <h3 className="text-foreground font-bold text-xl mb-3">No courses found</h3>
+                    <p className="text-muted-foreground font-medium mb-8">We couldn't find any courses matching your current active filters.</p>
                     <button onClick={clearFilters} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl text-[15px] font-bold shadow-sm transition-colors">Clear Filters</button>
                 </div>
             ) : (

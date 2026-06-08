@@ -5,10 +5,17 @@ const { mapEnrollment } = require('../utils/formatters');
 // GET /api/enrollments/student/:studentId
 const getByStudent = async (req, res) => {
     const studentId = req.params.studentId || req.user.id;
+    const { limit = 20, offset = 0 } = req.query;
+    const { getPagination } = require('../utils/pagination');
+
     // Only allow students to see their own, admins can see any
     if (req.user.role === 'STUDENT' && String(studentId) !== String(req.user.id)) {
         throw createError('Forbidden', 403);
     }
+
+    const countRes = await query('SELECT COUNT(*)::int as total FROM enrollments WHERE student_id = $1', [studentId]);
+    const total = countRes.rows[0].total;
+
     const result = await query(`
         SELECT e.*,
                c.id as "courseId", c.title, c.thumbnail, c.level, c.duration,
@@ -18,8 +25,16 @@ const getByStudent = async (req, res) => {
         JOIN users u ON c.instructor_id = u.id
         WHERE e.student_id = $1
         ORDER BY e.last_accessed DESC
-    `, [studentId]);
-    res.json(result.rows.map(mapEnrollment));
+        LIMIT $2 OFFSET $3
+    `, [studentId, parseInt(limit), parseInt(offset)]);
+
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+
+    res.json({
+        success: true,
+        data: result.rows.map(mapEnrollment),
+        pagination: getPagination(total, pageNum, limit)
+    });
 };
 
 // POST /api/enrollments
@@ -94,6 +109,17 @@ const updateProgress = async (req, res) => {
 
 // GET /api/enrollments/stats/:instructorId
 const getStats = async (req, res) => {
+    const { limit = 20, offset = 0 } = req.query;
+    const { getPagination } = require('../utils/pagination');
+
+    const countRes = await query(`
+        SELECT COUNT(*)::int as total
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.id
+        WHERE c.instructor_id = $1
+    `, [req.params.instructorId]);
+    const total = countRes.rows[0].total;
+
     const result = await query(`
         SELECT e.*,
                c.title as course_title,
@@ -104,15 +130,23 @@ const getStats = async (req, res) => {
         JOIN users u ON e.student_id = u.id
         WHERE c.instructor_id = $1
         ORDER BY e.last_accessed DESC
-    `, [req.params.instructorId]);
-    res.json(result.rows.map(row => ({
-        ...mapEnrollment(row),
-        studentId: row.studentId,
-        studentName: row.studentName,
-        studentEmail: row.studentEmail,
-        studentAvatar: row.studentAvatar,
-        courseTitle: row.course_title,
-    })));
+        LIMIT $2 OFFSET $3
+    `, [req.params.instructorId, parseInt(limit), parseInt(offset)]);
+
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+
+    res.json({
+        success: true,
+        data: result.rows.map(row => ({
+            ...mapEnrollment(row),
+            studentId: row.studentId,
+            studentName: row.studentName,
+            studentEmail: row.studentEmail,
+            studentAvatar: row.studentAvatar,
+            courseTitle: row.course_title,
+        })),
+        pagination: getPagination(total, pageNum, limit)
+    });
 };
 
 module.exports = { getByStudent, enroll, updateProgress, getStats };

@@ -113,7 +113,7 @@ export function Navbar({ onMobileMenuClick }) {
     };
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 shadow-sm h-16 flex items-center transition-all">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border shadow-sm h-16 flex items-center transition-all">
             <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                     {/* Left: Logo & Explore */}
@@ -122,13 +122,13 @@ export function Navbar({ onMobileMenuClick }) {
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                                 <GraduationCap size={18} className="text-white" />
                             </div>
-                            <span className="font-extrabold text-slate-900 text-xl tracking-tight font-['Satoshi']">
+                            <span className="font-extrabold text-foreground text-xl tracking-tight font-['Satoshi']">
                                 EduNexus
                             </span>
                         </Link>
                         <Link
                             to="/courses"
-                            className="hidden md:flex items-center gap-1 text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors"
+                            className="hidden md:flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-indigo-600 transition-colors"
                         >
                             Explore <ChevronDown size={14} className="opacity-50" />
                         </Link>
@@ -143,7 +143,7 @@ export function Navbar({ onMobileMenuClick }) {
                                 placeholder="Search courses, skills, or mentors..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-slate-100/50 backdrop-blur-md border border-slate-200/60 rounded-full pl-10 pr-4 py-2 text-sm font-medium outline-none hover:bg-slate-100/80 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner"
+                                className="w-full bg-muted/50 backdrop-blur-md border border-border/60 rounded-full pl-10 pr-4 py-2 text-sm font-medium outline-none hover:bg-muted focus:bg-background focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner text-foreground"
                             />
                         </form>
                     </div>
@@ -155,13 +155,13 @@ export function Navbar({ onMobileMenuClick }) {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={toggleDark}
-                                    className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors hidden lg:block"
+                                    className="p-2 text-muted-foreground hover:text-foreground transition-colors hidden lg:block"
                                     title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                                 >
                                     {isDark ? <Sun size={18} /> : <Moon size={18} />}
                                 </button>
-                                <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors px-2">Log in</Link>
-                                <Link to="/register" className="bg-slate-900 text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-slate-800 transition-all hover:shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] active:scale-95">Sign up</Link>
+                                <Link to="/login" className="text-sm font-bold text-muted-foreground hover:text-indigo-600 transition-colors px-2">Log in</Link>
+                                <Link to="/register" className="bg-foreground text-background text-sm font-bold px-5 py-2.5 rounded-full hover:bg-slate-800 transition-all hover:shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] active:scale-95">Sign up</Link>
                             </div>
                         ) : (
                             <div className="flex items-center gap-5">
@@ -175,7 +175,7 @@ export function Navbar({ onMobileMenuClick }) {
 
                                 <button
                                     onClick={toggleDark}
-                                    className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors hidden lg:block"
+                                    className="p-1.5 text-muted-foreground hover:text-foreground transition-colors hidden lg:block"
                                     title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                                 >
                                     {isDark ? <Sun size={18} /> : <Moon size={18} />}
@@ -194,9 +194,9 @@ export function Navbar({ onMobileMenuClick }) {
                                     </button>
 
                                     {notifOpen && (
-                                        <div className="absolute right-0 top-10 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden transform origin-top-right transition-all">
-                                            <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-white/50">
-                                                <h3 className="text-sm font-extrabold text-slate-900">Notifications</h3>
+                                        <div className="absolute right-0 top-10 w-80 bg-popover border border-border rounded-2xl shadow-2xl py-2 z-50 overflow-hidden transform origin-top-right transition-all">
+                                            <div className="px-4 py-3 border-b border-border flex justify-between items-center bg-popover/50">
+                                                <h3 className="text-sm font-extrabold text-popover-foreground">Notifications</h3>
                                                 {unreadCount > 0 && (
                                                     <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{unreadCount} new</span>
                                                 )}
@@ -211,8 +211,8 @@ export function Navbar({ onMobileMenuClick }) {
                                                     notifications.map(notif => (
                                                         <div key={notif.id} className={`px-4 py-3 cursor-pointer relative transition-colors ${notif.read ? 'bg-transparent hover:bg-slate-50/80' : 'bg-indigo-50/30 hover:bg-indigo-50/80'}`}>
                                                             {!notif.read && <div className="absolute left-2.5 top-4 w-1.5 h-1.5 rounded-full bg-indigo-600" />}
-                                                            <p className={`text-sm ${notif.read ? 'font-medium text-slate-600' : 'font-bold text-slate-900 pl-3'} mb-0.5 leading-snug`}>{notif.message}</p>
-                                                            <p className={`text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-1 ${!notif.read && 'pl-3'}`}>{formatDate(notif.createdAt || notif.timestamp)}</p>
+                                                            <p className={`text-sm ${notif.read ? 'font-medium text-muted-foreground' : 'font-bold text-foreground pl-3'} mb-0.5 leading-snug`}>{notif.message}</p>
+                                                            <p className={`text-[10px] uppercase tracking-wider font-bold text-muted-foreground mt-1 ${!notif.read && 'pl-3'}`}>{formatDate(notif.createdAt || notif.timestamp)}</p>
                                                         </div>
                                                     ))
                                                 )}
@@ -240,10 +240,10 @@ export function Navbar({ onMobileMenuClick }) {
                                     </button>
 
                                     {profileOpen && (
-                                        <div className="absolute right-0 top-12 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 transform origin-top-right transition-all">
-                                            <div className="px-5 py-4 border-b border-slate-100 bg-white/50 flex flex-col gap-1">
-                                                <p className="text-slate-900 text-sm font-extrabold truncate">{user?.name}</p>
-                                                <p className="text-slate-500 text-xs font-medium truncate">{user?.email}</p>
+                                        <div className="absolute right-0 top-12 w-64 bg-popover border border-border rounded-2xl shadow-xl py-2 z-50 transform origin-top-right transition-all">
+                                            <div className="px-5 py-4 border-b border-border bg-popover/50 flex flex-col gap-1">
+                                                <p className="text-popover-foreground text-sm font-extrabold truncate">{user?.name}</p>
+                                                <p className="text-muted-foreground text-xs font-medium truncate">{user?.email}</p>
                                                 <div className="mt-2 inline-flex items-center w-fit">
                                                     <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">{user?.role?.replace('_', ' ')}</span>
                                                 </div>
@@ -281,11 +281,11 @@ export function Navbar({ onMobileMenuClick }) {
 
                 {/* Mobile menu dropdown */}
                 {menuOpen && (
-                    <div className="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-slate-200 shadow-2xl py-4 px-4 flex flex-col gap-4 z-50">
+                    <div className="md:hidden absolute top-16 left-0 right-0 bg-background border-b border-border shadow-2xl py-4 px-4 flex flex-col gap-4 z-50">
                         <form onSubmit={handleSearch} className="w-full relative">
-                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <input type="text" placeholder="Search exactly what you want..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-full py-2.5 pl-11 pr-4 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100" />
+                                className="w-full bg-muted border border-border rounded-full py-2.5 pl-11 pr-4 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 text-foreground" />
                         </form>
 
                         {isAuthenticated && (
