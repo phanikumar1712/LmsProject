@@ -5,6 +5,12 @@ const { mapCourse } = require('../utils/formatters');
 // GET /api/wishlist
 const getWishlist = async (req, res) => {
     const userId = req.params.userId || req.user.id;
+    const { limit = 20, offset = 0 } = req.query;
+    const { getPagination } = require('../utils/pagination');
+
+    const countRes = await query('SELECT COUNT(*)::int as total FROM wishlist WHERE user_id = $1', [userId]);
+    const total = countRes.rows[0].total;
+
     const result = await query(`
         SELECT w.added_at,
                c.id, c.title, c.thumbnail, c.price, c.discount_price, c.required_plan,
@@ -17,12 +23,20 @@ const getWishlist = async (req, res) => {
         LEFT JOIN categories cat ON c.category_id = cat.id
         WHERE w.user_id = $1
         ORDER BY w.added_at DESC
-    `, [userId]);
-    res.json(result.rows.map(r => mapCourse({
-        ...r,
-        instructorId: null,
-        categoryIcon: null,
-    })));
+        LIMIT $2 OFFSET $3
+    `, [userId, parseInt(limit), parseInt(offset)]);
+
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+
+    res.json({
+        success: true,
+        data: result.rows.map(r => mapCourse({
+            ...r,
+            instructorId: null,
+            categoryIcon: null,
+        })),
+        pagination: getPagination(total, pageNum, limit)
+    });
 };
 
 // POST /api/wishlist/toggle

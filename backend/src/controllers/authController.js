@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser } = require('../utils/formatters');
+const { sendOTPEmail } = require('../utils/mail');
 
 const generateToken = (userId, role) =>
     jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -126,9 +127,33 @@ const requestPasswordReset = async (req, res) => {
     const { email } = req.body;
     if (!email) throw createError('Email is required', 400);
 
-    // In a real app, we'd verify email exists, generate a random OTP, save to DB/Redis, and email it.
-    // For this demo platform, we just simulate success so the frontend moves to the OTP step.
-    res.json({ success: true, message: 'If registered, an OTP has been sent. (Demo: use 123456)' });
+    const result = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (!result.rows.length) {
+        // We still return success to prevent email enumeration, but we don't send anything.
+        return res.json({ success: true, message: 'If registered, an OTP has been sent.' });
+    }
+
+    const userId = result.rows[0].id;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    await query(
+        'UPDATE users SET reset_otp = $1, reset_otp_expiry = $2 WHERE id = $3',
+        [otp, expiry, userId]
+    );
+
+    const mailRes = await sendOTPEmail(email.toLowerCase(), otp);
+
+    if (!mailRes.success) {
+        console.error('Failed to send OTP email:', mailRes.error);
+        // We don't want to fail the request for the user, but maybe in development we'd like to know.
+        // For production, fallback to dummy success or throw error depending on requirements.
+        if (process.env.NODE_ENV === 'development') {
+            return res.json({ success: true, message: `(Dev) OTP generated: ${otp}. Email send failed: ${mailRes.error}` });
+        }
+    }
+
+    res.json({ success: true, message: 'An OTP has been sent to your email.' });
 };
 
 // POST /api/auth/reset-password
@@ -137,22 +162,37 @@ const resetPasswordByEmail = async (req, res) => {
     if (!email || !otp || !newPassword) throw createError('Email, OTP, and new password are required', 400);
     if (newPassword.length < 8) throw createError('Password must be at least 8 characters', 400);
 
-    // Demo hardcoded OTP verification
-    if (otp !== '123456') {
-        throw createError('Invalid OTP', 400);
-    }
+    const result = await query(
+        'SELECT id, reset_otp, reset_otp_expiry FROM users WHERE email = $1',
+        [email.toLowerCase()]
+    );
 
-    const result = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
     if (!result.rows.length) {
+        // Return generic success to prevent enumeration
         return res.json({ success: true, message: 'Password has been reset successfully.' });
     }
 
+    const user = result.rows[0];
+
+    if (!user.reset_otp || user.reset_otp !== otp) {
+        throw createError('Invalid OTP', 400);
+    }
+
+    if (new Date() > new Date(user.reset_otp_expiry)) {
+        throw createError('OTP has expired', 400);
+    }
+
     const hashed = await bcrypt.hash(newPassword, 12);
-    await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hashed, result.rows[0].id]);
+
+    // Update password and clear OTP
+    await query(
+        'UPDATE users SET password = $1, reset_otp = NULL, reset_otp_expiry = NULL, updated_at = NOW() WHERE id = $2',
+        [hashed, user.id]
+    );
 
     await query(
         `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
-        [result.rows[0].id, 'PASSWORD_RESET', 'users', result.rows[0].id]
+        [user.id, 'PASSWORD_RESET', 'users', user.id]
     ).catch(() => { });
 
     res.json({ success: true, message: 'Password has been reset successfully.' });

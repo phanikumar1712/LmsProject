@@ -86,8 +86,8 @@ export default function HomePage() {
                 /* ── Reset & Base ──────────────────────────────── */
                 .hp-root {
                     font-family: 'Inter', 'Segoe UI', sans-serif;
-                    background: #f8fafc;
-                    color: #334155;
+                    background: var(--color-background, #f8fafc);
+                    color: var(--color-foreground, #334155);
                     min-height: 100vh;
                     overflow-x: hidden;
                 }
@@ -116,7 +116,7 @@ export default function HomePage() {
                     display: flex; align-items: center;
                     padding: 80px 2rem 80px;
                     position: relative;
-                    background: white;
+                    background: var(--color-background, white);
                     overflow: hidden;
                 }
                 .hp-hero__bg {
@@ -127,7 +127,7 @@ export default function HomePage() {
                 }
                 .hp-hero__grid-lines {
                     position: absolute; inset: 0; z-index: 0;
-                    background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+                    background-image: radial-gradient(var(--color-border, #e2e8f0) 1px, transparent 1px);
                     background-size: 40px 40px;
                     opacity: 0.5;
                 }
@@ -156,7 +156,7 @@ export default function HomePage() {
                 .hp-hero__title {
                     font-size: clamp(2.8rem, 5vw, 4.2rem);
                     font-weight: 900; line-height: 1;
-                    color: #0f172a; margin-bottom: 1.5rem;
+                    color: var(--color-foreground, #0f172a); margin-bottom: 1.5rem;
                     letter-spacing: -0.04em;
                 }
                 .hp-hero__title-gradient {
@@ -164,7 +164,7 @@ export default function HomePage() {
                     display: block;
                 }
                 .hp-hero__subtitle {
-                    font-size: 1.15rem; color: #64748b; line-height: 1.6;
+                    font-size: 1.15rem; color: var(--color-muted-foreground, #64748b); line-height: 1.6;
                     margin-bottom: 3rem; max-width: 520px;
                     font-weight: 500;
                 }
@@ -172,9 +172,9 @@ export default function HomePage() {
                     display: flex; flex-wrap: wrap; gap: 1.25rem; margin-bottom: 4rem;
                 }
                 .hp-btn-outline {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    color: #0f172a; cursor: pointer;
+                    background: var(--color-background, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
+                    color: var(--color-foreground, #0f172a); cursor: pointer;
                     padding: 0.85rem 1.75rem; border-radius: 12px;
                     font-size: 1rem; font-weight: 700;
                     transition: all 0.2s;
@@ -204,11 +204,11 @@ export default function HomePage() {
                     display: flex; gap: 3rem; flex-wrap: wrap;
                 }
                 .hp-hero__stat-num {
-                    font-size: 1.75rem; font-weight: 800; color: #0f172a;
+                    font-size: 1.75rem; font-weight: 800; color: var(--color-foreground, #0f172a);
                     margin-bottom: 0.25rem;
                 }
                 .hp-hero__stat-label {
-                    font-size: 0.85rem; color: #64748b; font-weight: 600;
+                    font-size: 0.85rem; color: var(--color-muted-foreground, #64748b); font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.05em;
                 }
 
@@ -242,11 +242,11 @@ export default function HomePage() {
                 /* Floating badges */
                 .hp-hero__float-badge {
                     position: absolute; z-index: 2;
-                    background: white;
-                    border: 1px solid #e2e8f0;
+                    background: var(--color-card, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
                     border-radius: 16px; padding: 0.85rem 1.25rem;
                     display: flex; align-items: center; gap: 12px;
-                    font-size: 0.85rem; font-weight: 700; color: #0f172a;
+                    font-size: 0.85rem; font-weight: 700; color: var(--color-foreground, #0f172a);
                     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
                     animation: float-badge 5s ease-in-out infinite;
                 }
@@ -275,11 +275,11 @@ export default function HomePage() {
                 }
                 .hp-section__title {
                     font-size: clamp(2rem, 3.5vw, 2.75rem);
-                    font-weight: 900; color: #0f172a;
+                    font-weight: 900; color: var(--color-foreground, #0f172a);
                     letter-spacing: -0.03em; margin-bottom: 1rem;
                 }
                 .hp-section__subtitle {
-                    color: #64748b; font-size: 1.1rem; max-width: 600px;
+                    color: var(--color-muted-foreground, #64748b); font-size: 1.1rem; max-width: 600px;
                     font-weight: 500;
                 }
                 .hp-section__header {
@@ -289,14 +289,14 @@ export default function HomePage() {
                 }
 
                 /* ── Features ──────────────────────────────────── */
-                .hp-features { background: #f8fafc; }
+                .hp-features { background: var(--color-muted, #f8fafc); }
                 .hp-features__grid {
                     display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
                     gap: 2rem;
                 }
                 .hp-feature-card {
-                    background: white;
-                    border: 1px solid #e2e8f0;
+                    background: var(--color-card, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
                     border-radius: 24px; padding: 2.5rem;
                     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     position: relative;
@@ -320,7 +320,7 @@ export default function HomePage() {
                 .hp-feature-card p { font-size: 1rem; color: #64748b; line-height: 1.6; font-weight: 500; }
 
                 /* ── Courses Grid ──────────────────────────────── */
-                .hp-courses { background: white; }
+                .hp-courses { background: var(--color-background, white); }
                 .hp-courses-grid {
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -462,8 +462,8 @@ export default function HomePage() {
 
                 /* ── Course Card ───────────────────────────────── */
                 .hp-card {
-                    background: white;
-                    border: 1px solid #e2e8f0;
+                    background: var(--color-card, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
                     border-radius: 20px; overflow: hidden;
                     cursor: pointer;
                     transition: all 0.3s ease;
@@ -551,9 +551,9 @@ export default function HomePage() {
 
                 /* ── Stats Bar ─────────────────────────────────── */
                 .hp-statsbar {
-                    background: #f1f5f9;
-                    border-top: 1px solid #e2e8f0;
-                    border-bottom: 1px solid #e2e8f0;
+                    background: var(--color-muted, #f1f5f9);
+                    border-top: 1px solid var(--color-border, #e2e8f0);
+                    border-bottom: 1px solid var(--color-border, #e2e8f0);
                     padding: 3rem 2rem;
                 }
                 .hp-statsbar__inner {
@@ -562,10 +562,10 @@ export default function HomePage() {
                     gap: 2rem; text-align: center;
                 }
                 .hp-statsbar__num {
-                    font-size: 2.25rem; font-weight: 900; color: #0f172a;
+                    font-size: 2.25rem; font-weight: 900; color: var(--color-foreground, #0f172a);
                     margin-bottom: 0.5rem;
                 }
-                .hp-statsbar__label { font-size: 0.95rem; color: #64748b; font-weight: 600; }
+                .hp-statsbar__label { font-size: 0.95rem; color: var(--color-muted-foreground, #64748b); font-weight: 600; }
 
                 /* ── CTA Banner ────────────────────────────────── */
                 .hp-cta-banner {
@@ -599,8 +599,8 @@ export default function HomePage() {
 
                 /* ── Footer ────────────────────────────────────── */
                 .hp-footer {
-                    background: white;
-                    border-top: 1px solid #e2e8f0;
+                    background: var(--color-background, white);
+                    border-top: 1px solid var(--color-border, #e2e8f0);
                     padding: 5rem 2rem 2rem;
                 }
                 .hp-footer__inner {
@@ -608,15 +608,15 @@ export default function HomePage() {
                     display: grid; grid-template-columns: 2fr 1fr 1fr;
                     gap: 4rem; margin-bottom: 4rem;
                 }
-                .hp-footer__brand-text { color: #64748b; font-size: 0.95rem; line-height: 1.6; margin-top: 1rem; max-width: 300px; font-weight: 500; }
-                .hp-footer__col h4 { color: #0f172a; font-size: 0.9rem; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+                .hp-footer__brand-text { color: var(--color-muted-foreground, #64748b); font-size: 0.95rem; line-height: 1.6; margin-top: 1rem; max-width: 300px; font-weight: 500; }
+                .hp-footer__col h4 { color: var(--color-foreground, #0f172a); font-size: 0.9rem; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
                 .hp-footer__col ul li { margin-bottom: 1rem; list-style: none; }
-                .hp-footer__col ul li a { color: #64748b; font-size: 0.95rem; text-decoration: none; transition: color 0.2s; font-weight: 600; }
+                .hp-footer__col ul li a { color: var(--color-muted-foreground, #64748b); font-size: 0.95rem; text-decoration: none; transition: color 0.2s; font-weight: 600; }
                 .hp-footer__col ul li a:hover { color: #4f46e5; }
                 .hp-footer__bottom {
-                    border-top: 1px solid #f1f5f9;
+                    border-top: 1px solid var(--color-border, #f1f5f9);
                     padding-top: 2rem;
-                    text-align: center; color: #94a3b8; font-size: 0.9rem; font-weight: 600;
+                    text-align: center; color: var(--color-muted-foreground, #94a3b8); font-size: 0.9rem; font-weight: 600;
                 }
 
                 /* ── Responsive ────────────────────────────────── */

@@ -18,6 +18,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const notificationsRoutes = require('./routes/notifications');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const uploadRoutes = require('./routes/upload');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,6 +55,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);

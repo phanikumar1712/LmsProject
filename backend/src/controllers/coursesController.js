@@ -45,7 +45,21 @@ const getAll = async (req, res) => {
     if (sort === 'price_low') orderBy = 'COALESCE(c.discount_price, c.price) ASC';
     if (sort === 'newest') orderBy = 'c.created_at DESC';
 
+    const { getPagination } = require('../utils/pagination');
+
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countSql = `
+        SELECT COUNT(*)::int as total
+        FROM courses c
+        JOIN users u ON c.instructor_id = u.id
+        LEFT JOIN categories cat ON c.category_id = cat.id
+        ${where}
+    `;
+    const countResult = await query(countSql, values);
+
+    // Get paginated data
     const sql = `
         SELECT ${courseFields}
         FROM courses c
@@ -55,10 +69,17 @@ const getAll = async (req, res) => {
         ORDER BY ${orderBy}
         LIMIT $${i++} OFFSET $${i++}
     `;
-    values.push(parseInt(limit), parseInt(offset));
 
-    const result = await query(sql, values);
-    res.json(result.rows.map(mapCourse));
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+    const finalValues = [...values, parseInt(limit), parseInt(offset)];
+
+    const result = await query(sql, finalValues);
+
+    res.json({
+        success: true,
+        data: result.rows.map(mapCourse),
+        pagination: getPagination(countResult.rows[0].total, pageNum, limit)
+    });
 };
 
 // GET /api/courses/:id

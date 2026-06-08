@@ -6,8 +6,45 @@ const safeUserFields = `id, name, email, role, avatar, bio, active, subscription
 
 // GET /api/users
 const getAll = async (req, res) => {
-    const result = await query(`SELECT ${safeUserFields} FROM users ORDER BY created_at DESC`);
-    res.json(result.rows.map(mapUser));
+    const { limit = 20, offset = 0, search, role } = req.query;
+    const { getPagination } = require('../utils/pagination');
+
+    let conditions = [];
+    let values = [];
+    let i = 1;
+
+    if (role) {
+        conditions.push(`role = $${i++}`);
+        values.push(role.toUpperCase());
+    }
+    if (search) {
+        conditions.push(`(name ILIKE $${i} OR email ILIKE $${i})`);
+        values.push(`%${search}%`);
+        i++;
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRes = await query(`SELECT COUNT(*)::int as total FROM users ${where}`, values);
+    const total = countRes.rows[0].total;
+
+    const sql = `
+        SELECT ${safeUserFields} 
+        FROM users 
+        ${where} 
+        ORDER BY created_at DESC 
+        LIMIT $${i++} OFFSET $${i++}
+    `;
+    const finalValues = [...values, parseInt(limit), parseInt(offset)];
+
+    const result = await query(sql, finalValues);
+    const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
+
+    res.json({
+        success: true,
+        data: result.rows.map(mapUser),
+        pagination: getPagination(total, pageNum, limit)
+    });
 };
 
 // PUT /api/users/:id/role

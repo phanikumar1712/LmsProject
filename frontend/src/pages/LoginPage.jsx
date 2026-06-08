@@ -50,8 +50,7 @@ export default function LoginPage() {
             toast.success(res.message || 'OTP sent successfully!');
             setView('verify');
         } catch (err) {
-            toast.success('If registered, an OTP has been sent. (Demo: use 123456)');
-            setView('verify');
+            toast.error(err.message || 'Failed to send OTP. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -82,44 +81,44 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-slate-50 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center px-4 bg-background transition-colors duration-300 relative overflow-hidden">
             <div className="w-full max-w-md relative z-10">
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <Link to="/" className="inline-flex items-center gap-2 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+                    <Link to="/" className="inline-flex items-center gap-2 mb-4 group">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                             <GraduationCap size={22} className="text-white" />
                         </div>
-                        <span className="text-2xl font-bold text-slate-900 tracking-tight">EduNexus</span>
+                        <span className="text-2xl font-bold text-foreground tracking-tight">EduNexus</span>
                     </Link>
                     {view === 'login' && (
                         <>
-                            <h1 className="text-2xl font-bold text-slate-900 mb-1">Welcome back</h1>
-                            <p className="text-slate-500 text-sm">Sign in to continue learning</p>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">Welcome back</h1>
+                            <p className="text-muted-foreground text-sm">Sign in to continue learning</p>
                         </>
                     )}
                     {view === 'forgot' && (
                         <>
-                            <h1 className="text-2xl font-bold text-slate-900 mb-1">Reset Password</h1>
-                            <p className="text-slate-500 text-sm">Enter your email to receive an OTP</p>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">Reset Password</h1>
+                            <p className="text-muted-foreground text-sm">Enter your email to receive an OTP</p>
                         </>
                     )}
                     {view === 'verify' && (
                         <>
-                            <h1 className="text-2xl font-bold text-slate-900 mb-1">Enter OTP</h1>
-                            <p className="text-slate-500 text-sm">Enter the code sent to your email</p>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">Enter OTP</h1>
+                            <p className="text-muted-foreground text-sm">Enter the code sent to your email</p>
                         </>
                     )}
                     {view === 'reset-done' && (
                         <>
-                            <h1 className="text-2xl font-bold text-slate-900 mb-1">Password Reset!</h1>
-                            <p className="text-slate-500 text-sm">Your password has been updated</p>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">Password Reset!</h1>
+                            <p className="text-muted-foreground text-sm">Your password has been updated</p>
                         </>
                     )}
                 </div>
 
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
+                <div className="bg-card border border-border shadow-2xl rounded-2xl p-8">
 
                     {/* Error banner */}
                     {error && (
@@ -133,44 +132,44 @@ export default function LoginPage() {
                     {view === 'login' && (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-1.5">Email Address</label>
+                                <label className="text-sm font-medium text-foreground block mb-1.5">Email Address</label>
                                 <div className="relative">
-                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                     <input
                                         id="login-email"
                                         type="email"
                                         placeholder="you@example.com"
                                         value={form.email}
                                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                        className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400"
+                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors outline-none placeholder:text-muted-foreground text-foreground"
                                         autoComplete="email"
                                     />
                                 </div>
                             </div>
                             <div>
                                 <div className="flex justify-between items-center mb-1.5">
-                                    <label className="text-sm font-medium text-slate-700">Password</label>
+                                    <label className="text-sm font-medium text-foreground">Password</label>
                                     <button
                                         type="button"
                                         onClick={() => { setView('forgot'); setError(''); }}
-                                        className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                                        className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
                                     >
                                         Forgot password?
                                     </button>
                                 </div>
                                 <div className="relative">
-                                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                     <input
                                         id="login-password"
                                         type={showPass ? 'text' : 'password'}
                                         placeholder="••••••••"
                                         value={form.password}
                                         onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                                        className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400"
+                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
                                         autoComplete="current-password"
                                     />
                                     <button type="button" onClick={() => setShowPass(s => !s)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 outline-none">
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground outline-none">
                                         {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                                     </button>
                                 </div>
@@ -193,16 +192,16 @@ export default function LoginPage() {
                     {view === 'forgot' && (
                         <form onSubmit={handleRequestReset} className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-1.5">Registered Email</label>
+                                <label className="text-sm font-medium text-foreground block mb-1.5">Registered Email</label>
                                 <div className="relative">
-                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                     <input
                                         id="reset-email"
                                         type="email"
                                         placeholder="you@example.com"
                                         value={resetForm.email}
                                         onChange={e => { setResetForm(f => ({ ...f, email: e.target.value })); setError(''); }}
-                                        className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400"
+                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
                                         autoComplete="email"
                                         autoFocus
                                     />
@@ -226,7 +225,17 @@ export default function LoginPage() {
                     {view === 'verify' && (
                         <form onSubmit={handleReset} className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-1.5">6-Digit OTP</label>
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <label className="text-sm font-medium text-foreground">6-Digit OTP</label>
+                                    <button
+                                        type="button"
+                                        onClick={handleRequestReset}
+                                        disabled={loading}
+                                        className="text-xs text-indigo-600 hover:text-indigo-700 font-bold disabled:opacity-50"
+                                    >
+                                        {loading ? 'Sending...' : 'Resend OTP'}
+                                    </button>
+                                </div>
                                 <div className="relative">
                                     <input
                                         id="reset-otp"
@@ -235,7 +244,7 @@ export default function LoginPage() {
                                         maxLength={6}
                                         value={resetForm.otp}
                                         onChange={e => { setResetForm(f => ({ ...f, otp: e.target.value.replace(/\D/g, '') })); setError(''); }}
-                                        className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-center tracking-widest font-mono text-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:font-sans placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-400"
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-center tracking-widest font-mono text-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:font-sans placeholder:tracking-normal placeholder:text-sm placeholder:text-muted-foreground text-foreground"
                                         autoComplete="one-time-code"
                                         autoFocus
                                     />
@@ -322,9 +331,9 @@ export default function LoginPage() {
                     )}
 
                     {view === 'login' && (
-                        <p className="text-center text-slate-600 text-sm mt-6">
+                        <p className="text-center text-muted-foreground text-sm mt-6">
                             Don't have an account?{' '}
-                            <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">Create one free</Link>
+                            <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-bold">Create one free</Link>
                         </p>
                     )}
                 </div>

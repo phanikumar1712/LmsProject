@@ -72,12 +72,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
 
     return (
         <aside
-            className={`fixed top-16 bottom-0 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 z-40 ${collapsed ? 'w-16' : 'w-64'} ${mobileOpen ? 'left-0' : '-left-64 md:left-0'}`}
+            className={`fixed top-16 bottom-0 bg-background border-r border-border flex flex-col transition-all duration-300 z-40 ${collapsed ? 'w-16' : 'w-64'} ${mobileOpen ? 'left-0' : '-left-64 md:left-0'}`}
         >
             {/* User info */}
-            <div className={`flex items-center gap-3 p-4 border-b border-slate-100 ${collapsed ? 'justify-center' : ''}`}>
+            <div className={`flex items-center gap-3 p-4 border-b border-border ${collapsed ? 'justify-center' : ''}`}>
                 {user?.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full flex-shrink-0 object-cover border border-slate-200" />
+                    <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full flex-shrink-0 object-cover border border-border" />
                 ) : (
                     <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center flex-shrink-0">
                         {user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -85,7 +85,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
                 )}
                 {!collapsed && (
                     <div className="min-w-0 flex-1">
-                        <p className="text-slate-900 text-sm font-bold truncate">{user?.name}</p>
+                        <p className="text-foreground text-sm font-bold truncate">{user?.name}</p>
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mt-0.5 ${ROLE_COLORS[user?.role] || ROLE_COLORS.STUDENT}`}>
                             {user?.role?.replace('_', ' ')}
                         </span>
@@ -103,8 +103,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
                         onClick={() => onMobileClose && onMobileClose()}
                         className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30'
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                             } ${collapsed ? 'justify-center px-0' : ''}`
                         }
                         title={collapsed ? label : ''}
@@ -116,10 +116,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
             </nav>
 
             {/* Bottom actions */}
-            <div className="p-3 border-t border-slate-100 space-y-1">
+            <div className="p-3 border-t border-border space-y-1">
                 <button
                     onClick={handleLogout}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
                     title={collapsed ? 'Logout' : ''}
                 >
                     <LogOut size={18} className="flex-shrink-0" />
@@ -127,7 +127,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
                 </button>
                 <button
                     onClick={onToggle}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
                 >
                     <ChevronLeft size={18} className={`flex-shrink-0 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
                     {!collapsed && 'Collapse'}
