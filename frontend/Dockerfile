@@ -19,24 +19,18 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-# ── Stage 3: Serve with lightweight static server ─────────────
-FROM node:20-alpine AS runner
+# ── Stage 3: Serve with Nginx ─────────────────────────────────────
+FROM nginx:stable-alpine AS runner
 
-RUN npm install -g serve@latest
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-WORKDIR /app
-
-COPY --from=builder /app/dist ./dist
-
-RUN chown -R appuser:appgroup /app
-
-USER appuser
-
-EXPOSE 3000
+EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["nginx", "-g", "daemon off;"]

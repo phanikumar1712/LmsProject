@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Settings, Save, Globe, Mail, CreditCard, Shield, Bell, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Save, Globe, Mail, CreditCard, Shield, Bell, AlertTriangle, Loader2 } from 'lucide-react';
+import { statsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
 const SECTIONS = [
@@ -13,36 +14,37 @@ const SECTIONS = [
 export default function PlatformSettings() {
     const [active, setActive] = useState('general');
     const [saving, setSaving] = useState(false);
-    const [settings, setSettings] = useState({
-        siteName: 'EduNexus LMS',
-        siteTagline: 'Learn Without Limits',
-        supportEmail: 'support@edunexus.com',
-        defaultCurrency: 'INR',
-        instructorRevenueShare: 70,
-        maxUploadSizeMB: 500,
-        requireApproval: true,
-        maintenanceMode: false,
-        smtpHost: 'smtp.sendgrid.net',
-        smtpPort: '587',
-        emailFrom: 'noreply@edunexus.com',
-        razorpayEnabled: true,
-        stripeEnabled: false,
-        jwtExpiryDays: 1,
-        maxLoginAttempts: 5,
-        twoFactorRequired: false,
-        newEnrollmentNotif: true,
-        newReviewNotif: true,
-        weeklyReportEmail: true,
-    });
+    const [loading, setLoading] = useState(true);
+    const [settings, setSettings] = useState({});
+
+    useEffect(() => {
+        statsAPI.getSettings()
+            .then(setSettings)
+            .catch(err => toast.error('Failed to load settings'))
+            .finally(() => setLoading(false));
+    }, []);
 
     const update = (k, v) => setSettings(p => ({ ...p, [k]: v }));
 
     const saveSettings = async () => {
         setSaving(true);
-        await new Promise(r => setTimeout(r, 1000));
-        setSaving(false);
-        toast.success('Settings saved successfully!');
+        try {
+            const updated = await statsAPI.updateSettings(settings);
+            setSettings(updated);
+            toast.success('Settings saved successfully!');
+        } catch (err) {
+            toast.error(err.message || 'Failed to save settings');
+        } finally {
+            setSaving(false);
+        }
     };
+
+    if (loading) return (
+        <div className="p-20 text-center flex flex-col items-center gap-4">
+            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+            <p className="text-slate-500 font-bold">Fetching Platform Configuration...</p>
+        </div>
+    );
 
     const inputCls = 'w-full bg-white border border-slate-200 text-slate-900 rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm';
 

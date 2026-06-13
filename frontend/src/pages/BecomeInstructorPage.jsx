@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     GraduationCap, CheckCircle, Users, BookOpen, DollarSign,
     Star, ArrowRight, Zap, Globe, Award, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { usersAPI } from '../services/api';
+import { usersAPI, statsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const BENEFITS = [
@@ -37,6 +37,7 @@ export default function BecomeInstructorPage() {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [openFaq, setOpenFaq] = useState(null);
+    const [stats, setStats] = useState(null);
     const [form, setForm] = useState({
         bio: '',
         expertise: '',
@@ -46,6 +47,10 @@ export default function BecomeInstructorPage() {
         sampleTopic: '',
         agree: false,
     });
+
+    useEffect(() => {
+        statsAPI.getPublic().then(setStats).catch(() => { });
+    }, []);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -131,7 +136,7 @@ export default function BecomeInstructorPage() {
                             Share Your Knowledge,<br />Earn While You Teach
                         </h1>
                         <p className="text-white/80 text-lg font-medium max-w-lg">
-                            Join 1,800+ instructors teaching on EduNexus. Create courses, build your audience, and earn revenue doing what you love.
+                            Join {stats?.totalInstructors ? `${stats.totalInstructors}+` : '200+'} instructors teaching on EduNexus. Create courses, build your audience, and earn revenue doing what you love.
                         </p>
                     </div>
                     <div className="flex flex-col gap-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 flex-shrink-0 min-w-[220px]">
@@ -140,7 +145,7 @@ export default function BecomeInstructorPage() {
                             <p className="text-white/70 text-sm font-medium">Top monthly earnings</p>
                         </div>
                         <div className="border-t border-white/20 pt-4 text-center">
-                            <p className="text-3xl font-extrabold">15K+</p>
+                            <p className="text-3xl font-extrabold">{stats?.totalStudents ? `${(stats.totalStudents / 1000).toFixed(0)}K+` : '15K+'}</p>
                             <p className="text-white/70 text-sm font-medium">Active students</p>
                         </div>
                         <div className="border-t border-white/20 pt-4 text-center">

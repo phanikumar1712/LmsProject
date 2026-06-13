@@ -2,7 +2,7 @@ const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser } = require('../utils/formatters');
 
-const safeUserFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, created_at`;
+const safeUserFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, created_at`;
 
 // GET /api/subscriptions/plans
 const getPlans = async (req, res) => {

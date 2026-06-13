@@ -16,6 +16,8 @@ const mapUser = (u) => {
         ...u,
         subscriptionPlan: normalizePlan(u.subscription_plan || u.subscriptionPlan),
         subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
+        currentStreak: parseInt(u.current_streak ?? u.currentStreak ?? 0),
+        longestStreak: parseInt(u.longest_streak ?? u.longestStreak ?? 0),
         createdAt: u.created_at || u.createdAt,
     };
 };

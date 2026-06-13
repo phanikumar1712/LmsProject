@@ -239,15 +239,21 @@ const STREAK_ACTIONS = ['LESSON_COMPLETED', 'QUIZ_ATTEMPTED'];
 
 const getStudentStreak = async (req, res) => {
     const studentId = req.user.id;
-    const result = await query(`
-        SELECT DISTINCT DATE(created_at) as date
-        FROM audit_logs
-        WHERE user_id = $1
-          AND created_at >= NOW() - INTERVAL '7 days'
-          AND action = ANY($2::text[])
-    `, [studentId, STREAK_ACTIONS]);
 
-    const activeDates = result.rows.map(r => toDateKey(new Date(r.date)));
+    // Get the cached streak and the weekly logs
+    const [userReq, logsReq] = await Promise.all([
+        query('SELECT current_streak FROM users WHERE id = $1', [studentId]),
+        query(`
+            SELECT DISTINCT DATE(created_at) as date
+            FROM audit_logs
+            WHERE user_id = $1
+              AND created_at >= NOW() - INTERVAL '7 days'
+              AND action = ANY($2::text[])
+        `, [studentId, STREAK_ACTIONS])
+    ]);
+
+    const activeDates = logsReq.rows.map(r => toDateKey(new Date(r.date)));
+    const currentStreak = userReq.rows[0]?.current_streak || 0;
 
     const streakDays = [];
     const activeStreak = [];
@@ -262,17 +268,7 @@ const getStudentStreak = async (req, res) => {
         activeStreak.push(activeDates.includes(dateStr));
     }
 
-    let streakCount = 0;
-    const reversedStreak = [...activeStreak].reverse();
-    for (let i = 0; i < reversedStreak.length; i++) {
-        if (reversedStreak[i]) {
-            streakCount++;
-        } else if (i !== 0) {
-            break;
-        }
-    }
-
-    res.json({ streakDays, activeStreak, currentStreak: streakCount });
+    res.json({ streakDays, activeStreak, currentStreak });
 };
 
 const getSystemHealth = async (req, res) => {
@@ -314,4 +310,49 @@ const getSystemHealth = async (req, res) => {
     });
 };
 
-module.exports = { getPlatform, getInstructor, getAuditLogs, getCategories, createCategory, updateCategory, deleteCategory, getPublicStats, getStudentStreak, getSystemHealth };
+const getPlatformSettings = async (req, res) => {
+    const result = await query("SELECT value FROM platform_settings WHERE key = 'global'");
+    if (!result.rows.length) {
+        throw createError('Settings not found', 404);
+    }
+    res.json(result.rows[0].value);
+};
+
+const updatePlatformSettings = async (req, res) => {
+    const settings = req.body;
+    if (!settings || typeof settings !== 'object') {
+        throw createError('Invalid settings data', 400);
+    }
+
+    const result = await query(
+        "UPDATE platform_settings SET value = $1, updated_at = NOW() WHERE key = 'global' RETURNING value",
+        [JSON.stringify(settings)]
+    );
+
+    if (!result.rows.length) {
+        throw createError('Settings not found', 404);
+    }
+
+    // Audit log
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, ip_address) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'PLATFORM_SETTINGS_UPDATED', 'platform_settings', 'global', req.ip]
+    ).catch(() => { });
+
+    res.json(result.rows[0].value);
+};
+
+module.exports = {
+    getPlatform,
+    getInstructor,
+    getAuditLogs,
+    getCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    getPublicStats,
+    getStudentStreak,
+    getSystemHealth,
+    getPlatformSettings,
+    updatePlatformSettings
+};

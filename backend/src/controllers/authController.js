@@ -13,7 +13,7 @@ const getWishlistIds = async (userId) => {
     return res.rows.map(r => r.course_id);
 };
 
-const userFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, created_at`;
+const userFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, created_at`;
 
 // POST /api/auth/register
 const register = async (req, res) => {
@@ -80,7 +80,7 @@ const getMe = async (req, res) => {
     if (!result.rows.length) throw createError('User not found', 404);
     const user = result.rows[0];
     user.wishlist = await getWishlistIds(user.id);
-    res.json(user);
+    res.json(mapUser(user));
 };
 
 // PUT /api/auth/profile
@@ -156,6 +156,33 @@ const requestPasswordReset = async (req, res) => {
     res.json({ success: true, message: 'An OTP has been sent to your email.' });
 };
 
+// POST /api/auth/verify-otp
+const verifyOTP = async (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) throw createError('Email and OTP are required', 400);
+
+    const result = await query(
+        'SELECT reset_otp, reset_otp_expiry FROM users WHERE email = $1',
+        [email.toLowerCase()]
+    );
+
+    if (!result.rows.length) {
+        throw createError('User not found', 404);
+    }
+
+    const user = result.rows[0];
+
+    if (!user.reset_otp || user.reset_otp !== otp) {
+        throw createError('Invalid OTP', 400);
+    }
+
+    if (new Date() > new Date(user.reset_otp_expiry)) {
+        throw createError('OTP has expired', 400);
+    }
+
+    res.json({ success: true, message: 'OTP verified successfully.' });
+};
+
 // POST /api/auth/reset-password
 const resetPasswordByEmail = async (req, res) => {
     const { email, otp, newPassword } = req.body;
@@ -220,4 +247,4 @@ const demoLogin = async (req, res) => {
     res.json({ user: safeUser, token });
 };
 
-module.exports = { register, login, getMe, updateProfile, changePassword, requestPasswordReset, resetPasswordByEmail, demoLogin };
+module.exports = { register, login, getMe, updateProfile, changePassword, requestPasswordReset, verifyOTP, resetPasswordByEmail, demoLogin };

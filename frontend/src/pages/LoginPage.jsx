@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GraduationCap, Eye, EyeOff, Mail, Lock, AlertCircle, KeyRound, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
@@ -16,7 +17,7 @@ export default function LoginPage() {
     const location = useLocation();
     const from = location.state?.from || '/';
 
-    // 'login' | 'forgot' | 'verify' | 'reset-done'
+    // 'login' | 'forgot' | 'verify' | 'reset-password' | 'reset-done'
     const [view, setView] = useState('login');
     const [form, setForm] = useState({ email: '', password: '' });
     const [resetForm, setResetForm] = useState({ email: '', otp: '', newPassword: '', confirm: '' });
@@ -56,9 +57,23 @@ export default function LoginPage() {
         }
     };
 
-    const handleReset = async (e) => {
+    const handleVerifyOTP = async (e) => {
         e.preventDefault();
-        if (!resetForm.otp) { setError('Please enter the OTP'); return; }
+        if (!resetForm.otp || resetForm.otp.length < 6) { setError('Please enter a valid 6-digit OTP'); return; }
+
+        setLoading(true); setError('');
+        try {
+            await authAPI.verifyOTP(resetForm.email, resetForm.otp);
+            setView('reset-password');
+        } catch (err) {
+            setError(err.message || 'Verification failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
         if (!resetForm.newPassword) { setError('Please enter your new password'); return; }
         if (resetForm.newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
         if (resetForm.newPassword !== resetForm.confirm) { setError('Passwords do not match'); return; }
@@ -106,8 +121,14 @@ export default function LoginPage() {
                     )}
                     {view === 'verify' && (
                         <>
-                            <h1 className="text-2xl font-bold text-foreground mb-1">Enter OTP</h1>
-                            <p className="text-muted-foreground text-sm">Enter the code sent to your email</p>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">Verify OTP</h1>
+                            <p className="text-muted-foreground text-sm">Enter the code sent to {resetForm.email}</p>
+                        </>
+                    )}
+                    {view === 'reset-password' && (
+                        <>
+                            <h1 className="text-2xl font-bold text-foreground mb-1">New Password</h1>
+                            <p className="text-muted-foreground text-sm">Set a secure password for your account</p>
                         </>
                     )}
                     {view === 'reset-done' && (
@@ -128,207 +149,267 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    {/* ── Login Form ─────────────────────────── */}
-                    {view === 'login' && (
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-foreground block mb-1.5">Email Address</label>
-                                <div className="relative">
-                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        id="login-email"
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={form.email}
-                                        onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors outline-none placeholder:text-muted-foreground text-foreground"
-                                        autoComplete="email"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <label className="text-sm font-medium text-foreground">Password</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setView('forgot'); setError(''); }}
-                                        className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
-                                    >
-                                        Forgot password?
-                                    </button>
-                                </div>
-                                <div className="relative">
-                                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        id="login-password"
-                                        type={showPass ? 'text' : 'password'}
-                                        placeholder="••••••••"
-                                        value={form.password}
-                                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
-                                        autoComplete="current-password"
-                                    />
-                                    <button type="button" onClick={() => setShowPass(s => !s)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground outline-none">
-                                        {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                                    </button>
-                                </div>
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                id="login-submit"
-                                className="w-full py-2.5 mt-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors shadow-sm"
+                    <AnimatePresence mode="wait">
+                        {/* ── Login Form ─────────────────────────── */}
+                        {view === 'login' && (
+                            <motion.form
+                                key="login"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 10 }}
+                                onSubmit={handleSubmit}
+                                className="space-y-4"
                             >
-                                {loading
-                                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
-                                    : 'Sign In'
-                                }
-                            </button>
-                        </form>
-                    )}
-
-                    {/* ── Request OTP Form ───────── */}
-                    {view === 'forgot' && (
-                        <form onSubmit={handleRequestReset} className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-foreground block mb-1.5">Registered Email</label>
-                                <div className="relative">
-                                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        id="reset-email"
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={resetForm.email}
-                                        onChange={e => { setResetForm(f => ({ ...f, email: e.target.value })); setError(''); }}
-                                        className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
-                                        autoComplete="email"
-                                        autoFocus
-                                    />
+                                <div>
+                                    <label className="text-sm font-medium text-foreground block mb-1.5">Email Address</label>
+                                    <div className="relative">
+                                        <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                        <input
+                                            id="login-email"
+                                            type="email"
+                                            placeholder="you@example.com"
+                                            value={form.email}
+                                            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                                            className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors outline-none placeholder:text-muted-foreground text-foreground"
+                                            autoComplete="email"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm disabled:opacity-60 flex items-center justify-center gap-2 transition-colors shadow-sm"
+                                <div>
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <label className="text-sm font-medium text-foreground">Password</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setView('forgot'); setError(''); }}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                        <input
+                                            id="login-password"
+                                            type={showPass ? 'text' : 'password'}
+                                            placeholder="••••••••"
+                                            value={form.password}
+                                            onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                                            className="w-full bg-background border border-border rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
+                                            autoComplete="current-password"
+                                        />
+                                        <button type="button" onClick={() => setShowPass(s => !s)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground outline-none">
+                                            {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    id="login-submit"
+                                    className="w-full py-2.5 mt-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors shadow-sm"
+                                >
+                                    {loading
+                                        ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
+                                        : 'Sign In'
+                                    }
+                                </button>
+                            </motion.form>
+                        )}
+
+                        {/* ── Request OTP Form ───────── */}
+                        {view === 'forgot' && (
+                            <motion.form
+                                key="forgot"
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                onSubmit={handleRequestReset}
+                                className="space-y-6"
                             >
-                                {loading ? 'Sending OTP...' : 'Get OTP'}
-                            </button>
-                            <button type="button" onClick={goBackToLogin}
-                                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
-                                <ArrowLeft size={14} /> Back to Sign In
-                            </button>
-                        </form>
-                    )}
+                                <div>
+                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">Registered Email</label>
+                                    <div className="relative">
+                                        <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            id="reset-email"
+                                            type="email"
+                                            placeholder="you@example.com"
+                                            value={resetForm.email}
+                                            onChange={e => { setResetForm(f => ({ ...f, email: e.target.value })); setError(''); }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900"
+                                            autoComplete="email"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 font-medium mt-3 text-center uppercase tracking-widest leading-relaxed">
+                                        We'll send a 6-digit code to your inbox
+                                    </p>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={loading || !resetForm.email}
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-60 transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    {loading ? 'Sending OTP...' : 'Send Verification Code'}
+                                    {!loading && <KeyRound size={16} />}
+                                </button>
+                                <button type="button" onClick={goBackToLogin}
+                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    <ArrowLeft size={14} /> Back to Sign In
+                                </button>
+                            </motion.form>
+                        )}
 
-                    {/* ── Verify & Set New Password Form ───────── */}
-                    {view === 'verify' && (
-                        <form onSubmit={handleReset} className="space-y-4">
-                            <div>
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <label className="text-sm font-medium text-foreground">6-Digit OTP</label>
-                                    <button
-                                        type="button"
-                                        onClick={handleRequestReset}
-                                        disabled={loading}
-                                        className="text-xs text-indigo-600 hover:text-indigo-700 font-bold disabled:opacity-50"
-                                    >
-                                        {loading ? 'Sending...' : 'Resend OTP'}
-                                    </button>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        id="reset-otp"
-                                        type="text"
-                                        placeholder="123456"
-                                        maxLength={6}
-                                        value={resetForm.otp}
-                                        onChange={e => { setResetForm(f => ({ ...f, otp: e.target.value.replace(/\D/g, '') })); setError(''); }}
-                                        className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-center tracking-widest font-mono text-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:font-sans placeholder:tracking-normal placeholder:text-sm placeholder:text-muted-foreground text-foreground"
-                                        autoComplete="one-time-code"
-                                        autoFocus
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-1.5">New Password</label>
-                                <div className="relative">
-                                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        id="reset-new-password"
-                                        type={showNewPass ? 'text' : 'password'}
-                                        placeholder="Min. 8 characters"
-                                        value={resetForm.newPassword}
-                                        onChange={e => { setResetForm(f => ({ ...f, newPassword: e.target.value })); setError(''); }}
-                                        className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-10 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400"
-                                        autoComplete="new-password"
-                                    />
-                                    <button type="button" onClick={() => setShowNewPass(s => !s)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 outline-none">
-                                        {showNewPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-1.5">Confirm New Password</label>
-                                <div className="relative">
-                                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        id="reset-confirm-password"
-                                        type="password"
-                                        placeholder="Repeat new password"
-                                        value={resetForm.confirm}
-                                        onChange={e => { setResetForm(f => ({ ...f, confirm: e.target.value })); setError(''); }}
-                                        className={`w-full bg-white border rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none transition-colors placeholder:text-slate-400 focus:ring-1
-                                            ${resetForm.confirm && resetForm.newPassword !== resetForm.confirm
-                                                ? 'border-rose-400 focus:ring-rose-200 focus:border-rose-400'
-                                                : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500'
-                                            }`}
-                                        autoComplete="new-password"
-                                    />
-                                </div>
-                                {resetForm.confirm && resetForm.newPassword !== resetForm.confirm && (
-                                    <p className="text-rose-500 text-xs font-medium mt-1">Passwords do not match</p>
-                                )}
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                id="reset-submit"
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors shadow-sm"
+                        {/* ── Verify OTP Form ───────── */}
+                        {view === 'verify' && (
+                            <motion.form
+                                key="verify"
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                onSubmit={handleVerifyOTP}
+                                className="space-y-6"
                             >
-                                {loading
-                                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Resetting...</>
-                                    : <><KeyRound size={15} /> Set New Password</>
-                                }
-                            </button>
-                            <button type="button" onClick={goBackToLogin}
-                                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition-colors">
-                                <ArrowLeft size={14} /> Cancel
-                            </button>
-                        </form>
-                    )}
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Verification Code</label>
+                                        <button
+                                            type="button"
+                                            onClick={handleRequestReset}
+                                            disabled={loading}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-bold disabled:opacity-50"
+                                        >
+                                            {loading ? 'Sending...' : 'Resend OTP'}
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2 justify-between">
+                                        {/* Traditional single input for simplicity in this replacement chunk, 
+                                            but styled to look premium with tracking-widest */}
+                                        <input
+                                            id="reset-otp"
+                                            type="text"
+                                            placeholder="0 0 0 0 0 0"
+                                            maxLength={6}
+                                            value={resetForm.otp}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setResetForm(f => ({ ...f, otp: val }));
+                                                setError('');
+                                            }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-center tracking-[1em] font-mono text-2xl font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-300 text-slate-900"
+                                            autoComplete="one-time-code"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 font-medium text-center mt-4 uppercase tracking-widest">Enter the 6-digit code</p>
+                                </div>
 
-                    {/* ── Success state ──────────────────────── */}
-                    {view === 'reset-done' && (
-                        <div className="text-center space-y-5">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                                <CheckCircle size={32} className="text-green-600" />
-                            </div>
-                            <div>
-                                <p className="text-slate-800 font-bold text-base">Password updated!</p>
-                                <p className="text-slate-500 text-sm mt-1">
-                                    You can now sign in with your new password.
+                                <button
+                                    type="submit"
+                                    disabled={loading || resetForm.otp.length < 6}
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
+                                >
+                                    {loading ? 'Verifying...' : 'Verify Code'}
+                                </button>
+                                <button type="button" onClick={goBackToLogin}
+                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    <ArrowLeft size={14} /> Back to Sign In
+                                </button>
+                            </motion.form>
+                        )}
+
+                        {/* ── Set New Password Form ───────── */}
+                        {view === 'reset-password' && (
+                            <motion.form
+                                key="reset-password"
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                onSubmit={handleResetPassword}
+                                className="space-y-5"
+                            >
+                                <div>
+                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">New Password</label>
+                                    <div className="relative">
+                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            id="reset-new-password"
+                                            type={showNewPass ? 'text' : 'password'}
+                                            placeholder="••••••••"
+                                            value={resetForm.newPassword}
+                                            onChange={e => { setResetForm(f => ({ ...f, newPassword: e.target.value })); setError(''); }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-12 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900"
+                                            autoComplete="new-password"
+                                            autoFocus
+                                        />
+                                        <button type="button" onClick={() => setShowNewPass(s => !s)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                                            {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">Confirm Password</label>
+                                    <div className="relative">
+                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            id="reset-confirm-password"
+                                            type="password"
+                                            placeholder="••••••••"
+                                            value={resetForm.confirm}
+                                            onChange={e => { setResetForm(f => ({ ...f, confirm: e.target.value })); setError(''); }}
+                                            className={`w-full bg-slate-50 border rounded-xl pl-11 pr-4 py-3 text-sm font-medium outline-none transition-all text-slate-900 focus:ring-4
+                                                ${resetForm.confirm && resetForm.newPassword !== resetForm.confirm
+                                                    ? 'border-rose-300 focus:ring-rose-500/10 focus:border-rose-400'
+                                                    : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                                }`}
+                                            autoComplete="new-password"
+                                        />
+                                    </div>
+                                    {resetForm.confirm && resetForm.newPassword !== resetForm.confirm && (
+                                        <p className="text-rose-500 text-xs font-bold mt-2">Passwords do not match</p>
+                                    )}
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={loading || !resetForm.newPassword || resetForm.newPassword !== resetForm.confirm}
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
+                                >
+                                    {loading ? 'Updating...' : <><KeyRound size={16} /> Update Password</>}
+                                </button>
+                                <button type="button" onClick={goBackToLogin}
+                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    <ArrowLeft size={14} /> Cancel
+                                </button>
+                            </motion.form>
+                        )}
+
+                        {/* ── Success state ──────────────────────── */}
+                        {view === 'reset-done' && (
+                            <motion.div
+                                key="reset-done"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 1.05 }}
+                                className="text-center py-4"
+                            >
+                                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-emerald-100">
+                                    <CheckCircle size={40} className="text-emerald-500" strokeWidth={1.5} />
+                                </div>
+                                <h3 className="text-xl font-black text-slate-900 mb-2">Password Secured!</h3>
+                                <p className="text-slate-500 text-[15px] font-medium leading-relaxed mb-8">
+                                    Your account password has been updated. You can now sign in with your new credentials.
                                 </p>
-                            </div>
-                            <button
-                                onClick={goBackToLogin}
-                                className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-sm"
-                            >
-                                Back to Sign In
-                            </button>
-                        </div>
-                    )}
+                                <button
+                                    onClick={goBackToLogin}
+                                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
+                                >
+                                    Continue to Sign In
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {view === 'login' && (
                         <p className="text-center text-muted-foreground text-sm mt-6">
