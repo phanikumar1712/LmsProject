@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
+      - FRONTEND_URL=http://localhost
     networks:
       - lms-network
     restart: unless-stopped
