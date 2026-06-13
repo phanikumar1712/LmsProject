@@ -30,7 +30,7 @@ app.use(cors({
         // Allow requests with no origin (curl, mobile apps, etc.)
         if (!origin) return callback(null, true);
         // Allow any localhost port in development
-        if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
         // Allow configured FRONTEND_URL in production
         const allowed = process.env.FRONTEND_URL;
         if (allowed && origin === allowed) return callback(null, true);
