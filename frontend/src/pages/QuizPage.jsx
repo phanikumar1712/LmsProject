@@ -103,40 +103,114 @@ export default function QuizPage() {
         return () => clearInterval(timerRef.current);
     }, [started, finished, answers, violations, submitQuiz]);
 
-    // Anti-cheat: visibility change (tab switch)
+    // Unified Anti-cheat Handler
     useEffect(() => {
         if (!started || finished) return;
+
+        let lastViolationTime = 0;
+        const VIOLATION_COOLDOWN = 2000; // Prevent multiple events from double-counting
+
+        const triggerViolation = (msg) => {
+            const now = Date.now();
+            if (now - lastViolationTime < VIOLATION_COOLDOWN) return;
+            lastViolationTime = now;
+
+            setViolations(v => {
+                const newV = v + 1;
+                if (newV >= MAX_VIOLATIONS) {
+                    setWarning(null);
+                    submitQuiz(answers, newV, true);
+                } else {
+                    setWarning(`⚠️ ${msg} ${MAX_VIOLATIONS - newV} warning(s) remaining.`);
+                    setTimeout(() => setWarning(null), 4000);
+                }
+                return newV;
+            });
+        };
+
         const handleVisibility = () => {
-            if (document.hidden) {
-                setViolations(v => {
-                    const newV = v + 1;
-                    if (newV >= MAX_VIOLATIONS) {
-                        setWarning(null);
-                        submitQuiz(answers, newV, true);
-                    } else {
-                        setWarning(`⚠️ Tab switch detected! ${MAX_VIOLATIONS - newV} warning(s) remaining before auto-submit.`);
-                        setTimeout(() => setWarning(null), 4000);
-                    }
-                    return newV;
-                });
+            if (document.hidden || document.visibilityState === 'hidden') {
+                triggerViolation('Tab switch detected!');
             }
         };
+
+        const handleBlur = () => {
+            triggerViolation('Window focus lost!');
+        };
+
+        const handleFsChange = () => {
+            if (!document.fullscreenElement) {
+                setIsFullscreen(false);
+                triggerViolation('Fullscreen exited!');
+            } else {
+                setIsFullscreen(true);
+            }
+        };
+
+        const handleKeyDown = (e) => {
+            // Detect Tab with modifiers (Ctrl+Tab, Alt+Tab, Cmd+Tab)
+            if ((e.key === 'Tab' || e.keyCode === 9) && (e.ctrlKey || e.altKey || e.metaKey)) {
+                triggerViolation('Restricted shortcut detected!');
+            }
+            // Detect DevTools shortcuts
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))) {
+                triggerViolation('Developer tools access restricted!');
+                e.preventDefault();
+            }
+            // Detect Alt+F4 or other common exit shortcuts if possible
+            if (e.altKey && e.key === 'F4') {
+                triggerViolation('Exit shortcut detected!');
+            }
+        };
+
+        const handleMouseLeave = () => {
+            // Optional: detect when mouse leaves the document (useful for multi-monitor cheating)
+            // triggerViolation('Mouse left the quiz area!'); 
+        };
+
         document.addEventListener('visibilitychange', handleVisibility);
-        return () => document.removeEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('blur', handleBlur);
+        document.addEventListener('fullscreenchange', handleFsChange);
+        window.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('mouseleave', handleMouseLeave);
+
+        // Backup integrity check (every 1.5s) to catch switches missed by events
+        const integrityInterval = setInterval(() => {
+            if (document.hidden || document.visibilityState === 'hidden') {
+                triggerViolation('Tab switch detected!');
+            }
+        }, 1500);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('blur', handleBlur);
+            document.removeEventListener('fullscreenchange', handleFsChange);
+            window.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('mouseleave', handleMouseLeave);
+            clearInterval(integrityInterval);
+        };
     }, [started, finished, answers, submitQuiz]);
 
-    // Anti-cheat: disable right-click, copy, select
+    // Anti-cheat: disable right-click, copy, paste, select
     useEffect(() => {
         if (!started || finished) return;
-        const prevent = (e) => e.preventDefault();
+        const prevent = (e) => {
+            e.preventDefault();
+            setWarning('⚠️ Right-click, Copy, and Paste are disabled for security.');
+            setTimeout(() => setWarning(null), 2000);
+        };
         document.addEventListener('contextmenu', prevent);
         document.addEventListener('copy', prevent);
+        document.addEventListener('paste', prevent);
         document.addEventListener('cut', prevent);
+        document.addEventListener('drop', prevent);
         document.addEventListener('selectstart', prevent);
         return () => {
             document.removeEventListener('contextmenu', prevent);
             document.removeEventListener('copy', prevent);
+            document.removeEventListener('paste', prevent);
             document.removeEventListener('cut', prevent);
+            document.removeEventListener('drop', prevent);
             document.removeEventListener('selectstart', prevent);
         };
     }, [started, finished]);
@@ -155,29 +229,7 @@ export default function QuizPage() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, [started, finished]);
 
-    // Anti-cheat: detect fullscreen exit
-    useEffect(() => {
-        if (!started || finished) return;
-        const handleFsChange = () => {
-            if (!document.fullscreenElement) {
-                setIsFullscreen(false);
-                setViolations(v => {
-                    const newV = v + 1;
-                    if (newV >= MAX_VIOLATIONS) {
-                        submitQuiz(answers, newV, true);
-                    } else {
-                        setWarning(`⚠️ Fullscreen exited! Please re-enter fullscreen. ${MAX_VIOLATIONS - newV} warning(s) left.`);
-                    }
-                    return newV;
-                });
-            } else {
-                setIsFullscreen(true);
-            }
-        };
-        document.addEventListener('fullscreenchange', handleFsChange);
-        return () => document.removeEventListener('fullscreenchange', handleFsChange);
-    }, [started, finished, answers, submitQuiz]);
-
+    // Fullscreen helper
     const enterFullscreen = async () => {
         try {
             await containerRef.current?.requestFullscreen?.();

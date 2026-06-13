@@ -175,6 +175,9 @@ export const ratingsAPI = {
     getMyRating: async (courseId) =>
         http('GET', `/ratings/my/${courseId}`, null, getToken()),
 
+    getByStudent: async (studentId) =>
+        http('GET', `/ratings/student/${studentId}`, null, getToken()),
+
     create: async (courseId, studentId, stars, comment) =>
         http('POST', '/ratings', { courseId, stars, comment }, getToken()),
 

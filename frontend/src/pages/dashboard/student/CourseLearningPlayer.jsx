@@ -6,7 +6,11 @@ import {
 } from 'lucide-react';
 import { coursesAPI, enrollmentsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { RatingStars } from '../../../components/ui/RatingStars';
+import { ratingsAPI } from '../../../services/api';
+import { Star } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ReactPlayer = lazy(() => import('react-player'));
 
@@ -63,6 +67,9 @@ export default function CourseLearningPlayer() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [loading, setLoading] = useState(true);
     const [marking, setMarking] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
+    const [submittingRating, setSubmittingRating] = useState(false);
 
     useEffect(() => {
         if (!user) return;
@@ -89,6 +96,28 @@ export default function CourseLearningPlayer() {
             navigate('/student/courses');
         }).finally(() => setLoading(false));
     }, [courseId, user, navigate]);
+
+    useEffect(() => {
+        if (user && courseId) {
+            ratingsAPI.getMyRating(courseId).then(r => {
+                if (r) setMyRating({ stars: r.stars, comment: r.comment || '' });
+            }).catch(() => { });
+        }
+    }, [courseId, user]);
+
+    const handleSubmitRating = async () => {
+        if (!myRating.stars) { toast.error('Please select a star rating'); return; }
+        setSubmittingRating(true);
+        try {
+            await ratingsAPI.create(courseId, user.id, myRating.stars, myRating.comment);
+            toast.success('Thank you for your feedback! ⭐');
+            setShowReviewModal(false);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setSubmittingRating(false);
+        }
+    };
 
     const isCompleted = useCallback((lessonId) => {
         return enrollment?.completedLessons?.includes(lessonId) ?? false;
@@ -186,6 +215,14 @@ export default function CourseLearningPlayer() {
                         className="text-slate-400 hover:text-white transition-colors lg:hidden flex-shrink-0"
                     >
                         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+
+                    <button
+                        onClick={() => setShowReviewModal(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-amber-400 transition-colors border border-amber-400/20"
+                    >
+                        <Star size={14} fill="currentColor" />
+                        <span className="hidden xs:block">Rate Course</span>
                     </button>
                 </div>
             </header>
@@ -423,6 +460,65 @@ export default function CourseLearningPlayer() {
                     )}
                 </div>
             </div>
+            {/* ── Review Modal ─────────────────────────────────────── */}
+            <AnimatePresence>
+                {showReviewModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowReviewModal(false)}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-8 max-w-md w-full relative z-10"
+                        >
+                            <h3 className="text-xl font-bold text-white mb-2">How's the course?</h3>
+                            <p className="text-slate-400 text-sm mb-6">Your feedback helps us and other students.</p>
+
+                            <div className="mb-6">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 block">Your Rating</label>
+                                <RatingStars
+                                    rating={myRating.stars}
+                                    size={32}
+                                    interactive
+                                    onRate={s => setMyRating(r => ({ ...r, stars: s }))}
+                                />
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 block">Your Review</label>
+                                <textarea
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-32 transition-all"
+                                    placeholder="What did you like or dislike?"
+                                    value={myRating.comment}
+                                    onChange={e => setMyRating(r => ({ ...r, comment: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleSubmitRating}
+                                    disabled={submittingRating || !myRating.stars}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all"
+                                >
+                                    {submittingRating ? 'Submitting...' : 'Submit Review'}
+                                </button>
+                                <button
+                                    onClick={() => setShowReviewModal(false)}
+                                    className="px-6 py-3 text-slate-400 font-bold hover:text-white transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

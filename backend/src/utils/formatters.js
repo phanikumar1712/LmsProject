@@ -90,6 +90,7 @@ const mapQuizAttempt = (r) => ({
     studentId: r.student_id,
     completedAt: r.completed_at,
     timeTaken: r.time_taken,
+    violations: r.violations ?? 0,
     quiz: { title: r.quiz_title, passingScore: r.passing_score },
     course: { id: r.course_id, title: r.course_title },
 });
