@@ -9,6 +9,8 @@ const mapUser = (u) => ({
     ...u,
     subscriptionPlan: u.subscription_plan || u.subscriptionPlan || 'FREE',
     subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
+    currentStreak: u.current_streak || u.currentStreak || 0,
+    longestStreak: u.longest_streak || u.longestStreak || 0,
     createdAt: u.created_at || u.createdAt,
 });
 

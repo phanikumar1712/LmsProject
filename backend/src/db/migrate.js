@@ -42,6 +42,11 @@ const createTables = async () => {
                 subscription_plan subscription_plan NOT NULL DEFAULT 'FREE',
                 subscription_expiry DATE,
                 earnings    DECIMAL(10,2) DEFAULT 0,
+                current_streak INTEGER DEFAULT 0,
+                longest_streak INTEGER DEFAULT 0,
+                last_activity_date DATE,
+                reset_otp     VARCHAR(6),
+                reset_otp_expiry TIMESTAMP,
                 created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
@@ -228,6 +233,15 @@ const createTables = async () => {
             );
         `);
 
+        // ── PLATFORM SETTINGS ─────────────────────────────────────────────────
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS platform_settings (
+                key TEXT PRIMARY KEY,
+                value JSONB NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
         // ── AUDIT LOGS ────────────────────────────────────────────────────────
         await client.query(`
             CREATE TABLE IF NOT EXISTS audit_logs (
@@ -272,6 +286,16 @@ const createTables = async () => {
             WHERE progress >= 100 AND completed_at IS NULL;
         `);
 
+        // -- ENSURE USERS TABLE HAS ALL RECENT FIELDS --
+        await client.query(`
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS last_activity_date DATE,
+            ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(6),
+            ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
+        `);
+
         // ── SEED DEFAULT CATEGORIES ───────────────────────────────────────────
         await client.query(`
             INSERT INTO categories (name, icon) VALUES
@@ -290,6 +314,34 @@ const createTables = async () => {
                 ('ENTERPRISE', 49.99, 30, ARRAY['All PRO features', 'Team management', 'Custom LMS branding', 'API access', 'Dedicated account manager'], false)
             ON CONFLICT (name) DO NOTHING;
         `);
+
+        // ── SEED DEFAULT SETTINGS ─────────────────────────────────────────────
+        const defaultSettings = {
+            siteName: 'EduNexus LMS',
+            siteTagline: 'Learn Without Limits',
+            supportEmail: 'support@edunexus.com',
+            defaultCurrency: 'INR',
+            instructorRevenueShare: 70,
+            maxUploadSizeMB: 500,
+            requireApproval: true,
+            maintenanceMode: false,
+            smtpHost: 'smtp.sendgrid.net',
+            smtpPort: '587',
+            emailFrom: 'noreply@edunexus.com',
+            razorpayEnabled: true,
+            stripeEnabled: false,
+            jwtExpiryDays: 1,
+            maxLoginAttempts: 5,
+            twoFactorRequired: false,
+            newEnrollmentNotif: true,
+            newReviewNotif: true,
+            weeklyReportEmail: true,
+        };
+        await client.query(`
+            INSERT INTO platform_settings (key, value) 
+            VALUES ('global', $1)
+            ON CONFLICT (key) DO NOTHING;
+        `, [JSON.stringify(defaultSettings)]);
 
         // ── SEED SUPER ADMIN ──────────────────────────────────────────────────
         const bcrypt = require('bcryptjs');

@@ -55,6 +55,10 @@ export const authAPI = {
         return http('POST', '/auth/reset-password', { email, otp, newPassword });
     },
 
+    verifyOTP: async (email, otp) => {
+        return http('POST', '/auth/verify-otp', { email, otp });
+    },
+
     loginWithDemo: async (role = 'STUDENT') => {
         return http('POST', '/auth/demo', { role });
     },
@@ -72,7 +76,8 @@ export const coursesAPI = {
         if (filters.sort) params.set('sort', filters.sort);
         if (filters.limit) params.set('limit', filters.limit);
         const token = filters.admin ? getToken() : null;
-        return http('GET', `/courses?${params.toString()}`, null, token);
+        const res = await http('GET', `/courses?${params.toString()}`, null, token);
+        return res.data || [];
     },
 
     getById: async (id) => http('GET', `/courses/${id}`),
@@ -118,8 +123,10 @@ export const coursesAPI = {
 
 // ─── ENROLLMENTS ─────────────────────────────────────────────────────────────
 export const enrollmentsAPI = {
-    getByStudent: async (studentId) =>
-        http('GET', `/enrollments/student/${studentId}`, null, getToken()),
+    getByStudent: async (studentId) => {
+        const res = await http('GET', `/enrollments/student/${studentId}`, null, getToken());
+        return res.data || [];
+    },
 
     enroll: async (studentId, courseId) =>
         http('POST', '/enrollments', { courseId }, getToken()),
@@ -130,8 +137,10 @@ export const enrollmentsAPI = {
     markLessonComplete: async (studentId, courseId, lessonId) =>
         http('PUT', '/enrollments/progress', { courseId, lessonId }, getToken()),
 
-    getStats: async (instructorId) =>
-        http('GET', `/enrollments/stats/${instructorId}`, null, getToken()),
+    getStats: async (instructorId) => {
+        const res = await http('GET', `/enrollments/stats/${instructorId}`, null, getToken());
+        return res.data || [];
+    },
 };
 
 // ─── QUIZZES ─────────────────────────────────────────────────────────────────
@@ -181,8 +190,10 @@ export const ratingsAPI = {
 
 // ─── USERS (Admin) ────────────────────────────────────────────────────────────
 export const usersAPI = {
-    getAll: async () =>
-        http('GET', '/users', null, getToken()),
+    getAll: async () => {
+        const res = await http('GET', '/users', null, getToken());
+        return res.data || res; // handle both wrapped and plain
+    },
 
     updateRole: async (userId, role) =>
         http('PUT', `/users/${userId}/role`, { role }, getToken()),
@@ -220,8 +231,10 @@ export const subscriptionsAPI = {
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
 export const notificationsAPI = {
-    getByUser: async (userId) =>
-        http('GET', '/notifications', null, getToken()),
+    getByUser: async (userId) => {
+        const res = await http('GET', '/notifications', null, getToken());
+        return res.data || [];
+    },
 
     markRead: async (userId, notifId) =>
         http('PUT', `/notifications/${notifId}/read`, {}, getToken()),
@@ -264,6 +277,12 @@ export const statsAPI = {
 
     deleteCategory: async (id) =>
         http('DELETE', `/stats/categories/${id}`, null, getToken()),
+
+    getSettings: async () =>
+        http('GET', '/stats/settings', null, getToken()),
+
+    updateSettings: async (settings) =>
+        http('PUT', '/stats/settings', settings, getToken()),
 };
 
 // ─── WISHLIST ─────────────────────────────────────────────────────────────────
@@ -271,8 +290,10 @@ export const wishlistAPI = {
     toggle: async (userId, courseId) =>
         http('POST', '/wishlist/toggle', { courseId }, getToken()),
 
-    get: async (userId) =>
-        http('GET', '/wishlist', null, getToken()),
+    get: async (userId) => {
+        const res = await http('GET', '/wishlist', null, getToken());
+        return res.data || [];
+    },
 };
 
 // ─── UPLOADS ──────────────────────────────────────────────────────────────────

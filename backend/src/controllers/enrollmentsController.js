@@ -99,6 +99,9 @@ const updateProgress = async (req, res) => {
     );
 
     // Track active learning for streak
+    const { updateStreak } = require('../utils/streak');
+    await updateStreak(req.user.id).catch(() => { });
+
     await query(
         `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
         [req.user.id, 'LESSON_COMPLETED', 'lessons', lessonId]

@@ -649,15 +649,15 @@ export default function HomePage() {
                         >
                             <div className="hp-hero__badge">
                                 <div className="hp-hero__badge-dot" />
-                                NEW: Generative AI Mastery Course
+                                {courses.length > 0 ? `NEW: ${courses[0].title}` : 'NEW: Generative AI Mastery Course'}
                             </div>
                             <h1 className="hp-hero__title">
                                 Master Skills with
                                 <span className="hp-hero__title-gradient">Expert Instructors</span>
                             </h1>
                             <p className="hp-hero__subtitle">
-                                Access 50+ premium courses in design, development, and business.
-                                Join 10,000+ students and transform your career with project-based learning.
+                                Access {stats?.totalCourses || 50}+ premium courses in design, development, and business.
+                                Join {stats?.totalStudents ? stats.totalStudents.toLocaleString() : '10,000'}+ students and transform your career with project-based learning.
                             </p>
 
                             <div className="hp-hero__ctas">
@@ -735,7 +735,7 @@ export default function HomePage() {
                                     </div>
                                     <div>
                                         <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 800 }}>Active Learners</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600 }}>2.4K online now</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600 }}>{stats?.totalStudents ? `${Math.floor(stats.totalStudents * 0.12).toLocaleString()} online now` : '2.4K online now'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -923,7 +923,7 @@ export default function HomePage() {
                                         whileInView={{ opacity: 1, y: 0 }}
                                         viewport={{ once: true }}
                                         transition={{ delay: (i % 4) * 0.08 }}
-                                        onClick={() => navigate(`/course/${course.id}`)}
+                                        onClick={() => navigate(`/courses/${course.id}`)}
                                     >
                                         <div className="hp-card__thumb">
                                             <img src={thumbnail} alt={course.title} loading="lazy" />

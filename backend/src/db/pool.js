@@ -6,8 +6,16 @@ const net = require('net');
 // it aborts the entire TCP handshake causing sporadic ETIMEDOUT on NeonDB.
 const originalConnect = net.Socket.prototype.connect;
 net.Socket.prototype.connect = function (...args) {
-    if (args[0] && typeof args[0] === 'object') {
+    if (typeof args[0] === 'object' && args[0] !== null) {
         args[0].family = 4;
+    } else if (typeof args[1] === 'string') {
+        // signature: connect(port, host, listener)
+        // host is the second argument
+        // We can't easily force family here without converting to options object
+        const port = args[0];
+        const host = args[1];
+        const listener = typeof args[2] === 'function' ? args[2] : undefined;
+        return originalConnect.call(this, { port, host, family: 4 }, listener);
     }
     return originalConnect.apply(this, args);
 };

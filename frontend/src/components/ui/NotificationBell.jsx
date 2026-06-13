@@ -25,7 +25,7 @@ export function NotificationBell() {
 
     useEffect(() => {
         if (!user) return;
-        notificationsAPI.getByUser(user.id).then(setNotifs);
+        notificationsAPI.getByUser(user.id).then(setNotifs).catch(() => setNotifs([]));
     }, [user]);
 
     useEffect(() => {

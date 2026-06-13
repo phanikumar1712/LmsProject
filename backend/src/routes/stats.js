@@ -13,5 +13,7 @@ router.post('/categories', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyn
 router.put('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateCategory));
 router.delete('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.deleteCategory));
 router.get('/system-health', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getSystemHealth));
+router.get('/settings', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getPlatformSettings));
+router.put('/settings', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.updatePlatformSettings));
 
 module.exports = router;
