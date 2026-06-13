@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { User, Lock, Camera, Save, Shield, Mail, Calendar, CreditCard, CheckCircle, Upload, Loader2 } from 'lucide-react';
+import { User, Lock, Camera, Save, Shield, Mail, Calendar, CreditCard, CheckCircle, Upload, Loader2, MessageSquare, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI, uploadAPI } from '../services/api';
+import { authAPI, uploadAPI, ratingsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const PLAN_COLORS = {
@@ -25,6 +25,8 @@ export default function ProfilePage() {
     const [saving, setSaving] = useState(false);
     const [changingPwd, setChangingPwd] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [myReviews, setMyReviews] = useState([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
     const fileInputRef = useRef(null);
 
     const [form, setForm] = useState({
@@ -115,6 +117,16 @@ export default function ProfilePage() {
         }
     };
 
+    useEffect(() => {
+        if (activeTab === 'reviews' && user) {
+            setLoadingReviews(true);
+            ratingsAPI.getByStudent(user.id)
+                .then(setMyReviews)
+                .catch(() => toast.error('Failed to load reviews'))
+                .finally(() => setLoadingReviews(false));
+        }
+    }, [activeTab, user]);
+
     const handleRemovePhoto = () => {
         setForm(prev => ({ ...prev, avatar: '' }));
     };
@@ -127,6 +139,7 @@ export default function ProfilePage() {
     const TABS = [
         { id: 'profile', label: 'Edit Profile', icon: User },
         { id: 'security', label: 'Security', icon: Lock },
+        { id: 'reviews', label: 'My Reviews', icon: MessageSquare },
         { id: 'account', label: 'Account Info', icon: Shield },
     ];
 
@@ -389,6 +402,53 @@ export default function ProfilePage() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'reviews' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-extrabold text-slate-900">My Course Feedback</h3>
+                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-xs font-bold">{myReviews.length} Reviews</span>
+                    </div>
+
+                    {loadingReviews ? (
+                        <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-3">
+                            <Loader2 className="animate-spin" size={24} />
+                            <p className="text-sm font-medium">Loading your feedback...</p>
+                        </div>
+                    ) : myReviews.length === 0 ? (
+                        <div className="py-20 text-center bg-slate-50 border border-slate-200 border-dashed rounded-2xl">
+                            <MessageSquare className="mx-auto mb-4 text-slate-300" size={40} />
+                            <h4 className="text-slate-900 font-bold">No reviews yet</h4>
+                            <p className="text-slate-500 text-sm max-w-[240px] mx-auto mt-1">Start learning a course and share your experience with others.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {myReviews.map(r => (
+                                <div key={r.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-100 transition-colors">
+                                    <div className="flex justify-between items-start gap-4 mb-3">
+                                        <div>
+                                            <h4 className="text-slate-900 font-bold text-sm leading-snug">{r.courseTitle}</h4>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Reviewed on {new Date(r.createdAt).toLocaleDateString()}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1 bg-amber-50 text-amber-500 px-2 py-0.5 rounded-lg border border-amber-100 shrink-0">
+                                            <span className="text-xs font-black">{r.stars}</span>
+                                            <Star size={12} fill="currentColor" />
+                                        </div>
+                                    </div>
+                                    <p className="text-slate-600 text-sm italic">"{r.comment || 'No comment provided.'}"</p>
+
+                                    {r.instructorReply && (
+                                        <div className="mt-4 p-3 bg-white border border-slate-100 rounded-xl">
+                                            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Instructor Reply:</p>
+                                            <p className="text-slate-500 text-xs">{r.instructorReply}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

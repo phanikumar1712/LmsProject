@@ -152,4 +152,21 @@ const deleteRating = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { getAll, getByInstructor, getByCourse, getMyRating, create, replyToReview, likeReview, deleteRating };
+// GET /api/ratings/student/:studentId
+const getByStudent = async (req, res) => {
+    const { studentId } = req.params;
+    if (req.user.role === 'STUDENT' && req.user.id !== studentId) {
+        throw createError('Forbidden', 403);
+    }
+    const result = await query(`
+        SELECT ${ratingFields}, c.title as "courseTitle"
+        FROM ratings r
+        JOIN users u ON r.student_id = u.id
+        JOIN courses c ON r.course_id = c.id
+        WHERE r.student_id = $1
+        ORDER BY r.created_at DESC
+    `, [studentId]);
+    res.json(result.rows.map(r => ({ ...mapRating(r), courseTitle: r.courseTitle })));
+};
+
+module.exports = { getAll, getByInstructor, getByCourse, getMyRating, getByStudent, create, replyToReview, likeReview, deleteRating };
