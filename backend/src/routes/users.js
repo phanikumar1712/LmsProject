@@ -1,7 +1,12 @@
 const router = require('express').Router();
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const ctrl = require('../controllers/usersController');
+
+// Public instructor profile (with optional auth for follower status)
+router.get('/instructor/:id', optionalAuth, asyncHandler(ctrl.getInstructorProfile));
+router.post('/instructor/:id/follow', authenticate, asyncHandler(ctrl.followInstructor));
+router.post('/instructor/:id/unfollow', authenticate, asyncHandler(ctrl.unfollowInstructor));
 
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));

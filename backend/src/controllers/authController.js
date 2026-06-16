@@ -149,7 +149,8 @@ const requestPasswordReset = async (req, res) => {
         // We don't want to fail the request for the user, but maybe in development we'd like to know.
         // For production, fallback to dummy success or throw error depending on requirements.
         if (process.env.NODE_ENV === 'development') {
-            return res.json({ success: true, message: `(Dev) OTP generated: ${otp}. Email send failed: ${mailRes.error}` });
+            const errMsg = typeof mailRes.error === 'object' ? JSON.stringify(mailRes.error) : mailRes.error;
+            return res.json({ success: true, message: `(Dev) OTP generated: ${otp}. Email send failed: ${errMsg}` });
         }
     }
 

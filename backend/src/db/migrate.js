@@ -256,17 +256,27 @@ const createTables = async () => {
             );
         `);
 
+        // ── FOLLOWS ───────────────────────────────────────────────────────────
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS follows (
+                follower_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+                following_id    UUID REFERENCES users(id) ON DELETE CASCADE,
+                created_at      TIMESTAMPTZ DEFAULT NOW(),
+                PRIMARY KEY (follower_id, following_id)
+            );
+        `);
+
         // ── INDEXES ───────────────────────────────────────────────────────────
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_status ON courses(status);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_ratings_course ON ratings(course_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_instructor_requests_user ON instructor_requests(user_id);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_status ON courses(status); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_ratings_course ON ratings(course_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_instructor_requests_user ON instructor_requests(user_id); `);
 
         // ── PATCH EXISTING DATABASES ──────────────────────────────────────────
         await client.query(`
@@ -291,28 +301,28 @@ const createTables = async () => {
             ALTER TABLE users 
             ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS last_activity_date DATE,
-            ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(6),
-            ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
+                ADD COLUMN IF NOT EXISTS last_activity_date DATE,
+                    ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(6),
+                        ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
         `);
 
         // ── SEED DEFAULT CATEGORIES ───────────────────────────────────────────
         await client.query(`
-            INSERT INTO categories (name, icon) VALUES
-                ('Development', '💻'), ('Design', '🎨'), ('Marketing', '📊'),
-                ('Business', '💼'), ('Data Science', '📈'), ('Photography', '📷'),
-                ('Music', '🎵'), ('Health', '🏃'), ('Personal Development', '🚀'), ('Finance', '💰')
-            ON CONFLICT (name) DO NOTHING;
+            INSERT INTO categories(name, icon) VALUES
+            ('Development', '💻'), ('Design', '🎨'), ('Marketing', '📊'),
+            ('Business', '💼'), ('Data Science', '📈'), ('Photography', '📷'),
+            ('Music', '🎵'), ('Health', '🏃'), ('Personal Development', '🚀'), ('Finance', '💰')
+            ON CONFLICT(name) DO NOTHING;
         `);
 
         // ── SEED SUBSCRIPTION PLANS ───────────────────────────────────────────
         await client.query(`
-            INSERT INTO subscription_plans (name, price, duration, features, popular) VALUES
-                ('FREE', 0, 0, ARRAY['Access to free courses', 'Community support', 'Certificate on completion'], false),
-                ('BASIC', 9.99, 30, ARRAY['50+ Premium courses', 'HD Video quality', 'Certificate on completion', '1 course download'], false),
-                ('PRO', 19.99, 30, ARRAY['All BASIC features', 'Unlimited premium courses', 'Offline downloads', 'Priority support', 'Advanced analytics'], true),
-                ('ENTERPRISE', 49.99, 30, ARRAY['All PRO features', 'Team management', 'Custom LMS branding', 'API access', 'Dedicated account manager'], false)
-            ON CONFLICT (name) DO NOTHING;
+            INSERT INTO subscription_plans(name, price, duration, features, popular) VALUES
+            ('FREE', 0, 0, ARRAY['Access to free courses', 'Community support', 'Certificate on completion'], false),
+            ('BASIC', 9.99, 30, ARRAY['50+ Premium courses', 'HD Video quality', 'Certificate on completion', '1 course download'], false),
+            ('PRO', 19.99, 30, ARRAY['All BASIC features', 'Unlimited premium courses', 'Offline downloads', 'Priority support', 'Advanced analytics'], true),
+            ('ENTERPRISE', 49.99, 30, ARRAY['All PRO features', 'Team management', 'Custom LMS branding', 'API access', 'Dedicated account manager'], false)
+            ON CONFLICT(name) DO NOTHING;
         `);
 
         // ── SEED DEFAULT SETTINGS ─────────────────────────────────────────────
@@ -338,18 +348,18 @@ const createTables = async () => {
             weeklyReportEmail: true,
         };
         await client.query(`
-            INSERT INTO platform_settings (key, value) 
-            VALUES ('global', $1)
-            ON CONFLICT (key) DO NOTHING;
+            INSERT INTO platform_settings(key, value)
+        VALUES('global', $1)
+            ON CONFLICT(key) DO NOTHING;
         `, [JSON.stringify(defaultSettings)]);
 
         // ── SEED SUPER ADMIN ──────────────────────────────────────────────────
         const bcrypt = require('bcryptjs');
         const hashedPassword = await bcrypt.hash('admin123', 12);
         await client.query(`
-            INSERT INTO users (name, email, password, role, avatar)
-            VALUES ('Super Admin', 'superadmin@lms.com', $1, 'SUPER_ADMIN', 'https://api.dicebear.com/7.x/avataaars/svg?seed=SuperAdmin')
-            ON CONFLICT (email) DO NOTHING;
+            INSERT INTO users(name, email, password, role, avatar)
+        VALUES('Super Admin', 'superadmin@lms.com', $1, 'SUPER_ADMIN', 'https://api.dicebear.com/7.x/avataaars/svg?seed=SuperAdmin')
+            ON CONFLICT(email) DO NOTHING;
         `, [hashedPassword]);
 
         // ── SEED DEMO USERS ───────────────────────────────────────────────────
@@ -361,10 +371,10 @@ const createTables = async () => {
         const demoPass = await bcrypt.hash('demo123', 12);
         for (const u of demoUsers) {
             await client.query(`
-                INSERT INTO users (name, email, password, role, avatar)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (email) DO NOTHING;
-            `, [u.name, u.email, demoPass, u.role, `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`]);
+                INSERT INTO users(name, email, password, role, avatar)
+        VALUES($1, $2, $3, $4, $5)
+                ON CONFLICT(email) DO NOTHING;
+        `, [u.name, u.email, demoPass, u.role, `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`]);
         }
 
         await client.query('COMMIT');
