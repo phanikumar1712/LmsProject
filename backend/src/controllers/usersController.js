@@ -159,4 +159,89 @@ const approveInstructorRequest = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { getAll, updateRole, toggleStatus, assignPlan, deleteUser, submitInstructorRequest, getInstructorRequests, approveInstructorRequest };
+// GET /api/users/instructor/:id (Public)
+const getInstructorProfile = async (req, res) => {
+    const instructorId = req.params.id;
+    const currentUserId = req.user?.id;
+
+    const userRes = await query(
+        `SELECT id, name, avatar, bio, created_at as "joinedAt" 
+         FROM users 
+         WHERE id = $1 AND role = 'INSTRUCTOR'`,
+        [instructorId]
+    );
+
+    if (!userRes.rows.length) throw createError('Instructor not found', 404);
+
+    const instructor = userRes.rows[0];
+
+    // Get follower count
+    const followersRes = await query('SELECT COUNT(*)::int as total FROM follows WHERE following_id = $1', [instructorId]);
+    instructor.followerCount = followersRes.rows[0].total;
+
+    // Check if current user is following
+    instructor.isFollowing = false;
+    if (currentUserId) {
+        const followCheck = await query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [currentUserId, instructorId]);
+        instructor.isFollowing = followCheck.rows.length > 0;
+    }
+
+    // Get instructor's courses
+    const { mapCourse } = require('../utils/formatters');
+    const instructorCoursesFields = `
+        c.id, c.title, c.thumbnail, c.price, c.discount_price,
+        c.level, c.rating, c.review_count, c.enrollment_count, c.duration,
+        u.name as "instructorName", u.avatar as "instructorAvatar"
+    `;
+
+    const coursesRes = await query(
+        `SELECT ${instructorCoursesFields}
+         FROM courses c
+         JOIN users u ON c.instructor_id = u.id
+         WHERE c.instructor_id = $1 AND c.status = 'PUBLISHED'
+         ORDER BY c.created_at DESC`,
+        [instructorId]
+    );
+
+    res.json({
+        instructor,
+        courses: coursesRes.rows.map(mapCourse)
+    });
+};
+
+// POST /api/users/instructor/:id/follow
+const followInstructor = async (req, res) => {
+    const instructorId = req.params.id;
+    const followerId = req.user.id;
+
+    if (instructorId === followerId) throw createError('You cannot follow yourself', 400);
+
+    // Check if already following
+    const check = await query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [followerId, instructorId]);
+    if (check.rows.length > 0) return res.json({ success: true, message: 'Already following' });
+
+    await query('INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)', [followerId, instructorId]);
+
+    // Optional: Create notification for instructor
+    await query(
+        'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
+        [instructorId, `${req.user.name} started following you!`, 'system']
+    );
+
+    res.json({ success: true });
+};
+
+// POST /api/users/instructor/:id/unfollow
+const unfollowInstructor = async (req, res) => {
+    const instructorId = req.params.id;
+    const followerId = req.user.id;
+
+    await query('DELETE FROM follows WHERE follower_id = $1 AND following_id = $2', [followerId, instructorId]);
+    res.json({ success: true });
+};
+
+module.exports = {
+    getAll, updateRole, toggleStatus, assignPlan, deleteUser,
+    submitInstructorRequest, getInstructorRequests, approveInstructorRequest,
+    getInstructorProfile, followInstructor, unfollowInstructor
+};
