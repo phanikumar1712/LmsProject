@@ -81,7 +81,7 @@ export default function StudentDashboard() {
                     />
                     {loading ? (
                         <div className="space-y-3">
-                            {[1, 2].map(i => <div key={i} className="bg-white border border-slate-200 rounded-xl h-28 animate-pulse" />)}
+                            {[1, 2].map(i => <div key={i} className="bg-card border border-border rounded-xl h-28 animate-pulse" />)}
                         </div>
                     ) : inProgressCourses.length === 0 && safeEnrollments.length === 0 ? (
                         <EmptyState
@@ -98,29 +98,29 @@ export default function StudentDashboard() {
                             {(inProgressCourses.length > 0 ? inProgressCourses : safeEnrollments).slice(0, 4).map(e => (
                                 <div
                                     key={e.id}
-                                    className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group"
+                                    className="bg-card border border-border rounded-xl p-4 flex gap-4 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition-all cursor-pointer group"
                                     onClick={() => navigate(`/courses/${e.courseId}/learn`)}
                                 >
                                     {e.course?.thumbnail ? (
-                                        <div className="w-24 h-20 rounded-lg overflow-hidden shrink-0 bg-slate-100">
+                                        <div className="w-24 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
                                             <img src={e.course.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                         </div>
                                     ) : (
-                                        <div className="w-24 h-20 rounded-lg bg-slate-100 shrink-0 flex items-center justify-center">
-                                            <BookOpen size={24} className="text-slate-300" />
+                                        <div className="w-24 h-20 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+                                            <BookOpen size={24} className="text-muted-foreground/30" />
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                        <p className="text-slate-900 font-bold text-base truncate mb-1 group-hover:text-indigo-600 transition-colors">{e.course?.title}</p>
-                                        <p className="text-slate-500 text-sm mb-3 truncate">{e.course?.instructorName}</p>
+                                        <p className="text-foreground font-bold text-base truncate mb-1 group-hover:text-indigo-600 transition-colors">{e.course?.title}</p>
+                                        <p className="text-muted-foreground text-sm mb-3 truncate">{e.course?.instructorName}</p>
                                         <div className="flex items-center gap-3">
                                             <div className="flex-1"><ProgressBar value={e.progress} /></div>
-                                            <span className="text-xs font-bold text-slate-700">{e.progress}%</span>
+                                            <span className="text-xs font-bold text-foreground">{e.progress}%</span>
                                         </div>
                                     </div>
                                     <div className="hidden sm:flex items-center shrink-0">
-                                        <button className="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-indigo-50 border border-slate-200 group-hover:border-indigo-100 flex items-center justify-center transition-colors">
-                                            <Play size={16} className="text-slate-400 group-hover:text-indigo-600 ml-1 transition-colors" fill="currentColor" />
+                                        <button className="w-10 h-10 rounded-full bg-muted group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 border border-border group-hover:border-indigo-200 dark:group-hover:border-indigo-700 flex items-center justify-center transition-colors">
+                                            <Play size={16} className="text-muted-foreground group-hover:text-indigo-600 ml-1 transition-colors" fill="currentColor" />
                                         </button>
                                     </div>
                                 </div>
@@ -132,25 +132,25 @@ export default function StudentDashboard() {
                 {/* Side Panel */}
                 <div className="space-y-6">
                     {/* Subscription */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-slate-900 font-bold">Subscription</h3>
+                            <h3 className="text-foreground font-bold">Subscription</h3>
                             <span className="badge" style={{ backgroundColor: `${planColor}15`, color: planColor }}>
                                 {user.subscriptionPlan}
                             </span>
                         </div>
-                        <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-muted/50 rounded-lg">
                             <CreditCard size={18} style={{ color: planColor }} />
                             <div>
-                                <p className="text-slate-900 font-medium text-sm">Active Plan</p>
+                                <p className="text-foreground font-medium text-sm">Active Plan</p>
                                 {user.subscriptionExpiry
-                                    ? <p className="text-slate-500 text-xs mt-0.5">Renews on: {user.subscriptionExpiry}</p>
-                                    : <p className="text-slate-500 text-xs mt-0.5">Free forever</p>}
+                                    ? <p className="text-muted-foreground text-xs mt-0.5">Renews on: {user.subscriptionExpiry}</p>
+                                    : <p className="text-muted-foreground text-xs mt-0.5">Free forever</p>}
                             </div>
                         </div>
                         <Link
                             to="/student/subscription"
-                            className="text-sm font-medium flex items-center justify-center w-full py-2 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="text-sm font-medium flex items-center justify-center w-full py-2 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
                             style={{ color: planColor }}
                         >
                             {user.subscriptionPlan === 'FREE' ? 'Upgrade Plan' : 'Manage Subscription'}
@@ -158,10 +158,10 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Learning Streak */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-slate-900 font-bold">Learning Streak</h3>
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 rounded-full text-amber-600">
+                            <h3 className="text-foreground font-bold">Learning Streak</h3>
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/20 rounded-full text-amber-600 dark:text-amber-400">
                                 <Flame size={16} fill="currentColor" />
                                 <span className="text-sm font-bold">{safeStreak.currentStreak} days</span>
                             </div>
@@ -169,10 +169,10 @@ export default function StudentDashboard() {
                         <div className="flex justify-between items-center gap-1">
                             {safeStreak.streakDays.map((day, i) => (
                                 <div key={i} className="flex flex-col items-center">
-                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-2 text-xs transition-colors ${safeStreak.activeStreak[i] ? 'bg-amber-100 text-amber-600 ring-2 ring-amber-100 ring-offset-1' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
-                                        {safeStreak.activeStreak[i] ? <Flame size={16} fill="currentColor" /> : <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
+                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-2 text-xs transition-colors ${safeStreak.activeStreak[i] ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 ring-2 ring-amber-200 ring-offset-1 dark:ring-offset-card' : 'bg-muted text-muted-foreground border border-border'}`}>
+                                        {safeStreak.activeStreak[i] ? <Flame size={16} fill="currentColor" /> : <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />}
                                     </div>
-                                    <span className="text-slate-500 text-[11px] font-medium">{day}</span>
+                                    <span className="text-muted-foreground text-[11px] font-medium">{day}</span>
                                 </div>
                             ))}
                         </div>
@@ -180,7 +180,7 @@ export default function StudentDashboard() {
 
                     {/* Recent Quizzes */}
                     {safeAttempts.length > 0 && (
-                        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                             <SectionHeader
                                 title="Recent Quizzes"
                                 link={
@@ -191,11 +191,11 @@ export default function StudentDashboard() {
                             />
                             <div className="space-y-3">
                                 {safeAttempts.slice(0, 3).map(a => (
-                                    <div key={a.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
+                                    <div key={a.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer">
                                         <div className="min-w-0 flex-1 pr-4">
-                                            <p className="text-slate-900 text-sm font-medium truncate">{a.quiz?.title || 'Knowledge Check'}</p>
+                                            <p className="text-foreground text-sm font-medium truncate">{a.quiz?.title || 'Knowledge Check'}</p>
                                         </div>
-                                        <span className={`px-2.5 py-1 text-xs font-bold rounded-full flex-shrink-0 ${a.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        <span className={`px-2.5 py-1 text-xs font-bold rounded-full flex-shrink-0 ${a.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'}`}>
                                             {a.score}%
                                         </span>
                                     </div>
@@ -219,17 +219,17 @@ export default function StudentDashboard() {
                     />
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {completedCourses.map(e => (
-                            <div key={e.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow cursor-pointer">
+                            <div key={e.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow cursor-pointer">
                                 {e.course?.thumbnail ? (
-                                    <img src={e.course.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 bg-slate-100" />
+                                    <img src={e.course.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 bg-muted" />
                                 ) : (
-                                    <div className="w-16 h-16 rounded-lg bg-slate-50 shrink-0 flex items-center justify-center border border-slate-100">
-                                        <Award size={20} className="text-slate-300" />
+                                    <div className="w-16 h-16 rounded-lg bg-muted shrink-0 flex items-center justify-center border border-border">
+                                        <Award size={20} className="text-muted-foreground/30" />
                                     </div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-slate-900 text-sm font-bold truncate mb-1">{e.course?.title}</p>
-                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-50 text-green-700 rounded text-[11px] font-bold uppercase tracking-wide">
+                                    <p className="text-foreground text-sm font-bold truncate mb-1">{e.course?.title}</p>
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-[11px] font-bold uppercase tracking-wide">
                                         <Award size={12} /> Completed
                                     </div>
                                 </div>

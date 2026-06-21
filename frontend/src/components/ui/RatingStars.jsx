@@ -11,8 +11,8 @@ export function RatingStars({ rating, size = 14, interactive = false, onRate, ma
                     <Star
                         key={star}
                         size={size}
-                        className={`star cursor-pointer transition-colors ${star <= numericRating ? 'text-yellow-400' : 'text-gray-600'}`}
-                        fill={star <= numericRating ? '#facc15' : 'none'}
+                        className={`star cursor-pointer transition-all hover:scale-110 ${star <= numericRating ? 'text-amber-400' : 'text-muted-foreground/30'}`}
+                        fill={star <= numericRating ? 'currentColor' : 'none'}
                         onClick={() => onRate?.(star)}
                     />
                 ))}
@@ -26,8 +26,8 @@ export function RatingStars({ rating, size = 14, interactive = false, onRate, ma
                 <Star
                     key={star}
                     size={size}
-                    className={star <= Math.round(numericRating) ? 'text-yellow-400' : 'text-gray-600'}
-                    fill={star <= Math.round(numericRating) ? '#facc15' : 'none'}
+                    className={star <= Math.round(numericRating) ? 'text-amber-400' : 'text-muted-foreground/30'}
+                    fill={star <= Math.round(numericRating) ? 'currentColor' : 'none'}
                 />
             ))}
         </div>
@@ -39,9 +39,9 @@ export function RatingDisplay({ rating, count }) {
     return (
         <div className="flex items-center gap-1.5">
             <RatingStars rating={numericRating} size={13} />
-            <span className="text-yellow-400 font-semibold text-sm">{numericRating.toFixed(1)}</span>
+            <span className="text-amber-400 font-bold text-sm tracking-tight">{numericRating.toFixed(1)}</span>
             {count !== undefined && count !== null && (
-                <span className="text-gray-500 text-xs">({Number(count).toLocaleString()})</span>
+                <span className="text-muted-foreground/60 text-xs font-medium">({Number(count).toLocaleString()})</span>
             )}
         </div>
     );

@@ -88,7 +88,7 @@ export default function BecomeInstructorPage() {
         }
     };
 
-    const inputCls = 'w-full bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl py-3 px-4 focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow text-sm font-medium';
+    const inputCls = 'w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-3 px-4 focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow text-sm font-medium';
 
     if (step === 3) {
         return (
@@ -96,12 +96,12 @@ export default function BecomeInstructorPage() {
                 <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8 border-2 border-emerald-200">
                     <CheckCircle size={40} className="text-emerald-600" />
                 </div>
-                <h1 className="text-3xl font-extrabold text-slate-900 mb-4 tracking-tight">Application Submitted!</h1>
-                <p className="text-slate-500 text-lg font-medium mb-3">
-                    Thanks for applying, <strong className="text-slate-700">{user?.name?.split(' ')[0]}</strong>!
+                <h1 className="text-3xl font-extrabold text-foreground mb-4 tracking-tight">Application Submitted!</h1>
+                <p className="text-muted-foreground text-lg font-medium mb-3">
+                    Thanks for applying, <strong className="text-foreground/80">{user?.name?.split(' ')[0]}</strong>!
                 </p>
-                <p className="text-slate-500 mb-10">
-                    Our team will review your application and send a decision to <strong className="text-slate-700">{user?.email}</strong> within 2–3 business days.
+                <p className="text-muted-foreground mb-10">
+                    Our team will review your application and send a decision to <strong className="text-foreground/80">{user?.email}</strong> within 2–3 business days.
                 </p>
                 <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8 text-left">
                     <h3 className="text-indigo-900 font-bold mb-3">What happens next?</h3>
@@ -129,7 +129,7 @@ export default function BecomeInstructorPage() {
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, white 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
                 <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-8">
                     <div className="flex-1">
-                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-bold mb-6">
+                        <div className="inline-flex items-center gap-2 bg-card/20 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-bold mb-6">
                             <Zap size={14} fill="currentColor" /> Instructor Program
                         </div>
                         <h1 className="text-4xl font-extrabold mb-4 tracking-tight leading-tight">
@@ -139,7 +139,7 @@ export default function BecomeInstructorPage() {
                             Join {stats?.totalInstructors ? `${stats.totalInstructors}+` : '200+'} instructors teaching on EduNexus. Create courses, build your audience, and earn revenue doing what you love.
                         </p>
                     </div>
-                    <div className="flex flex-col gap-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 flex-shrink-0 min-w-[220px]">
+                    <div className="flex flex-col gap-4 bg-card/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 flex-shrink-0 min-w-[220px]">
                         <div className="text-center">
                             <p className="text-4xl font-extrabold">₹1L+</p>
                             <p className="text-white/70 text-sm font-medium">Top monthly earnings</p>
@@ -158,15 +158,15 @@ export default function BecomeInstructorPage() {
 
             {/* Benefits */}
             <div>
-                <h2 className="text-2xl font-extrabold text-slate-900 mb-6 tracking-tight">Why Teach on EduNexus?</h2>
+                <h2 className="text-2xl font-extrabold text-foreground mb-6 tracking-tight">Why Teach on EduNexus?</h2>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {BENEFITS.map(({ icon: Icon, color, bg, title, desc }) => (
-                        <div key={title} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                        <div key={title} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ backgroundColor: bg }}>
                                 <Icon size={22} style={{ color }} />
                             </div>
-                            <h3 className="text-slate-900 font-bold text-base mb-2">{title}</h3>
-                            <p className="text-slate-500 text-sm font-medium leading-relaxed">{desc}</p>
+                            <h3 className="text-foreground font-bold text-base mb-2">{title}</h3>
+                            <p className="text-muted-foreground text-sm font-medium leading-relaxed">{desc}</p>
                         </div>
                     ))}
                 </div>
@@ -176,13 +176,13 @@ export default function BecomeInstructorPage() {
             <div className="grid lg:grid-cols-3 gap-8">
                 {/* Requirements */}
                 <div className="space-y-6">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                        <h3 className="text-slate-900 font-bold mb-4 flex items-center gap-2">
+                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                        <h3 className="text-foreground font-bold mb-4 flex items-center gap-2">
                             <CheckCircle size={18} className="text-emerald-600" /> Requirements
                         </h3>
                         <ul className="space-y-3">
                             {REQUIREMENTS.map(r => (
-                                <li key={r} className="flex items-start gap-2.5 text-sm text-slate-600 font-medium">
+                                <li key={r} className="flex items-start gap-2.5 text-sm text-muted-foreground font-medium">
                                     <CheckCircle size={15} className="text-emerald-500 flex-shrink-0 mt-0.5" />
                                     {r}
                                 </li>
@@ -191,20 +191,20 @@ export default function BecomeInstructorPage() {
                     </div>
 
                     {/* FAQ */}
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                        <h3 className="text-slate-900 font-bold mb-4">FAQs</h3>
+                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                        <h3 className="text-foreground font-bold mb-4">FAQs</h3>
                         <div className="space-y-3">
                             {FAQS.map((faq, i) => (
-                                <div key={i} className="border border-slate-100 rounded-xl overflow-hidden">
+                                <div key={i} className="border border-border rounded-xl overflow-hidden">
                                     <button
                                         onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                                        className="w-full flex items-center justify-between p-4 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 transition-colors"
+                                        className="w-full flex items-center justify-between p-4 text-left text-sm font-bold text-foreground hover:bg-muted/40 transition-colors"
                                     >
                                         {faq.q}
-                                        <ChevronDown size={16} className={`text-slate-400 transition-transform flex-shrink-0 ${openFaq === i ? 'rotate-180' : ''}`} />
+                                        <ChevronDown size={16} className={`text-muted-foreground/60 transition-transform flex-shrink-0 ${openFaq === i ? 'rotate-180' : ''}`} />
                                     </button>
                                     {openFaq === i && (
-                                        <div className="px-4 pb-4 text-sm text-slate-600 font-medium leading-relaxed border-t border-slate-100 pt-3">
+                                        <div className="px-4 pb-4 text-sm text-muted-foreground font-medium leading-relaxed border-t border-border pt-3">
                                             {faq.a}
                                         </div>
                                     )}
@@ -216,14 +216,14 @@ export default function BecomeInstructorPage() {
 
                 {/* Application Form */}
                 <div className="lg:col-span-2">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
                         <div className="flex items-center gap-3 mb-8">
                             <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
                                 <GraduationCap size={22} className="text-white" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-extrabold text-slate-900">Instructor Application</h2>
-                                <p className="text-slate-500 text-sm font-medium">Takes about 5 minutes to complete</p>
+                                <h2 className="text-xl font-extrabold text-foreground">Instructor Application</h2>
+                                <p className="text-muted-foreground text-sm font-medium">Takes about 5 minutes to complete</p>
                             </div>
                         </div>
 
@@ -241,7 +241,7 @@ export default function BecomeInstructorPage() {
 
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Your Bio / About You *</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Your Bio / About You *</label>
                                 <textarea
                                     name="bio"
                                     value={form.bio}
@@ -254,7 +254,7 @@ export default function BecomeInstructorPage() {
 
                             <div className="grid sm:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Area of Expertise *</label>
+                                    <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Area of Expertise *</label>
                                     <input
                                         type="text"
                                         name="expertise"
@@ -266,7 +266,7 @@ export default function BecomeInstructorPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Years of Experience *</label>
+                                    <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Years of Experience *</label>
                                     <select name="experience" value={form.experience} onChange={handleChange} className={inputCls} required>
                                         <option value="">Select experience</option>
                                         <option value="1-2">1–2 years</option>
@@ -278,7 +278,7 @@ export default function BecomeInstructorPage() {
                             </div>
 
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Sample Course Topic *</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Sample Course Topic *</label>
                                 <input
                                     type="text"
                                     name="sampleTopic"
@@ -292,7 +292,7 @@ export default function BecomeInstructorPage() {
 
                             <div className="grid sm:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">LinkedIn Profile (optional)</label>
+                                    <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">LinkedIn Profile (optional)</label>
                                     <input
                                         type="url"
                                         name="linkedin"
@@ -303,7 +303,7 @@ export default function BecomeInstructorPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">YouTube / Portfolio (optional)</label>
+                                    <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">YouTube / Portfolio (optional)</label>
                                     <input
                                         type="url"
                                         name="youtube"
@@ -315,16 +315,16 @@ export default function BecomeInstructorPage() {
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <div className="bg-muted/40 border border-border rounded-xl p-5">
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         name="agree"
                                         checked={form.agree}
                                         onChange={handleChange}
-                                        className="w-4 h-4 mt-0.5 rounded text-indigo-600 border-slate-300 flex-shrink-0"
+                                        className="w-4 h-4 mt-0.5 rounded text-indigo-600 border-border flex-shrink-0"
                                     />
-                                    <span className="text-sm text-slate-600 font-medium leading-relaxed">
+                                    <span className="text-sm text-muted-foreground font-medium leading-relaxed">
                                         I agree to the <span className="text-indigo-600 font-bold cursor-pointer hover:underline">Instructor Agreement</span> and{' '}
                                         <span className="text-indigo-600 font-bold cursor-pointer hover:underline">Code of Conduct</span>. I understand that my application
                                         will be reviewed and I'll receive a response within 2–3 business days.

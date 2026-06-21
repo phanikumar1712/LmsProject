@@ -14,10 +14,10 @@ export function ProtectedRoute({ children, allowedRoles = [] }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-muted/40">
                 <div className="text-center">
                     <div className="w-12 h-12 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-500 text-sm font-medium">Loading...</p>
+                    <p className="text-muted-foreground text-sm font-medium">Loading...</p>
                 </div>
             </div>
         );
@@ -39,7 +39,7 @@ export function GuestRoute({ children }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-muted/40">
                 <div className="w-12 h-12 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             </div>
         );

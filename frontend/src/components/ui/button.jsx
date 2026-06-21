@@ -5,9 +5,9 @@ import { cn } from "../../lib/utils"
 const buttonVariants = {
     default: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
     destructive: "bg-red-500 text-white hover:bg-red-600 shadow-sm",
-    outline: "border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 shadow-sm",
-    secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
-    ghost: "hover:bg-slate-100 hover:text-slate-900 text-slate-600",
+    outline: "border border-border bg-card hover:bg-muted/40 text-foreground shadow-sm",
+    secondary: "bg-muted text-foreground hover:bg-muted/70",
+    ghost: "hover:bg-muted hover:text-foreground text-muted-foreground",
     link: "text-indigo-600 underline-offset-4 hover:underline",
 }
 

@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 import QuizPage from './pages/QuizPage';
+import InstructorProfilePage from './pages/InstructorProfilePage';
 
 
 
@@ -48,10 +49,10 @@ import AdminSubscriptions from './pages/dashboard/admin/AdminSubscriptions';
 
 // Placeholder empty page for other routes
 const Placeholder = ({ title }) => (
-  <div className="flex flex-col items-center justify-center py-20 text-center bg-slate-50 border border-slate-200 border-dashed rounded-2xl m-4">
-    <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mb-4 text-2xl shadow-inner">🚧</div>
-    <h2 className="text-2xl font-bold text-slate-900 mb-2" style={{ fontFamily: 'Outfit' }}>{title}</h2>
-    <p className="text-slate-500 max-w-sm font-medium">This page is under construction. Check back soon for updates!</p>
+  <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/40 border border-border border-dashed rounded-2xl m-4">
+    <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 text-2xl shadow-inner">🚧</div>
+    <h2 className="text-2xl font-bold text-foreground mb-2" style={{ fontFamily: 'Outfit' }}>{title}</h2>
+    <p className="text-muted-foreground max-w-sm font-medium">This page is under construction. Check back soon for updates!</p>
   </div>
 );
 
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/courses/:id" element={<CourseDetailPage />} />
+            <Route path="/instructor/:id" element={<InstructorProfilePage />} />
             <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
             <Route path="/become-instructor" element={<BecomeInstructorPage />} />

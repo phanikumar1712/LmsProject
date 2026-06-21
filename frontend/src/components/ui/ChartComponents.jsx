@@ -10,11 +10,11 @@
 export function ChartTooltip({ active, payload, label, prefix = '', suffix = '' }) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white border border-slate-200 shadow-xl rounded-xl px-4 py-3 text-sm">
-            {label && <p className="text-slate-500 font-medium mb-1">{label}</p>}
+        <div className="bg-card border border-border shadow-xl rounded-xl px-4 py-3 text-sm">
+            {label && <p className="text-muted-foreground font-medium mb-1">{label}</p>}
             {payload.map((p, i) => (
                 <p key={i} className="font-bold" style={{ color: p.color || p.fill || '#4f46e5' }}>
-                    {p.name && <span className="text-slate-500 font-normal mr-1">{p.name}:</span>}
+                    {p.name && <span className="text-muted-foreground font-normal mr-1">{p.name}:</span>}
                     {prefix}
                     {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
                     {suffix && ` ${suffix}`}
@@ -35,9 +35,9 @@ export function ChartTooltip({ active, payload, label, prefix = '', suffix = '' 
  */
 export function ChartCard({ title, badge, height = 'h-[260px]', children, className = '' }) {
     return (
-        <div className={`bg-white border border-slate-200 rounded-2xl p-6 shadow-sm ${className}`}>
+        <div className={`bg-card border border-border rounded-2xl p-6 shadow-sm ${className}`}>
             <div className="flex items-center justify-between mb-6">
-                <h3 className="text-slate-900 font-bold text-lg">{title}</h3>
+                <h3 className="text-foreground font-bold text-lg">{title}</h3>
                 {badge}
             </div>
             <div className={height}>{children}</div>

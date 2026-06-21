@@ -338,31 +338,31 @@ export default function CreateCourseForm() {
 
     if (loading && editId) return <div className="p-8 text-center text-gray-500">Loading course data...</div>;
 
-    const InputClass = "w-full bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow";
+    const InputClass = "w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow";
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             <div>
-                <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
+                <h1 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">
                     {editId ? 'Edit Course Details' : 'Create New Course'}
                 </h1>
-                <p className="text-slate-500 font-medium">Design your curriculum and manage media</p>
+                <p className="text-muted-foreground font-medium">Design your curriculum and manage media</p>
             </div>
 
             <form className="space-y-8" onSubmit={(e) => handleSubmit(e, 'PENDING')}>
 
                 {/* Basic Info */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2"><CheckCircle size={20} className="text-indigo-600" /> Basic Information</h2>
+                <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
+                    <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><CheckCircle size={20} className="text-indigo-600" /> Basic Information</h2>
                     <div className="space-y-5">
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Course Title *</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Course Title *</label>
                             <input type="text" name="title" value={formData.title} onChange={handleChange} className={InputClass} placeholder="e.g. Advanced JavaScript Masterclass" required />
                         </div>
 
                         <div className="grid sm:grid-cols-2 gap-5">
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Category *</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Category *</label>
                                 <select name="categoryId" value={formData.categoryId} onChange={handleChange} className={InputClass} required>
                                     <option value="">Select Category</option>
                                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -373,7 +373,7 @@ export default function CreateCourseForm() {
                                 )}
                             </div>
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Difficulty Level</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Difficulty Level</label>
                                 <select name="level" value={formData.level} onChange={handleChange} className={InputClass}>
                                     <option value="Beginner">Beginner</option>
                                     <option value="Intermediate">Intermediate</option>
@@ -383,23 +383,23 @@ export default function CreateCourseForm() {
                         </div>
 
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Course Description *</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Course Description *</label>
                             <textarea name="description" value={formData.description} onChange={handleChange} className={`${InputClass} min-h-[120px] resize-y`} placeholder="Describe what students will learn..." required />
                         </div>
                     </div>
                 </div>
 
                 {/* Media & Pricing */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Pricing</h2>
+                <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
+                    <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Pricing</h2>
                     <div className="space-y-6">
 
                         {/* Thumbnail Upload */}
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-3">Course Thumbnail</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-3">Course Thumbnail</label>
                             <div className="flex gap-6 items-start">
                                 <div
-                                    className="w-64 h-36 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 hover:border-indigo-300 transition-colors overflow-hidden relative group shadow-sm"
+                                    className="w-64 h-36 border-2 border-dashed border-border rounded-xl bg-muted/40 flex flex-col items-center justify-center cursor-pointer hover:bg-muted hover:border-indigo-300 transition-colors overflow-hidden relative group shadow-sm"
                                     onClick={() => thumbnailInputRef.current?.click()}
                                 >
                                     <input type="file" ref={thumbnailInputRef} onChange={handleThumbnailUpload} accept="image/*" className="hidden" />
@@ -412,15 +412,15 @@ export default function CreateCourseForm() {
                                         </>
                                     ) : (
                                         <div className="text-center p-4">
-                                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mx-auto mb-3">
-                                                <ImageIcon size={20} className="text-slate-400" />
+                                            <div className="w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-sm mx-auto mb-3">
+                                                <ImageIcon size={20} className="text-muted-foreground/60" />
                                             </div>
-                                            <p className="text-[13px] font-bold text-slate-500 leading-tight">Click to upload image<br />(Max 5MB)</p>
+                                            <p className="text-[13px] font-bold text-muted-foreground leading-tight">Click to upload image<br />(Max 5MB)</p>
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <p className="text-[13px] font-semibold text-slate-600 leading-relaxed">
+                                <div className="flex-1 bg-muted/40 p-4 rounded-xl border border-border">
+                                    <p className="text-[13px] font-semibold text-muted-foreground leading-relaxed">
                                         Upload your course image here. It must meet our course image quality standards to be accepted.<br /><br />
                                         Important guidelines: 750x422 pixels; .jpg, .jpeg,. gif, or .png. No text on the image.
                                     </p>
@@ -428,24 +428,24 @@ export default function CreateCourseForm() {
                             </div>
                         </div>
 
-                        <div className="grid sm:grid-cols-3 gap-5 border-t border-slate-100 pt-6">
+                        <div className="grid sm:grid-cols-3 gap-5 border-t border-border pt-6">
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Est. Total Duration</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Est. Total Duration</label>
                                 <input type="text" name="duration" value={formData.duration} onChange={handleChange} className={InputClass} placeholder="e.g. 10 hours" />
                             </div>
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Regular Price (₹)</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Regular Price (₹)</label>
                                 <input type="number" name="price" value={formData.price} onChange={handleChange} className={InputClass} min="0" />
                             </div>
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Discount Price (₹)</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Discount Price (₹)</label>
                                 <input type="number" name="discountPrice" value={formData.discountPrice} onChange={handleChange} className={InputClass} min="0" />
                             </div>
                         </div>
 
                         <div className="grid sm:grid-cols-2 gap-5 pt-2">
                             <div>
-                                <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Required Plan</label>
+                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Required Plan</label>
                                 <select name="requiredPlan" value={formData.requiredPlan} onChange={handleChange} className={InputClass}>
                                     <option value="FREE">Free for all</option>
                                     <option value="BASIC">Basic Plan & above</option>
@@ -454,17 +454,17 @@ export default function CreateCourseForm() {
                                 </select>
                             </div>
                             <div className="flex items-center gap-3 pt-8">
-                                <input type="checkbox" id="cert" name="certificate" checked={formData.certificate} onChange={handleChange} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" />
-                                <label htmlFor="cert" className="text-[14px] font-semibold text-slate-700 cursor-pointer">Offer Certificate on completion</label>
+                                <input type="checkbox" id="cert" name="certificate" checked={formData.certificate} onChange={handleChange} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-border" />
+                                <label htmlFor="cert" className="text-[14px] font-semibold text-foreground/80 cursor-pointer">Offer Certificate on completion</label>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Curriculum Builder */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
+                <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
                     <div className="flex items-center justify-between mb-8">
-                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Video size={20} className="text-purple-600" /> Curriculum Builder</h2>
+                        <h2 className="text-xl font-bold text-foreground flex items-center gap-2"><Video size={20} className="text-purple-600" /> Curriculum Builder</h2>
                         <button type="button" onClick={addSection} className="text-sm font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors">
                             <Plus size={16} /> Add Module
                         </button>
@@ -472,30 +472,30 @@ export default function CreateCourseForm() {
 
                     <div className="space-y-5">
                         {curriculum.map((section, sIdx) => (
-                            <div key={section.id} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
-                                    <GripVertical size={18} className="text-slate-400 cursor-move" />
-                                    <span className="font-bold text-slate-700">Module {sIdx + 1}:</span>
+                            <div key={section.id} className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+                                <div className="p-4 bg-muted/40 border-b border-border flex items-center gap-3">
+                                    <GripVertical size={18} className="text-muted-foreground/60 cursor-move" />
+                                    <span className="font-bold text-foreground/80">Module {sIdx + 1}:</span>
                                     <input
                                         type="text"
                                         value={section.title}
                                         onChange={e => updateSection(sIdx, 'title', e.target.value)}
-                                        className="flex-1 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 rounded-lg outline-none text-slate-900 px-3 py-1.5 font-bold shadow-sm"
+                                        className="flex-1 bg-card border border-border focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 rounded-lg outline-none text-foreground px-3 py-1.5 font-bold shadow-sm"
                                         placeholder="Enter module title..."
                                     />
-                                    <button type="button" onClick={() => deleteSection(sIdx)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                                    <button type="button" onClick={() => updateSection(sIdx, 'isExpanded', !section.isExpanded)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                                    <button type="button" onClick={() => deleteSection(sIdx)} className="p-2 text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                    <button type="button" onClick={() => updateSection(sIdx, 'isExpanded', !section.isExpanded)} className="p-2 text-muted-foreground/60 hover:text-foreground/80 hover:bg-muted rounded-lg transition-colors">
                                         {section.isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                     </button>
                                 </div>
 
                                 {section.isExpanded && (
-                                    <div className="p-5 space-y-4 bg-white">
+                                    <div className="p-5 space-y-4 bg-card">
                                         {section.lessons.map((lesson, lIdx) => (
                                             <div key={lesson.id} className={`ml-4 md:ml-12 border rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${lesson.type === 'video' ? 'border-blue-100 bg-blue-50/20' : lesson.type === 'quiz' ? 'border-purple-100 bg-purple-50/20' : 'border-emerald-100 bg-emerald-50/20'}`}>
-                                                <div className="p-4 flex flex-col md:flex-row items-center gap-4 bg-white/60 backdrop-blur-sm">
+                                                <div className="p-4 flex flex-col md:flex-row items-center gap-4 bg-card/60 backdrop-blur-sm">
                                                     <div className="flex items-center gap-3 w-full md:w-auto">
-                                                        <GripVertical size={18} className="text-slate-300 cursor-move" />
+                                                        <GripVertical size={18} className="text-muted-foreground/30 cursor-move" />
                                                         <div className={`p-2 rounded-lg ${lesson.type === 'video' ? 'bg-blue-100 text-blue-600' : lesson.type === 'quiz' ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'}`}>
                                                             {lesson.type === 'video' && <Play size={18} />}
                                                             {lesson.type === 'quiz' && <HelpCircle size={18} />}
@@ -504,7 +504,7 @@ export default function CreateCourseForm() {
                                                         <select
                                                             value={lesson.type}
                                                             onChange={e => updateLesson(sIdx, lIdx, 'type', e.target.value)}
-                                                            className="bg-slate-50 border-0 text-[13px] font-bold rounded-lg text-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-100 w-32 md:w-36 transition-all"
+                                                            className="bg-muted/40 border-0 text-[13px] font-bold rounded-lg text-foreground/80 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-100 w-32 md:w-36 transition-all"
                                                         >
                                                             <option value="video">Video</option>
                                                             <option value="lecture">Document</option>
@@ -516,51 +516,51 @@ export default function CreateCourseForm() {
                                                             type="text"
                                                             value={lesson.title}
                                                             onChange={e => updateLesson(sIdx, lIdx, 'title', e.target.value)}
-                                                            className="w-full bg-transparent border-b-2 border-transparent focus:border-indigo-500 outline-none text-[15px] font-bold text-slate-900 py-1 transition-all"
+                                                            className="w-full bg-transparent border-b-2 border-transparent focus:border-indigo-500 outline-none text-[15px] font-bold text-foreground py-1 transition-all"
                                                             placeholder="Lesson title (e.g., Intro to React)"
                                                         />
                                                     </div>
                                                     <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
                                                         <div className="relative group">
-                                                            <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                            <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
                                                             <input
                                                                 type="text"
                                                                 value={lesson.duration}
                                                                 onChange={e => updateLesson(sIdx, lIdx, 'duration', e.target.value)}
-                                                                className="w-24 pl-8 pr-3 py-2 bg-slate-50 border-0 text-[13px] font-semibold text-slate-600 rounded-lg outline-none focus:ring-2 focus:ring-indigo-100 text-center transition-all"
+                                                                className="w-24 pl-8 pr-3 py-2 bg-muted/40 border-0 text-[13px] font-semibold text-muted-foreground rounded-lg outline-none focus:ring-2 focus:ring-indigo-100 text-center transition-all"
                                                                 placeholder="Duration"
                                                             />
                                                         </div>
-                                                        <button type="button" onClick={() => deleteLesson(sIdx, lIdx)} className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm md:shadow-none hover:shadow-md"><Trash2 size={18} /></button>
+                                                        <button type="button" onClick={() => deleteLesson(sIdx, lIdx)} className="p-2.5 text-muted-foreground/60 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm md:shadow-none hover:shadow-md"><Trash2 size={18} /></button>
                                                     </div>
                                                 </div>
 
-                                                <div className="p-4 md:p-6 bg-white/40 border-t border-slate-100">
+                                                <div className="p-4 md:p-6 bg-card/40 border-t border-border">
                                                     {lesson.type !== 'quiz' ? (
                                                         <div className="space-y-6">
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-3">
                                                                     <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
-                                                                    <label className="text-[12px] font-extrabold text-slate-700 uppercase tracking-widest">Content Resource</label>
+                                                                    <label className="text-[12px] font-extrabold text-foreground/80 uppercase tracking-widest">Content Resource</label>
                                                                 </div>
                                                                 <div className="flex flex-col sm:flex-row gap-4">
                                                                     <div className="flex-1 flex flex-col gap-2">
                                                                         <div className="flex flex-wrap gap-3 items-center">
-                                                                            <label className="cursor-pointer bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-md px-5 py-2.5 rounded-xl text-[13px] text-slate-700 font-bold flex items-center gap-2.5 transition-all group">
+                                                                            <label className="cursor-pointer bg-card border border-border hover:border-indigo-400 hover:shadow-md px-5 py-2.5 rounded-xl text-[13px] text-foreground/80 font-bold flex items-center gap-2.5 transition-all group">
                                                                                 <Upload size={16} className="text-indigo-600 group-hover:scale-110 transition-transform" />
                                                                                 <span>Upload {lesson.type === 'video' ? 'Video' : 'Document'}</span>
                                                                                 <input type="file" className="hidden" onChange={(e) => handleLessonFileUpload(e, sIdx, lIdx)} accept={lesson.type === 'video' ? 'video/*' : 'application/pdf,.doc,.docx'} />
                                                                             </label>
-                                                                            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+                                                                            <div className="h-4 w-px bg-muted hidden sm:block" />
                                                                             <div className="relative flex-1 group">
-                                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500">
+                                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500">
                                                                                     {lesson.type === 'video' ? <Play size={14} /> : <FileText size={14} />}
                                                                                 </div>
                                                                                 <input
                                                                                     type="text"
                                                                                     value={lesson.contentUrl || ''}
                                                                                     onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
-                                                                                    className="w-full bg-slate-100 border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                                                                                    className="w-full bg-muted border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-foreground focus:bg-card focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
                                                                                     placeholder={lesson.fileName ? `File: ${lesson.fileName}` : lesson.type === 'video' ? "Paste YouTube/Vimeo link" : "Paste shareable document link"}
                                                                                     disabled={!!lesson.fileName}
                                                                                 />
@@ -580,9 +580,9 @@ export default function CreateCourseForm() {
                                                                         id={`prev-${lesson.id}`}
                                                                         className="sr-only peer"
                                                                     />
-                                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                                                                 </div>
-                                                                <label htmlFor={`prev-${lesson.id}`} className="text-[13px] font-bold text-slate-600 cursor-pointer select-none">Make this lesson Free Preview</label>
+                                                                <label htmlFor={`prev-${lesson.id}`} className="text-[13px] font-bold text-muted-foreground cursor-pointer select-none">Make this lesson Free Preview</label>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -600,38 +600,38 @@ export default function CreateCourseForm() {
                                                             </div>
 
                                                             {(lesson.questions || []).length === 0 ? (
-                                                                <div className="text-center py-12 px-4 border-2 border-dashed border-slate-200 rounded-3xl">
-                                                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                                        <HelpCircle size={32} className="text-slate-300" />
+                                                                <div className="text-center py-12 px-4 border-2 border-dashed border-border rounded-3xl">
+                                                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                                                                        <HelpCircle size={32} className="text-muted-foreground/30" />
                                                                     </div>
-                                                                    <h5 className="text-slate-900 font-bold mb-1">No Questions Yet</h5>
-                                                                    <p className="text-slate-500 text-[13px] max-w-[280px] mx-auto font-medium">Add some multiple-choice or fill-in-the-blank questions to test your students' knowledge.</p>
+                                                                    <h5 className="text-foreground font-bold mb-1">No Questions Yet</h5>
+                                                                    <p className="text-muted-foreground text-[13px] max-w-[280px] mx-auto font-medium">Add some multiple-choice or fill-in-the-blank questions to test your students' knowledge.</p>
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-6">
                                                                     {(lesson.questions || []).map((q, qIdx) => (
-                                                                        <div key={q.id} className="group relative bg-white border border-slate-200 rounded-3xl p-6 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-300">
+                                                                        <div key={q.id} className="group relative bg-card border border-border rounded-3xl p-6 hover:border-purple-300 hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-300">
                                                                             <div className="absolute -left-3 top-6 w-8 h-8 bg-purple-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shadow-purple-200 border-2 border-white">
                                                                                 {qIdx + 1}
                                                                             </div>
 
-                                                                            <button type="button" onClick={() => deleteLessonQuestion(sIdx, lIdx, qIdx)} className="absolute -right-3 -top-3 w-8 h-8 bg-white text-slate-400 hover:text-rose-600 rounded-full flex items-center justify-center shadow-lg border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button type="button" onClick={() => deleteLessonQuestion(sIdx, lIdx, qIdx)} className="absolute -right-3 -top-3 w-8 h-8 bg-card text-muted-foreground/60 hover:text-rose-600 rounded-full flex items-center justify-center shadow-lg border border-border opacity-0 group-hover:opacity-100 transition-opacity">
                                                                                 <Trash2 size={14} />
                                                                             </button>
 
                                                                             <div className="space-y-5 ml-2">
                                                                                 <div className="flex flex-col md:flex-row gap-4">
                                                                                     <div className="md:w-1/3">
-                                                                                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Question Type</label>
-                                                                                        <select value={q.type} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'type', e.target.value)} className="w-full bg-slate-50 border-0 rounded-xl px-4 py-3 text-[13px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-100 transition-all">
+                                                                                        <label className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest mb-1.5 block ml-1">Question Type</label>
+                                                                                        <select value={q.type} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'type', e.target.value)} className="w-full bg-muted/40 border-0 rounded-xl px-4 py-3 text-[13px] font-bold text-foreground/80 outline-none focus:ring-2 focus:ring-purple-100 transition-all">
                                                                                             <option value="MCQ_SINGLE">Single Choice</option>
                                                                                             <option value="MCQ_MULTI">Multiple Choice</option>
                                                                                             <option value="FILL_BLANK">Fill in the Blank</option>
                                                                                         </select>
                                                                                     </div>
                                                                                     <div className="flex-1">
-                                                                                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Question Prompt</label>
-                                                                                        <input type="text" value={q.text} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'text', e.target.value)} className="w-full bg-slate-100 border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-purple-100 transition-all" placeholder="Ask your question here..." />
+                                                                                        <label className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest mb-1.5 block ml-1">Question Prompt</label>
+                                                                                        <input type="text" value={q.text} onChange={e => updateLessonQuestion(sIdx, lIdx, qIdx, 'text', e.target.value)} className="w-full bg-muted border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-foreground outline-none focus:bg-card focus:ring-2 focus:ring-purple-100 transition-all" placeholder="Ask your question here..." />
                                                                                     </div>
                                                                                 </div>
 
@@ -644,7 +644,7 @@ export default function CreateCourseForm() {
                                                                                                     <button
                                                                                                         type="button"
                                                                                                         onClick={() => toggleCorrectOptionInline(sIdx, lIdx, qIdx, oIdx)}
-                                                                                                        className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-slate-100 text-transparent hover:bg-slate-200 group-hover/opt:text-slate-300'}`}
+                                                                                                        className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-muted text-transparent hover:bg-muted group-hover/opt:text-muted-foreground/30'}`}
                                                                                                     >
                                                                                                         <CheckCircle size={20} />
                                                                                                     </button>
@@ -653,14 +653,14 @@ export default function CreateCourseForm() {
                                                                                                             type="text"
                                                                                                             value={opt}
                                                                                                             onChange={e => updateQuestionOption(sIdx, lIdx, qIdx, oIdx, e.target.value)}
-                                                                                                            className={`w-full border-0 rounded-2xl px-4 py-2.5 text-[14px] font-semibold transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-50 text-emerald-900 selection:bg-emerald-200' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 focus:bg-white focus:ring-2 focus:ring-purple-100'}`}
+                                                                                                            className={`w-full border-0 rounded-2xl px-4 py-2.5 text-[14px] font-semibold transition-all ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-50 text-emerald-900 selection:bg-emerald-200' : 'bg-muted/40 text-foreground/80 hover:bg-muted focus:bg-card focus:ring-2 focus:ring-purple-100'}`}
                                                                                                             placeholder={`Option ${oIdx + 1}`}
                                                                                                         />
-                                                                                                        <button type="button" onClick={() => removeQuestionOption(sIdx, lIdx, qIdx, oIdx)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover/opt:opacity-100"><Trash2 size={16} /></button>
+                                                                                                        <button type="button" onClick={() => removeQuestionOption(sIdx, lIdx, qIdx, oIdx)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-muted-foreground/30 hover:text-rose-500 transition-colors opacity-0 group-hover/opt:opacity-100"><Trash2 size={16} /></button>
                                                                                                     </div>
                                                                                                 </div>
                                                                                             ))}
-                                                                                            <button type="button" onClick={() => addQuestionOption(sIdx, lIdx, qIdx)} className="w-full h-11 border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-extrabold text-slate-400 hover:text-purple-600 transition-all mt-1">
+                                                                                            <button type="button" onClick={() => addQuestionOption(sIdx, lIdx, qIdx)} className="w-full h-11 border-2 border-dashed border-border hover:border-purple-300 hover:bg-purple-50 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-extrabold text-muted-foreground/60 hover:text-purple-600 transition-all mt-1">
                                                                                                 <Plus size={16} /> ADD ANOTHER OPTION
                                                                                             </button>
                                                                                         </div>
@@ -668,14 +668,14 @@ export default function CreateCourseForm() {
                                                                                 )}
 
                                                                                 {q.type === 'FILL_BLANK' && (
-                                                                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                                                                                        <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Acceptable Correct Answer</label>
+                                                                                    <div className="bg-muted/40 rounded-2xl p-4 border border-border">
+                                                                                        <label className="block text-[11px] font-extrabold text-muted-foreground uppercase tracking-widest mb-2 ml-1">Acceptable Correct Answer</label>
                                                                                         <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
                                                                                             const newCurr = [...curriculum];
                                                                                             newCurr[sIdx].lessons[lIdx].questions[qIdx].correctAnswers = [e.target.value];
                                                                                             setCurriculum(newCurr);
-                                                                                        }} className="w-full bg-white border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-slate-900 focus:ring-2 focus:ring-purple-100 outline-none shadow-sm" placeholder="e.g., React Context API" />
-                                                                                        <p className="text-[10px] text-slate-400 font-bold mt-2 ml-1 uppercase">Note: Answer comparison is case-insensitive and ignores leading/trailing whitespace.</p>
+                                                                                        }} className="w-full bg-card border-0 rounded-xl px-4 py-3 text-[14px] font-bold text-foreground focus:ring-2 focus:ring-purple-100 outline-none shadow-sm" placeholder="e.g., React Context API" />
+                                                                                        <p className="text-[10px] text-muted-foreground/60 font-bold mt-2 ml-1 uppercase">Note: Answer comparison is case-insensitive and ignores leading/trailing whitespace.</p>
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -699,27 +699,27 @@ export default function CreateCourseForm() {
                 </div>
 
                 {/* Metadata */}
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6">Course Metadata</h2>
+                <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
+                    <h2 className="text-xl font-bold text-foreground mb-6">Course Metadata</h2>
                     <div className="space-y-5">
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Tags (comma separated)</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Tags (comma separated)</label>
                             <input type="text" name="tags" value={formData.tags} onChange={handleChange} className={InputClass} placeholder="React, Frontend, Web Dev" />
                         </div>
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Prerequisites (comma separated)</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Prerequisites (comma separated)</label>
                             <input type="text" name="prerequisites" value={formData.prerequisites} onChange={handleChange} className={InputClass} placeholder="Basic JavaScript, HTML/CSS" />
                         </div>
                         <div>
-                            <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Learning Outcomes (one per line)</label>
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Learning Outcomes (one per line)</label>
                             <textarea name="learningOutcomes" value={formData.learningOutcomes} onChange={handleChange} className={`${InputClass} min-h-[120px]`} placeholder="Build functional React applications&#10;Understand state management" />
                         </div>
                     </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-4 pt-4 sticky bottom-0 bg-white/90 backdrop-blur-md p-5 rounded-2xl z-10 border border-slate-200 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
-                    <button type="button" onClick={() => navigate(-1)} className="px-6 py-3 rounded-xl text-[14px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors">
+                <div className="flex items-center gap-4 pt-4 sticky bottom-0 bg-card/90 backdrop-blur-md p-5 rounded-2xl z-10 border border-border shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+                    <button type="button" onClick={() => navigate(-1)} className="px-6 py-3 rounded-xl text-[14px] font-bold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted transition-colors">
                         Cancel
                     </button>
                     <div className="flex-1" />

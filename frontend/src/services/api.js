@@ -218,6 +218,18 @@ export const usersAPI = {
 
     approveInstructorRequest: async (id, action) =>
         http('PUT', `/users/instructor-requests/${id}/approve`, { action }, getToken()),
+
+    getInstructorProfile: async (id) =>
+        http('GET', `/users/instructor/${id}`, null, getToken()),
+
+    followInstructor: async (id) =>
+        http('POST', `/users/instructor/${id}/follow`, {}, getToken()),
+
+    unfollowInstructor: async (id) =>
+        http('POST', `/users/instructor/${id}/unfollow`, {}, getToken()),
+
+    inviteAdmin: async (data) =>
+        http('POST', '/users/invite-admin', data, getToken()),
 };
 
 // ─── SUBSCRIPTIONS ────────────────────────────────────────────────────────────
@@ -247,6 +259,9 @@ export const notificationsAPI = {
 
     clearAll: async () =>
         http('DELETE', '/notifications/clear-all', null, getToken()),
+
+    create: async (data) =>
+        http('POST', '/notifications', data, getToken()),
 };
 
 // ─── STATS ────────────────────────────────────────────────────────────────────

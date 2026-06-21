@@ -40,16 +40,16 @@ export default function StudentSubscription() {
         }
     };
 
-    if (loading) return <div className="text-center py-20 text-slate-500 font-medium">Loading plans...</div>;
+    if (loading) return <div className="text-center py-20 text-muted-foreground font-medium">Loading plans...</div>;
 
     const currentPlanName = user?.subscriptionPlan || 'FREE';
 
     return (
         <div className="space-y-8 max-w-5xl mx-auto">
-            <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
+            <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Active Subscription</h1>
-                    <p className="text-slate-500 font-medium mt-1">Manage your billing and plan details</p>
+                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Active Subscription</h1>
+                    <p className="text-muted-foreground font-medium mt-1">Manage your billing and plan details</p>
                 </div>
                 <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl text-center md:text-right">
                     <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Current Plan</p>
@@ -65,24 +65,24 @@ export default function StudentSubscription() {
                     const isAnyProcessing = processingId !== null;
 
                     return (
-                        <div key={plan.id} className={`bg-white border rounded-2xl p-6 shadow-sm flex flex-col relative transition-all ${isCurrent ? 'border-2 border-indigo-500 shadow-md ring-4 ring-indigo-50' : 'border-slate-200 opacity-90 hover:opacity-100 hover:border-indigo-300 hover:shadow-md'}`}>
+                        <div key={plan.id} className={`bg-card border rounded-2xl p-6 shadow-sm flex flex-col relative transition-all ${isCurrent ? 'border-2 border-indigo-500 shadow-md ring-4 ring-indigo-50' : 'border-border opacity-90 hover:opacity-100 hover:border-indigo-300 hover:shadow-md'}`}>
                             {isCurrent && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-sm z-10">
                                     Active Plan
                                 </div>
                             )}
 
-                            <h3 className="text-xl font-extrabold text-slate-900 mb-2">{plan.name}</h3>
+                            <h3 className="text-xl font-extrabold text-foreground mb-2">{plan.name}</h3>
                             <div className="flex items-end gap-1 mb-6">
-                                <span className="text-3xl font-black text-slate-900">
+                                <span className="text-3xl font-black text-foreground">
                                     {plan.price === 0 ? 'Free' : `₹${plan.price.toLocaleString()}`}
                                 </span>
-                                {plan.price > 0 && <span className="text-slate-400 text-sm font-medium mb-1">/mo</span>}
+                                {plan.price > 0 && <span className="text-muted-foreground/60 text-sm font-medium mb-1">/mo</span>}
                             </div>
 
                             <ul className="space-y-3 mb-8 flex-1">
                                 {plan.features.slice(0, 4).map(f => (
-                                    <li key={f} className="flex items-start gap-2 text-sm text-slate-600 font-medium leading-snug">
+                                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground font-medium leading-snug">
                                         <Check size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" /> {f}
                                     </li>
                                 ))}
@@ -108,13 +108,13 @@ export default function StudentSubscription() {
                 })}
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+            <div className="bg-muted/40 border border-border rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
                 <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
                     <ShieldAlert size={20} />
                 </div>
                 <div>
-                    <h4 className="text-slate-900 font-bold mb-1">Secure Payments</h4>
-                    <p className="text-slate-500 text-sm">All transactions are secured with military-grade encryption. You can cancel your subscription at any time without hidden fees.</p>
+                    <h4 className="text-foreground font-bold mb-1">Secure Payments</h4>
+                    <p className="text-muted-foreground text-sm">All transactions are secured with military-grade encryption. You can cancel your subscription at any time without hidden fees.</p>
                 </div>
             </div>
         </div>

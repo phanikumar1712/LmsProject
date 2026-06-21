@@ -10,11 +10,11 @@
 export function PageHeader({ title, subtitle, action, border = false, className = '' }) {
     return (
         <div
-            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${border ? 'border-b border-slate-200 pb-6' : ''} ${className}`}
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${border ? 'border-b border-border pb-6' : ''} ${className}`}
         >
             <div>
-                <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{title}</h1>
-                {subtitle && <p className="text-slate-500 mt-1 font-medium">{subtitle}</p>}
+                <h1 className="text-3xl font-extrabold text-foreground tracking-tight">{title}</h1>
+                {subtitle && <p className="text-muted-foreground mt-1 font-medium">{subtitle}</p>}
             </div>
             {action && <div className="flex items-center gap-4">{action}</div>}
         </div>
@@ -32,7 +32,7 @@ export function PageHeader({ title, subtitle, action, border = false, className 
 export function SectionHeader({ title, icon, link, className = '' }) {
     return (
         <div className={`flex items-center justify-between mb-4 ${className}`}>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 {icon}
                 {title}
             </h2>

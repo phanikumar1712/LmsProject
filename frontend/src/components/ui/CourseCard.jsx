@@ -9,9 +9,9 @@ import { PLAN_ORDER } from '../../lib/constants';
 import toast from 'react-hot-toast';
 
 const LEVEL_COLORS = {
-    Beginner: 'bg-emerald-100 text-emerald-800',
-    Intermediate: 'bg-amber-100 text-amber-800',
-    Advanced: 'bg-rose-100 text-rose-800',
+    Beginner: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+    Intermediate: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    Advanced: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
 };
 
 export function CourseCard({ course, enrollment, compact = false }) {
@@ -36,8 +36,7 @@ export function CourseCard({ course, enrollment, compact = false }) {
     };
 
     const handleClick = () => {
-        if (isEnrolled) navigate(`/courses/${course.id}/learn`);
-        else navigate(`/courses/${course.id}`);
+        navigate(`/courses/${course.id}`);
     };
 
     const discountPct = course.price > 0
@@ -46,7 +45,7 @@ export function CourseCard({ course, enrollment, compact = false }) {
 
     return (
         <div
-            className="flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden card-hover cursor-pointer group"
+            className="flex flex-col bg-card rounded-xl border border-border overflow-hidden card-hover cursor-pointer group shadow-card"
             onClick={handleClick}
             role="button"
             tabIndex={0}
@@ -68,9 +67,9 @@ export function CourseCard({ course, enrollment, compact = false }) {
                 </div>
                 {!canAccess && !isEnrolled && (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100">
-                        <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-lg">
+                        <div className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-lg">
                             <Lock size={14} className="text-amber-500" />
-                            <span className="text-xs font-bold text-slate-900">{course.requiredPlan} Plan Required</span>
+                            <span className="text-xs font-bold text-foreground">{course.requiredPlan} Plan Required</span>
                         </div>
                     </div>
                 )}
@@ -78,12 +77,12 @@ export function CourseCard({ course, enrollment, compact = false }) {
                 <button
                     onClick={handleWishlist}
                     disabled={hearting}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur shadow-sm border border-slate-100 flex items-center justify-center hover:bg-rose-50 transition-colors"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-card/90 backdrop-blur shadow-sm border border-border flex items-center justify-center hover:bg-rose-50 transition-colors"
                     aria-label="Add to wishlist"
                 >
                     <Heart
                         size={14}
-                        className={wishlisted ? 'text-rose-500 fill-rose-500' : 'text-slate-400'}
+                        className={wishlisted ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground/60'}
                     />
                 </button>
                 {/* Play btn overlay */}
@@ -101,18 +100,18 @@ export function CourseCard({ course, enrollment, compact = false }) {
                 <div className="flex items-center gap-1.5 mb-2">
                     <span className="text-xs text-indigo-600 font-bold uppercase tracking-wide">{course.category}</span>
                 </div>
-                <h3 className="font-bold text-slate-900 text-base leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                <h3 className="font-bold text-foreground text-base leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
                     {course.title}
                 </h3>
                 <div className="flex items-center gap-2 mb-3">
-                    <img src={course.instructorAvatar} alt="" className="w-5 h-5 rounded-full bg-slate-100" />
-                    <span className="text-slate-500 text-sm">{course.instructorName}</span>
+                    <img src={course.instructorAvatar} alt="" className="w-5 h-5 rounded-full bg-muted" />
+                    <span className="text-muted-foreground text-sm">{course.instructorName}</span>
                 </div>
 
                 {/* Progress if enrolled */}
                 {isEnrolled && (
                     <div className="mt-auto mb-3">
-                        <div className="flex justify-between text-xs text-slate-500 mb-1 font-medium">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1 font-medium">
                             <span>Your Progress</span>
                             <span className="text-indigo-600 font-bold">{enrollment.progress}%</span>
                         </div>
@@ -120,7 +119,7 @@ export function CourseCard({ course, enrollment, compact = false }) {
                     </div>
                 )}
 
-                <div className="flex items-center gap-3 mb-3 text-[11px] text-slate-500 font-medium">
+                <div className="flex items-center gap-3 mb-3 text-[11px] text-muted-foreground font-medium">
                     <span className="flex items-center gap-1"><Clock size={12} /> {course.duration}</span>
                     <span className="flex items-center gap-1"><BookOpen size={12} /> {course.lessonsCount} lessons</span>
                     <span className="flex items-center gap-1"><Users size={12} /> {course.enrollmentCount?.toLocaleString()}</span>
@@ -139,15 +138,15 @@ export function CourseCard({ course, enrollment, compact = false }) {
                                 <span className="text-emerald-600 font-bold text-lg leading-none">Free</span>
                             ) : (
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-slate-900 font-bold text-lg leading-none">₹{course.discountPrice?.toLocaleString()}</span>
+                                    <span className="text-foreground font-bold text-lg leading-none">₹{course.discountPrice?.toLocaleString()}</span>
                                     {course.discountPrice < course.price && (
-                                        <span className="text-slate-400 text-sm line-through decoration-slate-300">₹{course.price?.toLocaleString()}</span>
+                                        <span className="text-muted-foreground text-sm line-through decoration-slate-300 dark:decoration-slate-700">₹{course.price?.toLocaleString()}</span>
                                     )}
                                 </div>
                             )}
                         </div>
                         {course.certificate && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-1 rounded">
                                 Certificate
                             </span>
                         )}
@@ -166,13 +165,13 @@ export function CourseCard({ course, enrollment, compact = false }) {
 
 export function SkeletonCard() {
     return (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="aspect-video bg-slate-100 animate-pulse" />
+        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+            <div className="aspect-video bg-muted animate-pulse" />
             <div className="p-4 flex flex-col gap-3">
-                <div className="h-3 w-20 bg-slate-100 rounded animate-pulse" />
-                <div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
-                <div className="h-4 w-3/4 bg-slate-100 rounded animate-pulse" />
-                <div className="h-3 w-24 bg-slate-100 rounded animate-pulse mt-2" />
+                <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-full bg-muted rounded animate-pulse" />
+                <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+                <div className="h-3 w-24 bg-muted rounded animate-pulse mt-2" />
             </div>
         </div>
     );

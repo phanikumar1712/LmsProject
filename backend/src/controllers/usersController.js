@@ -240,8 +240,56 @@ const unfollowInstructor = async (req, res) => {
     res.json({ success: true });
 };
 
+// POST /api/users/invite-admin
+const inviteAdmin = async (req, res) => {
+    const { name, email, role } = req.body;
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) throw createError('Invalid admin role', 400);
+
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+    const { sendOTPEmail } = require('../utils/mail');
+
+    // Check if user exists
+    const checkUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (checkUser.rows.length) throw createError('User already exists', 409);
+
+    // Generate random temporary password
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+    const result = await query(
+        `INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING ${safeUserFields}`,
+        [name, email, hashedPassword, role]
+    );
+
+    // In a real app, we would send a proper welcome/invite email.
+    // For now, we'll reuse the mail utility or just send a notification.
+    await query(
+        `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)`,
+        [result.rows[0].id, `Welcome to the platform! Your temporary password is: ${tempPassword}`, 'system']
+    );
+
+    // Try to send email if Resend is configured
+    try {
+        const { Resend } = require('resend');
+        if (process.env.RESEND_API_KEY) {
+            const resend = new Resend(process.env.RESEND_API_KEY);
+            await resend.emails.send({
+                from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+                to: email,
+                subject: 'You have been invited as an Admin',
+                html: `<p>Hello ${name},</p><p>You have been invited as an Admin on EduNexus. Your temporary password is: <strong>${tempPassword}</strong></p>`
+            });
+        }
+    } catch (e) {
+        console.error('Failed to send invite email:', e.message);
+    }
+
+    res.status(201).json(mapUser(result.rows[0]));
+};
+
 module.exports = {
     getAll, updateRole, toggleStatus, assignPlan, deleteUser,
     submitInstructorRequest, getInstructorRequests, approveInstructorRequest,
-    getInstructorProfile, followInstructor, unfollowInstructor
+    getInstructorProfile, followInstructor, unfollowInstructor, inviteAdmin
 };

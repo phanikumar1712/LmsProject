@@ -52,8 +52,8 @@ export default function AdminDashboard() {
                 }
                 subtitle="Platform overview and management"
                 action={
-                    <div className="text-right bg-white border border-slate-200 px-6 py-3 rounded-xl shadow-sm hidden sm:block">
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Platform Revenue</p>
+                    <div className="text-right bg-card border border-border px-6 py-3 rounded-xl shadow-sm hidden sm:block">
+                        <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mb-1">Platform Revenue</p>
                         <p className="text-emerald-600 font-extrabold text-2xl tracking-tighter">₹{stats?.totalRevenue?.toLocaleString() || '0'}</p>
                     </div>
                 }
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/20 rounded-xl border border-dashed border-border">
                                 <DollarSign size={32} className="opacity-20" />
                                 <p className="text-sm font-medium">No revenue data available</p>
                             </div>
@@ -110,12 +110,12 @@ export default function AdminDashboard() {
                                         </PieChart>
                                     </ResponsiveContainer>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <span className="text-slate-900 font-extrabold text-2xl">{stats.totalUsers?.toLocaleString()}</span>
-                                        <span className="text-slate-500 text-xs font-bold uppercase tracking-wide">Total</span>
+                                        <span className="text-foreground font-extrabold text-2xl">{stats.totalUsers?.toLocaleString()}</span>
+                                        <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Total</span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-48 flex items-center justify-center text-slate-400">No user data</div>
+                                <div className="h-48 flex items-center justify-center text-muted-foreground/60">No user data</div>
                             )}
                         </Card>
 
@@ -127,14 +127,14 @@ export default function AdminDashboard() {
                                     stats.topCategories.slice(0, 5).map((cat, i) => (
                                         <div key={cat.name} className="flex items-center justify-between group">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-6 h-6 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                                                <span className="text-slate-700 font-medium group-hover:text-indigo-600 transition-colors">{cat.name}</span>
+                                                <div className="w-6 h-6 rounded-md bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">{i + 1}</div>
+                                                <span className="text-foreground font-medium group-hover:text-indigo-600 transition-colors">{cat.name}</span>
                                             </div>
-                                            <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold">{cat.enrollments.toLocaleString()}</span>
+                                            <span className="bg-muted text-muted-foreground px-2.5 py-1 rounded-md text-xs font-bold">{cat.enrollments.toLocaleString()}</span>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="py-8 text-center text-slate-400 text-sm">No category data available</div>
+                                    <div className="py-8 text-center text-muted-foreground text-sm">No category data available</div>
                                 )}
                             </div>
                         </Card>
@@ -148,13 +148,13 @@ export default function AdminDashboard() {
                         <CardHeader title="Action Required" icon={<AlertTriangle size={18} className="text-amber-500" />} className="pl-3" />
                         <div className="space-y-4">
                             {[
-                                { title: 'Pending Courses', sub: `${stats?.pendingCourses || 0} awaiting approval`, btnClass: 'bg-amber-100 text-amber-700 hover:bg-amber-200', btnText: 'Review', to: '/admin/courses' },
-                                { title: 'User Reports', sub: '3 new flagged items', btnClass: 'bg-rose-100 text-rose-700 hover:bg-rose-200', btnText: 'Check', to: '/admin/reports' },
+                                { title: 'Pending Courses', sub: `${stats?.pendingCourses || 0} awaiting approval`, btnClass: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200', btnText: 'Review', to: '/admin/courses' },
+                                { title: 'User Reports', sub: '3 new flagged items', btnClass: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200', btnText: 'Check', to: '/admin/reports' },
                             ].map(item => (
-                                <div key={item.title} className="flex items-center justify-between bg-slate-50 border border-slate-100 p-4 rounded-xl hover:bg-white hover:border-slate-200 transition-all shadow-sm">
+                                <div key={item.title} className="flex items-center justify-between bg-muted/30 border border-border p-4 rounded-xl hover:bg-muted hover:border-border transition-all shadow-sm">
                                     <div>
-                                        <p className="font-bold text-slate-800 text-[15px]">{item.title}</p>
-                                        <p className="text-sm font-medium text-slate-500 mt-1">{item.sub}</p>
+                                        <p className="font-bold text-foreground text-[15px]">{item.title}</p>
+                                        <p className="text-sm font-medium text-muted-foreground mt-1">{item.sub}</p>
                                     </div>
                                     <button onClick={() => navigate(item.to)} className={`${item.btnClass} px-4 py-2 rounded-lg transition-colors font-bold text-sm shadow-sm`}>{item.btnText}</button>
                                 </div>
@@ -167,18 +167,18 @@ export default function AdminDashboard() {
                         <CardHeader title="Quick Links" />
                         <div className="space-y-2">
                             {[
-                                { label: 'Manage Users', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', to: '/admin/users' },
-                                { label: 'Course Catalog', icon: BookOpen, color: 'text-cyan-600', bg: 'bg-cyan-50', to: '/admin/courses' },
-                                { label: 'Platform Stats', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', to: '/admin' },
+                                { label: 'Manage Users', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', to: isSuperAdmin ? '/super-admin/users' : '/admin/users' },
+                                { label: 'Course Catalog', icon: BookOpen, color: 'text-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-900/20', to: isSuperAdmin ? '/super-admin/courses' : '/admin/courses' },
+                                { label: 'Platform Stats', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', to: isSuperAdmin ? '/super-admin/analytics' : '/admin' },
                             ].map(link => (
-                                <button key={link.label} onClick={() => navigate(link.to)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group">
+                                <button key={link.label} onClick={() => navigate(link.to)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted border border-transparent hover:border-border transition-all group">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${link.bg}`}>
                                             <link.icon size={16} className={link.color} />
                                         </div>
-                                        <span className="text-[15px] font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">{link.label}</span>
+                                        <span className="text-[15px] font-medium text-muted-foreground group-hover:text-indigo-600 transition-colors">{link.label}</span>
                                     </div>
-                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-indigo-500" />
+                                    <ChevronRight size={16} className="text-muted-foreground group-hover:text-indigo-500" />
                                 </button>
                             ))}
                         </div>
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
                                             a.download = `Audit_Logs_${new Date().toISOString().split('T')[0]}.csv`;
                                             a.click();
                                         }}
-                                        className="text-[10px] font-black uppercase tracking-tighter text-slate-400 hover:text-indigo-600 transition-colors"
+                                        className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground/60 hover:text-indigo-600 transition-colors"
                                     >
                                         Export CSV
                                     </button>
@@ -210,18 +210,18 @@ export default function AdminDashboard() {
                             />
                             <div className="space-y-4">
                                 {(auditLogs ?? []).slice(0, 4).map(log => (
-                                    <div key={log.id} className="text-sm border-b border-slate-100 last:border-0 pb-4 last:pb-0">
+                                    <div key={log.id} className="text-sm border-b border-border last:border-0 pb-4 last:pb-0">
                                         <div className="flex justify-between items-start mb-2">
-                                            <span className="text-slate-800 font-bold">{log.userName}</span>
-                                            <span className="text-slate-400 font-medium text-xs">
+                                            <span className="text-foreground font-bold">{log.userName}</span>
+                                            <span className="text-muted-foreground font-medium text-xs">
                                                 {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2 mt-1">
-                                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide">
+                                            <span className="bg-muted text-muted-foreground px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide">
                                                 {log.action.replace('_', ' ')}
                                             </span>
-                                            <span className="text-slate-500 font-medium">{log.target}</span>
+                                            <span className="text-muted-foreground font-medium">{log.target}</span>
                                         </div>
                                     </div>
                                 ))}

@@ -78,7 +78,7 @@ export default function InstructorDashboard() {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-2">
                             <DollarSign size={32} className="opacity-20" />
                             <p className="text-sm font-medium">No revenue data available yet</p>
                         </div>
@@ -98,16 +98,16 @@ export default function InstructorDashboard() {
                                 label="Pending Review"
                                 value={<span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded text-sm font-bold">{stats?.pendingCourses || 0}</span>}
                             />
-                            <div className="h-px bg-slate-100" />
+                            <div className="h-px bg-border" />
                             <MetricRow
-                                label={<span className="text-slate-900 font-bold">Total Courses</span>}
-                                value={<span className="text-slate-900 font-bold text-lg">{stats?.totalCourses || 0}</span>}
+                                label={<span className="text-foreground font-bold">Total Courses</span>}
+                                value={<span className="text-foreground font-bold text-lg">{stats?.totalCourses || 0}</span>}
                             />
                         </div>
                     </Card>
 
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
-                        <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
+                    <div className="bg-card border border-border rounded-2xl p-6">
+                        <h3 className="text-lg font-bold text-foreground mb-4">Quick Actions</h3>
                         <div className="space-y-2">
                             {[
                                 { to: '/instructor/create-course', icon: PlusCircle, label: 'Create New Course', color: 'text-indigo-600' },
@@ -117,7 +117,7 @@ export default function InstructorDashboard() {
                                 <Link
                                     key={to}
                                     to={to}
-                                    className="flex items-center gap-3 text-[15px] font-medium text-slate-700 hover:text-indigo-600 hover:bg-white py-3 px-4 rounded-xl border border-transparent hover:border-slate-200 hover:shadow-sm transition-all bg-white/50"
+                                    className="flex items-center gap-3 text-[15px] font-medium text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-card py-3 px-4 rounded-xl border border-transparent hover:border-border hover:shadow-sm transition-all"
                                 >
                                     <Icon size={18} className={`${color} flex-shrink-0`} /> {label}
                                 </Link>
@@ -139,21 +139,21 @@ export default function InstructorDashboard() {
                 />
                 <div className="grid md:grid-cols-2 gap-6">
                     {loading ? (
-                        [1, 2, 3, 4].map(i => <div key={i} className="bg-white border border-slate-200 rounded-2xl h-[100px] animate-pulse" />)
+                        [1, 2, 3, 4].map(i => <div key={i} className="bg-card border border-border rounded-2xl h-[100px] animate-pulse" />)
                     ) : courses?.slice(0, 4).map(course => (
-                        <div key={course.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-shadow group">
-                            <img src={course.thumbnail} alt="" className="w-20 h-16 rounded-lg object-cover border border-slate-100 flex-shrink-0" />
+                        <div key={course.id} className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-shadow group">
+                            <img src={course.thumbnail} alt="" className="w-20 h-16 rounded-lg object-cover border border-border flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-slate-900 font-bold text-[15px] truncate group-hover:text-indigo-600 transition-colors">{course.title}</p>
-                                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 font-medium">
-                                    <span className="flex items-center gap-1.5"><Users size={14} className="text-slate-400" /> {course.enrollmentCount?.toLocaleString()} students</span>
-                                    <div className="w-1 h-1 bg-slate-300 rounded-full" />
+                                <p className="text-foreground font-bold text-[15px] truncate group-hover:text-indigo-600 transition-colors">{course.title}</p>
+                                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">
+                                    <span className="flex items-center gap-1.5"><Users size={14} className="text-muted-foreground/60" /> {course.enrollmentCount?.toLocaleString()} students</span>
+                                    <div className="w-1 h-1 bg-border rounded-full" />
                                     <RatingDisplay rating={course.rating} />
                                 </div>
                             </div>
                             <div className="flex flex-col items-end gap-2 flex-shrink-0">
                                 <StatusBadge status={course.status} />
-                                <Link to={`/courses/${course.id}`} className="bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 p-2 rounded-lg transition-colors border border-slate-200 hover:border-indigo-200">
+                                <Link to={`/courses/${course.id}`} className="bg-muted/40 hover:bg-indigo-50 text-muted-foreground/60 hover:text-indigo-600 p-2 rounded-lg transition-colors border border-border hover:border-indigo-200">
                                     <Eye size={16} />
                                 </Link>
                             </div>

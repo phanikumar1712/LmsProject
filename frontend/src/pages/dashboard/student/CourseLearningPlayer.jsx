@@ -170,13 +170,13 @@ export default function CourseLearningPlayer() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-slate-400 text-sm font-medium">Loading your course...</p>
+                <p className="text-muted-foreground/60 text-sm font-medium">Loading your course...</p>
             </div>
         </div>
     );
     if (!course) return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
-            <p className="text-slate-500">Course not found</p>
+            <p className="text-muted-foreground">Course not found</p>
         </div>
     );
 
@@ -188,7 +188,7 @@ export default function CourseLearningPlayer() {
                 <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={() => navigate('/student/courses')}
-                        className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                        className="text-muted-foreground/60 hover:text-white transition-colors flex-shrink-0"
                         title="Back to my courses"
                     >
                         <ChevronLeft size={20} />
@@ -199,7 +199,7 @@ export default function CourseLearningPlayer() {
                 {/* Progress indicator */}
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="hidden sm:flex flex-col items-end">
-                        <span className="text-xs text-slate-400 font-medium leading-tight">
+                        <span className="text-xs text-muted-foreground/60 font-medium leading-tight">
                             {completedCount}/{lessons.length} lessons
                         </span>
                         <span className={`text-xs font-bold leading-tight ${progress === 100 ? 'text-green-400' : 'text-indigo-400'}`}>
@@ -212,7 +212,7 @@ export default function CourseLearningPlayer() {
                     </div>
                     <button
                         onClick={() => setSidebarOpen(o => !o)}
-                        className="text-slate-400 hover:text-white transition-colors lg:hidden flex-shrink-0"
+                        className="text-muted-foreground/60 hover:text-white transition-colors lg:hidden flex-shrink-0"
                     >
                         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
@@ -236,7 +236,7 @@ export default function CourseLearningPlayer() {
                     {/* Media pane */}
                     <div className="relative flex-1 bg-black overflow-hidden">
                         {!activeLesson ? (
-                            <div className="absolute inset-0 flex items-center justify-center text-slate-500">
+                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                                 <BookOpen size={48} />
                             </div>
                         ) : activeLesson.type === 'video' ? (
@@ -272,7 +272,7 @@ export default function CourseLearningPlayer() {
                                         <HelpCircle size={40} className="text-indigo-400" />
                                     </div>
                                     <h3 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h3>
-                                    <p className="text-slate-400 text-sm mb-8">Test your knowledge. Complete the quiz to mark this lesson as done.</p>
+                                    <p className="text-muted-foreground/60 text-sm mb-8">Test your knowledge. Complete the quiz to mark this lesson as done.</p>
                                     <button
                                         onClick={() => navigate(`/courses/${courseId}/quiz/${activeLesson.id}`)}
                                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-lg"
@@ -294,7 +294,7 @@ export default function CourseLearningPlayer() {
                                         <FileText size={40} className="text-emerald-400" />
                                     </div>
                                     <h3 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h3>
-                                    <p className="text-slate-400 text-xs uppercase tracking-widest font-bold mb-8">Document Resource</p>
+                                    <p className="text-muted-foreground/60 text-xs uppercase tracking-widest font-bold mb-8">Document Resource</p>
                                     {activeLesson.contentUrl ? (
                                         <a
                                             href={activeLesson.contentUrl} target="_blank" rel="noopener noreferrer"
@@ -303,9 +303,9 @@ export default function CourseLearningPlayer() {
                                             View Resource <ChevronRight size={18} />
                                         </a>
                                     ) : (
-                                        <p className="text-slate-500 text-sm mb-4 bg-slate-800 py-3 rounded-xl border border-slate-700">No link provided.</p>
+                                        <p className="text-muted-foreground text-sm mb-4 bg-slate-800 py-3 rounded-xl border border-slate-700">No link provided.</p>
                                     )}
-                                    <p className="text-slate-500 text-xs">After viewing, click "Mark as Complete" below.</p>
+                                    <p className="text-muted-foreground text-xs">After viewing, click "Mark as Complete" below.</p>
                                 </div>
                             </div>
                         )}
@@ -316,7 +316,7 @@ export default function CourseLearningPlayer() {
                         <button
                             onClick={goToPrev}
                             disabled={currentIndex <= 0}
-                            className="flex items-center gap-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            className="flex items-center gap-2 text-muted-foreground/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                             <ChevronLeft size={16} /> Prev
                         </button>
@@ -343,7 +343,7 @@ export default function CourseLearningPlayer() {
                                     {marking ? 'Saving...' : alreadyCompleted ? 'Completed ✓' : 'Mark as Complete'}
                                 </button>
                             )}
-                            <span className="text-xs text-slate-600 hidden sm:block">
+                            <span className="text-xs text-muted-foreground hidden sm:block">
                                 Lesson {currentIndex + 1} of {lessons.length}
                             </span>
                         </div>
@@ -351,7 +351,7 @@ export default function CourseLearningPlayer() {
                         <button
                             onClick={() => goToNext()}
                             disabled={currentIndex >= lessons.length - 1}
-                            className="flex items-center gap-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            className="flex items-center gap-2 text-muted-foreground/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                             Next <ChevronRight size={16} />
                         </button>
@@ -368,13 +368,13 @@ export default function CourseLearningPlayer() {
                     <div className="p-4 border-b border-slate-800 flex-shrink-0">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="text-sm font-bold text-white">Course Content</h2>
-                            <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-white lg:hidden">
+                            <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-white lg:hidden">
                                 <X size={16} />
                             </button>
                         </div>
                         {/* Progress bar */}
                         <div className="space-y-1">
-                            <div className="flex justify-between text-xs text-slate-400">
+                            <div className="flex justify-between text-xs text-muted-foreground/60">
                                 <span>{completedCount}/{lessons.length} completed</span>
                                 <span className={progress === 100 ? 'text-green-400 font-bold' : 'text-indigo-400 font-bold'}>{progress}%</span>
                             </div>
@@ -396,8 +396,8 @@ export default function CourseLearningPlayer() {
                                 <div key={section.id} className="mb-1">
                                     {/* Section header */}
                                     <div className="px-4 py-2 flex items-center justify-between">
-                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate">{section.title}</h3>
-                                        <span className="text-xs text-slate-600 flex-shrink-0 ml-2">{sectionCompleted}/{sectionLessons.length}</span>
+                                        <h3 className="text-xs font-bold text-muted-foreground/60 uppercase tracking-wider truncate">{section.title}</h3>
+                                        <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">{sectionCompleted}/{sectionLessons.length}</span>
                                     </div>
                                     {/* Lessons */}
                                     {sectionLessons.map((lesson) => {
@@ -410,7 +410,7 @@ export default function CourseLearningPlayer() {
                                                 className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all border-l-2
                                                     ${active
                                                         ? 'bg-indigo-600/10 border-indigo-500 text-white'
-                                                        : 'border-transparent hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
+                                                        : 'border-transparent hover:bg-slate-800/50 text-muted-foreground/60 hover:text-slate-200'
                                                     }
                                                 `}
                                             >
@@ -419,11 +419,11 @@ export default function CourseLearningPlayer() {
                                                     {done ? (
                                                         <CheckCircle size={16} className="text-green-500" />
                                                     ) : lesson.type === 'quiz' ? (
-                                                        <HelpCircle size={16} className={active ? 'text-indigo-400' : 'text-slate-600'} />
+                                                        <HelpCircle size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
                                                     ) : lesson.type === 'document' ? (
-                                                        <FileText size={16} className={active ? 'text-indigo-400' : 'text-slate-600'} />
+                                                        <FileText size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
                                                     ) : (
-                                                        <Play size={16} className={active ? 'text-indigo-400' : 'text-slate-600'} />
+                                                        <Play size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
                                                     )}
                                                 </span>
                                                 <div className="min-w-0">
@@ -431,11 +431,11 @@ export default function CourseLearningPlayer() {
                                                         {lesson.title}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[10px] text-slate-600 capitalize">{lesson.type}</span>
+                                                        <span className="text-[10px] text-muted-foreground capitalize">{lesson.type}</span>
                                                         {lesson.duration && (
                                                             <>
-                                                                <span className="text-slate-700">·</span>
-                                                                <span className="text-[10px] text-slate-600 flex items-center gap-0.5">
+                                                                <span className="text-foreground/80">·</span>
+                                                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                                                                     <Clock size={9} /> {lesson.duration}
                                                                 </span>
                                                             </>
@@ -478,10 +478,10 @@ export default function CourseLearningPlayer() {
                             className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-8 max-w-md w-full relative z-10"
                         >
                             <h3 className="text-xl font-bold text-white mb-2">How's the course?</h3>
-                            <p className="text-slate-400 text-sm mb-6">Your feedback helps us and other students.</p>
+                            <p className="text-muted-foreground/60 text-sm mb-6">Your feedback helps us and other students.</p>
 
                             <div className="mb-6">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 block">Your Rating</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block">Your Rating</label>
                                 <RatingStars
                                     rating={myRating.stars}
                                     size={32}
@@ -491,7 +491,7 @@ export default function CourseLearningPlayer() {
                             </div>
 
                             <div className="mb-6">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 block">Your Review</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block">Your Review</label>
                                 <textarea
                                     className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-32 transition-all"
                                     placeholder="What did you like or dislike?"
@@ -510,7 +510,7 @@ export default function CourseLearningPlayer() {
                                 </button>
                                 <button
                                     onClick={() => setShowReviewModal(false)}
-                                    className="px-6 py-3 text-slate-400 font-bold hover:text-white transition-colors"
+                                    className="px-6 py-3 text-muted-foreground/60 font-bold hover:text-white transition-colors"
                                 >
                                     Cancel
                                 </button>

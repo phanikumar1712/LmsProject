@@ -41,4 +41,14 @@ const clearAll = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { getByUser, markRead, markAllRead, clearAll };
+// POST /api/notifications
+const create = async (req, res) => {
+    const { userId, message, type = 'system', link } = req.body;
+    const result = await query(
+        'INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4) RETURNING *',
+        [userId, message, type, link]
+    );
+    res.status(201).json(mapNotification(result.rows[0]));
+};
+
+module.exports = { getByUser, markRead, markAllRead, clearAll, create };

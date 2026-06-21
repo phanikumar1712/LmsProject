@@ -9,7 +9,7 @@
 export function Card({ children, className = '', noPadding = false, accentColor }) {
     return (
         <div
-            className={`bg-white border border-slate-200 rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-6'} ${className}`}
+            className={`bg-card border border-border rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-6'} ${className}`}
         >
             {accentColor && (
                 <div
@@ -28,7 +28,7 @@ export function Card({ children, className = '', noPadding = false, accentColor 
 export function CardHeader({ title, icon, right, className = '' }) {
     return (
         <div className={`flex items-center justify-between mb-6 ${className}`}>
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 {icon}
                 {title}
             </h3>
@@ -43,8 +43,8 @@ export function CardHeader({ title, icon, right, className = '' }) {
 export function MetricRow({ label, value, valueClassName = '' }) {
     return (
         <div className="flex items-center justify-between">
-            <span className="text-slate-600 font-medium">{label}</span>
-            <span className={`font-bold ${valueClassName}`}>{value}</span>
+            <span className="text-muted-foreground font-medium">{label}</span>
+            <span className={`font-bold text-foreground ${valueClassName}`}>{value}</span>
         </div>
     );
 }

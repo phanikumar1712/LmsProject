@@ -4,6 +4,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const ctrl = require('../controllers/notificationsController');
 
 router.get('/', authenticate, asyncHandler(ctrl.getByUser));
+router.post('/', authenticate, asyncHandler(ctrl.create));
 router.put('/read-all', authenticate, asyncHandler(ctrl.markAllRead));
 router.put('/:id/read', authenticate, asyncHandler(ctrl.markRead));
 router.delete('/clear-all', authenticate, asyncHandler(ctrl.clearAll));
