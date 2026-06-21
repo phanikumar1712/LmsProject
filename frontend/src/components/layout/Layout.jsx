@@ -42,7 +42,7 @@ export function DashboardLayout() {
 
 export function PublicLayout() {
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-background">
             <Navbar />
             <main className="pt-16">
                 <Outlet />

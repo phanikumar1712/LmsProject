@@ -41,7 +41,7 @@ export default function ModerateReviews() {
     });
 
     if (loading) return (
-        <div className="p-12 text-center text-slate-400 font-bold animate-pulse">
+        <div className="p-12 text-center text-muted-foreground/60 font-bold animate-pulse">
             <MessageSquare className="mx-auto mb-4 opacity-20" size={48} />
             Loading reviews...
         </div>
@@ -51,16 +51,16 @@ export default function ModerateReviews() {
         <div className="space-y-6 max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Review Moderation</h1>
-                    <p className="text-slate-500 font-medium">Maintain platform quality by monitoring feedback</p>
+                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Review Moderation</h1>
+                    <p className="text-muted-foreground font-medium">Maintain platform quality by monitoring feedback</p>
                 </div>
 
-                <div className="flex bg-slate-100 p-1 rounded-xl">
+                <div className="flex bg-muted p-1 rounded-xl">
                     {['all', 'low', 'high'].map(f => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${filter === f ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground/80'}`}
                         >
                             {f}
                         </button>
@@ -68,41 +68,41 @@ export default function ModerateReviews() {
                 </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-200">
+                        <thead className="bg-muted/40 border-b border-border">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Course Info</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rating</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Review</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Student</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Course Info</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Rating</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Review</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-border">
                             {filteredReviews.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-20 text-center text-slate-400">
+                                    <td colSpan="5" className="px-6 py-20 text-center text-muted-foreground/60">
                                         <Star size={40} className="mx-auto mb-3 opacity-20" />
                                         <p className="font-medium">No reviews match your filters</p>
                                     </td>
                                 </tr>
                             ) : filteredReviews.map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                                <tr key={r.id} className="hover:bg-muted/40/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-inner">
+                                            <div className="w-9 h-9 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground font-bold overflow-hidden shadow-inner">
                                                 {r.studentAvatar ? <img src={r.studentAvatar} className="w-full h-full object-cover" /> : r.studentName?.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-900 text-sm leading-none">{r.studentName}</p>
-                                                <p className="text-[11px] text-slate-400 font-medium mt-1 uppercase tracking-tight">{new Date(r.createdAt).toLocaleDateString()}</p>
+                                                <p className="font-bold text-foreground text-sm leading-none">{r.studentName}</p>
+                                                <p className="text-[11px] text-muted-foreground/60 font-medium mt-1 uppercase tracking-tight">{new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="text-sm font-semibold text-slate-800 max-w-xs truncate" title={r.courseTitle}>
+                                        <div className="text-sm font-semibold text-foreground max-w-xs truncate" title={r.courseTitle}>
                                             {r.courseTitle || `#${String(r.courseId).slice(0, 8)}…`}
                                         </div>
                                     </td>
@@ -113,7 +113,7 @@ export default function ModerateReviews() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <p className="text-sm text-slate-600 line-clamp-2 max-w-sm italic">"{r.comment || 'No comment provided.'}"</p>
+                                        <p className="text-sm text-muted-foreground line-clamp-2 max-w-sm italic">"{r.comment || 'No comment provided.'}"</p>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <button

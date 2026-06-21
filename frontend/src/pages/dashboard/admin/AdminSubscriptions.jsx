@@ -40,7 +40,7 @@ export default function AdminSubscriptions() {
     );
 
     const PLAN_COLORS = {
-        FREE: 'bg-slate-100 text-slate-600',
+        FREE: 'bg-muted text-muted-foreground',
         BASIC: 'bg-violet-100 text-violet-700',
         PRO: 'bg-indigo-100 text-indigo-700',
         ENTERPRISE: 'bg-emerald-100 text-emerald-700',
@@ -50,62 +50,62 @@ export default function AdminSubscriptions() {
         <div className="space-y-6 max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">User Subscriptions</h1>
-                    <p className="text-slate-500 font-medium mt-1">Manage platform billing and tier access</p>
+                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">User Subscriptions</h1>
+                    <p className="text-muted-foreground font-medium mt-1">Manage platform billing and tier access</p>
                 </div>
 
                 <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" size={18} />
                     <input
                         type="text"
                         placeholder="Search users..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-all"
                     />
                 </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200">
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Plan</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                            <tr className="bg-muted/40 border-b border-border">
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">User</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Plan</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Expiry</th>
+                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-border">
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-40"></div></td>
-                                        <td className="px-6 py-4"><div className="h-6 bg-slate-100 rounded-full w-16"></div></td>
-                                        <td className="px-6 py-4"><div className="h-6 bg-slate-100 rounded-full w-20"></div></td>
-                                        <td className="px-6 py-4"><div className="h-6 bg-slate-100 rounded-lg w-24"></div></td>
-                                        <td className="px-6 py-4 text-right"><div className="h-8 bg-slate-100 rounded ml-auto w-12"></div></td>
+                                        <td className="px-6 py-4"><div className="h-10 bg-muted rounded-lg w-40"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-muted rounded-full w-16"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-muted rounded-full w-20"></div></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-muted rounded-lg w-24"></div></td>
+                                        <td className="px-6 py-4 text-right"><div className="h-8 bg-muted rounded ml-auto w-12"></div></td>
                                     </tr>
                                 ))
                             ) : filteredUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan="5" className="px-6 py-12 text-center text-muted-foreground/60">
                                         <CreditCard size={40} className="mx-auto mb-3 opacity-20" />
                                         <p className="font-medium">No users found</p>
                                     </td>
                                 </tr>
                             ) : filteredUsers.map(user => (
-                                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <tr key={user.id} className="hover:bg-muted/40/50 transition-colors group">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold border border-slate-200">
+                                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-bold border border-border">
                                                 {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full object-cover" /> : user.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-900 text-sm leading-none">{user.name}</p>
-                                                <p className="text-xs text-slate-400 mt-1">{user.email}</p>
+                                                <p className="font-bold text-foreground text-sm leading-none">{user.name}</p>
+                                                <p className="text-xs text-muted-foreground/60 mt-1">{user.email}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -121,15 +121,15 @@ export default function AdminSubscriptions() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                                            <Calendar size={13} className="text-slate-400" />
+                                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                                            <Calendar size={13} className="text-muted-foreground/60" />
                                             {user.subscriptionExpiry ? new Date(user.subscriptionExpiry).toLocaleDateString() : 'N/A'}
                                         </p>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <select
-                                                className="text-[11px] font-bold bg-white border border-slate-200 rounded-md py-1 px-2 outline-none focus:ring-2 focus:ring-indigo-100"
+                                                className="text-[11px] font-bold bg-card border border-border rounded-md py-1 px-2 outline-none focus:ring-2 focus:ring-indigo-100"
                                                 value={user.subscriptionPlan || 'FREE'}
                                                 onChange={(e) => updatePlan(user.id, e.target.value)}
                                             >

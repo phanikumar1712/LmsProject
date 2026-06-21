@@ -19,10 +19,10 @@ export function DataTable({
     const colSpan = columns.length;
 
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <table className="w-full text-left text-sm text-foreground">
+                    <thead className="bg-muted/60 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         <tr>
                             {columns.map((col, i) => (
                                 <th
@@ -34,10 +34,10 @@ export function DataTable({
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-border">
                         {loading ? (
                             <tr>
-                                <td colSpan={colSpan} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground font-medium">
                                     <div className="flex items-center justify-center gap-3">
                                         <div className="w-5 h-5 border-[3px] border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
                                         {loadingText}
@@ -46,7 +46,7 @@ export function DataTable({
                             </tr>
                         ) : empty ? (
                             <tr>
-                                <td colSpan={colSpan} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground font-medium">
                                     {emptyText}
                                 </td>
                             </tr>
@@ -70,16 +70,16 @@ export function UserCell({ name, email, avatar }) {
                 <img
                     src={avatar}
                     alt={name}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm flex-shrink-0"
+                    className="w-10 h-10 rounded-full object-cover border border-border shadow-sm flex-shrink-0"
                 />
             ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 border border-slate-200 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 border border-border shadow-sm">
                     <span className="text-white text-sm font-bold">{name?.charAt(0)?.toUpperCase()}</span>
                 </div>
             )}
             <div>
-                <p className="text-slate-900 font-bold">{name}</p>
-                {email && <p className="text-slate-500 text-xs font-medium">{email}</p>}
+                <p className="text-foreground font-bold">{name}</p>
+                {email && <p className="text-muted-foreground text-xs font-medium">{email}</p>}
             </div>
         </div>
     );

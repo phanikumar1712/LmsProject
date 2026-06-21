@@ -26,8 +26,11 @@ export function StatCard({
 }) {
     return (
         <div
-            className={`bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow ${className}`}
+            className={`bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${className}`}
         >
+            <div className="absolute top-0 right-0 p-8 opacity-[0.03] dark:opacity-[0.07] pointer-events-none">
+                <Icon size={80} />
+            </div>
             <div className="flex items-center justify-between mb-4">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bg}`}>
                     <Icon size={24} style={{ color }} />
@@ -38,10 +41,10 @@ export function StatCard({
                     </div>
                 )}
             </div>
-            <p className="text-2xl lg:text-3xl font-bold text-slate-900 mb-1 tracking-tight">
+            <p className="text-2xl lg:text-3xl font-bold text-foreground mb-1 tracking-tight">
                 {value}
             </p>
-            <p className="text-slate-500 text-sm font-medium">{label}</p>
+            <p className="text-muted-foreground text-sm font-medium">{label}</p>
             {change && (
                 <p
                     className="text-[13px] font-medium mt-2"
@@ -77,7 +80,7 @@ export function StatCardSkeleton({ count = 4 }) {
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {Array.from({ length: count }).map((_, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-2xl h-[120px] animate-pulse" />
+                <div key={i} className="bg-card border border-border rounded-2xl h-[120px] animate-pulse" />
             ))}
         </div>
     );

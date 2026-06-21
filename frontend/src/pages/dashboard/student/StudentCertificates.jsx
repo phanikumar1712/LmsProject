@@ -46,18 +46,18 @@ export default function StudentCertificates() {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {certificates.map(cert => (
-                    <div key={cert.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center text-center group hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div key={cert.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center text-center group hover:shadow-md transition-shadow relative overflow-hidden">
                         <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-amber-400 to-amber-500" />
                         <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                             <Award size={32} />
                         </div>
-                        <h3 className="font-bold text-slate-900 text-lg mb-1 leading-tight">{cert.title}</h3>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-4">
+                        <h3 className="font-bold text-foreground text-lg mb-1 leading-tight">{cert.title}</h3>
+                        <p className="text-xs text-muted-foreground/60 font-bold uppercase tracking-widest mb-4">
                             Issued: {new Date(cert.completedAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                         </p>
 
-                        <div className="mt-auto pt-4 w-full border-t border-slate-100 flex gap-2">
-                            <button className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded-lg text-xs font-bold transition-colors">
+                        <div className="mt-auto pt-4 w-full border-t border-border flex gap-2">
+                            <button className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-muted/40 hover:bg-indigo-50 hover:text-indigo-700 text-muted-foreground rounded-lg text-xs font-bold transition-colors">
                                 <Download size={14} /> Download PDF
                             </button>
                         </div>

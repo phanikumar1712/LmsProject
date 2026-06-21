@@ -60,23 +60,33 @@
 
 /* ── Dark mode variable overrides ─────────────────────────────────────────── */
 .dark {
-  --color-background: #0f172a;
-  --color-foreground: #f1f5f9;
+  --color-background: #020617;
+  /* Deep midnight blue */
+  --color-foreground: #f8fafc;
   --color-border: #1e293b;
-  --color-input: #1e293b;
-  --color-card: #1e293b;
-  --color-card-foreground: #f1f5f9;
+  --color-input: #0f172a;
+  --color-card: #0f172a;
+  /* Slate 900 */
+  --color-card-foreground: #f8fafc;
   --color-muted: #1e293b;
   --color-muted-foreground: #94a3b8;
-  --color-accent: #1e293b;
-  --color-accent-foreground: #f1f5f9;
-  --color-popover: #1e293b;
-  --color-popover-foreground: #f1f5f9;
+  --color-accent: #334155;
+  --color-accent-foreground: #ffffff;
+  --color-popover: #0f172a;
+  --color-popover-foreground: #f8fafc;
+
+  /* Additional Premium Dark Tokens */
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 10px 40px -4px rgba(99, 102, 241, 0.15);
+  /* Indigo glow on hover */
 }
 
 .dark body {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
 }
 
 @layer base {
@@ -107,6 +117,20 @@
 
   .card-hover:hover {
     @apply shadow-card-hover transform -translate-y-1;
+  }
+
+  /* Premium Dark Card Effect */
+  .dark .card-hover:hover {
+    @apply border-primary/40;
+    box-shadow: 0 0 30px -10px rgba(99, 102, 241, 0.2);
+  }
+
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20;
+  }
+
+  .dark .glass {
+    @apply bg-slate-900/40 backdrop-blur-md border border-slate-800/50;
   }
 
   .input-field {

@@ -34,9 +34,9 @@ export function LoadingContainer({ height = 'h-64', size = 'md' }) {
  */
 export function EmptyState({ icon: Icon, message, action, className = '' }) {
     return (
-        <div className={`bg-white border border-slate-200 border-dashed rounded-2xl p-12 text-center ${className}`}>
-            {Icon && <Icon size={48} className="text-slate-300 mx-auto mb-4" />}
-            <p className="text-slate-500 font-medium text-lg mb-6">{message}</p>
+        <div className={`bg-card border border-border border-dashed rounded-2xl p-12 text-center ${className}`}>
+            {Icon && <Icon size={48} className="text-muted-foreground/30 mx-auto mb-4" />}
+            <p className="text-muted-foreground font-medium text-lg mb-6">{message}</p>
             {action}
         </div>
     );
@@ -51,12 +51,12 @@ export function EmptyState({ icon: Icon, message, action, className = '' }) {
  */
 export function Badge({ variant = 'neutral', children, className = '' }) {
     const variants = {
-        success: 'bg-emerald-100 text-emerald-700',
-        warning: 'bg-amber-100 text-amber-700',
-        danger: 'bg-rose-100 text-rose-700',
-        info: 'bg-indigo-100 text-indigo-700',
-        cyan: 'bg-cyan-100 text-cyan-700',
-        neutral: 'bg-slate-100 text-slate-600',
+        success: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+        warning: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+        danger: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+        info: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400',
+        cyan: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400',
+        neutral: 'bg-muted text-muted-foreground',
     };
     return (
         <span className={`px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${variants[variant] ?? variants.neutral} ${className}`}>

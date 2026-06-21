@@ -58,7 +58,7 @@ export default function SuperAdminAnalytics() {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
                             <DollarSign size={32} className="opacity-20 mb-2" />
                             <p className="text-sm font-medium">No revenue data</p>
                         </div>
@@ -77,7 +77,7 @@ export default function SuperAdminAnalytics() {
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
                             <TrendingUp size={32} className="opacity-20 mb-2" />
                             <p className="text-sm font-medium">No enrollment data</p>
                         </div>
@@ -87,8 +87,8 @@ export default function SuperAdminAnalytics() {
 
             {/* Users by Role + Categories */}
             <div className="grid lg:grid-cols-2 gap-8">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                    <h3 className="text-slate-900 font-bold text-lg mb-6">Users by Role</h3>
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-foreground font-bold text-lg mb-6">Users by Role</h3>
                     {stats?.usersByRole?.length > 0 ? (
                         <div className="flex items-center gap-8">
                             <div className="h-44 w-44 flex-shrink-0">
@@ -108,23 +108,23 @@ export default function SuperAdminAnalytics() {
                                     <div key={item.role} className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <div className="w-3 h-3 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                                            <span className="text-slate-700 font-medium text-sm">{item.role}</span>
+                                            <span className="text-foreground/80 font-medium text-sm">{item.role}</span>
                                         </div>
-                                        <span className="text-slate-900 font-bold text-sm">{item.count.toLocaleString()}</span>
+                                        <span className="text-foreground font-bold text-sm">{item.count.toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     ) : (
-                        <div className="h-44 flex items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                        <div className="h-44 flex items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
                             <Users size={32} className="opacity-20 mb-2" />
                             <p className="text-sm font-medium">No user data</p>
                         </div>
                     )}
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                    <h3 className="text-slate-900 font-bold text-lg mb-6">Top Categories</h3>
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-foreground font-bold text-lg mb-6">Top Categories</h3>
                     {stats?.topCategories?.length > 0 ? (
                         <div className="space-y-4">
                             {stats.topCategories.map((cat, i) => {
@@ -133,10 +133,10 @@ export default function SuperAdminAnalytics() {
                                 return (
                                     <div key={cat.name}>
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-sm font-bold text-slate-700">{cat.name}</span>
-                                            <span className="text-sm font-bold text-slate-500">{cat.enrollments.toLocaleString()}</span>
+                                            <span className="text-sm font-bold text-foreground/80">{cat.name}</span>
+                                            <span className="text-sm font-bold text-muted-foreground">{cat.enrollments.toLocaleString()}</span>
                                         </div>
-                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
                                             <div
                                                 className="h-full rounded-full transition-all"
                                                 style={{ width: `${pct}%`, background: CHART_COLORS[i % CHART_COLORS.length] }}
@@ -147,7 +147,7 @@ export default function SuperAdminAnalytics() {
                             })}
                         </div>
                     ) : (
-                        <div className="h-44 flex items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                        <div className="h-44 flex items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
                             <BookOpen size={32} className="opacity-20 mb-2" />
                             <p className="text-sm font-medium">No category data</p>
                         </div>

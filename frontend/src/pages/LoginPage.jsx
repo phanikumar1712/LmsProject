@@ -228,21 +228,21 @@ export default function LoginPage() {
                                 className="space-y-6"
                             >
                                 <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">Registered Email</label>
+                                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-2">Registered Email</label>
                                     <div className="relative">
-                                        <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                         <input
                                             id="reset-email"
                                             type="email"
                                             placeholder="you@example.com"
                                             value={resetForm.email}
                                             onChange={e => { setResetForm(f => ({ ...f, email: e.target.value })); setError(''); }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900"
+                                            className="w-full bg-muted/50 border border-border rounded-xl pl-11 pr-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-foreground placeholder:text-muted-foreground"
                                             autoComplete="email"
                                             autoFocus
                                         />
                                     </div>
-                                    <p className="text-[11px] text-slate-400 font-medium mt-3 text-center uppercase tracking-widest leading-relaxed">
+                                    <p className="text-[11px] text-muted-foreground font-medium mt-3 text-center uppercase tracking-widest leading-relaxed">
                                         We'll send a 6-digit code to your inbox
                                     </p>
                                 </div>
@@ -255,7 +255,7 @@ export default function LoginPage() {
                                     {!loading && <KeyRound size={16} />}
                                 </button>
                                 <button type="button" onClick={goBackToLogin}
-                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    className="w-full py-2 text-sm text-muted-foreground hover:text-foreground font-semibold flex items-center justify-center gap-1.5 transition-colors">
                                     <ArrowLeft size={14} /> Back to Sign In
                                 </button>
                             </motion.form>
@@ -273,7 +273,7 @@ export default function LoginPage() {
                             >
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Verification Code</label>
+                                        <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Verification Code</label>
                                         <button
                                             type="button"
                                             onClick={handleRequestReset}
@@ -297,12 +297,12 @@ export default function LoginPage() {
                                                 setResetForm(f => ({ ...f, otp: val }));
                                                 setError('');
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-center tracking-[1em] font-mono text-2xl font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-300 text-slate-900"
+                                            className="w-full bg-muted/40 border border-border rounded-xl px-4 py-4 text-center tracking-[1em] font-mono text-2xl font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-muted-foreground/30 text-foreground"
                                             autoComplete="one-time-code"
                                             autoFocus
                                         />
                                     </div>
-                                    <p className="text-[11px] text-slate-400 font-medium text-center mt-4 uppercase tracking-widest">Enter the 6-digit code</p>
+                                    <p className="text-[11px] text-muted-foreground/60 font-medium text-center mt-4 uppercase tracking-widest">Enter the 6-digit code</p>
                                 </div>
 
                                 <button
@@ -313,7 +313,7 @@ export default function LoginPage() {
                                     {loading ? 'Verifying...' : 'Verify Code'}
                                 </button>
                                 <button type="button" onClick={goBackToLogin}
-                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    className="w-full py-2 text-sm text-muted-foreground hover:text-foreground font-semibold flex items-center justify-center gap-1.5 transition-colors">
                                     <ArrowLeft size={14} /> Back to Sign In
                                 </button>
                             </motion.form>
@@ -330,39 +330,39 @@ export default function LoginPage() {
                                 className="space-y-5"
                             >
                                 <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">New Password</label>
+                                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-2">New Password</label>
                                     <div className="relative">
-                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                         <input
                                             id="reset-new-password"
                                             type={showNewPass ? 'text' : 'password'}
                                             placeholder="••••••••"
                                             value={resetForm.newPassword}
                                             onChange={e => { setResetForm(f => ({ ...f, newPassword: e.target.value })); setError(''); }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-12 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-slate-900"
+                                            className="w-full bg-muted/50 border border-border rounded-xl pl-11 pr-12 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all text-foreground"
                                             autoComplete="new-password"
                                             autoFocus
                                         />
                                         <button type="button" onClick={() => setShowNewPass(s => !s)}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                                             {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-2">Confirm Password</label>
+                                    <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-2">Confirm Password</label>
                                     <div className="relative">
-                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                         <input
                                             id="reset-confirm-password"
                                             type="password"
                                             placeholder="••••••••"
                                             value={resetForm.confirm}
                                             onChange={e => { setResetForm(f => ({ ...f, confirm: e.target.value })); setError(''); }}
-                                            className={`w-full bg-slate-50 border rounded-xl pl-11 pr-4 py-3 text-sm font-medium outline-none transition-all text-slate-900 focus:ring-4
+                                            className={`w-full bg-muted/50 border rounded-xl pl-11 pr-4 py-3 text-sm font-medium outline-none transition-all text-foreground focus:ring-4
                                                 ${resetForm.confirm && resetForm.newPassword !== resetForm.confirm
                                                     ? 'border-rose-300 focus:ring-rose-500/10 focus:border-rose-400'
-                                                    : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                                    : 'border-border focus:border-indigo-500 focus:ring-indigo-500/10'
                                                 }`}
                                             autoComplete="new-password"
                                         />
@@ -379,7 +379,7 @@ export default function LoginPage() {
                                     {loading ? 'Updating...' : <><KeyRound size={16} /> Update Password</>}
                                 </button>
                                 <button type="button" onClick={goBackToLogin}
-                                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                                    className="w-full py-2 text-sm text-muted-foreground hover:text-foreground font-semibold flex items-center justify-center gap-1.5 transition-colors">
                                     <ArrowLeft size={14} /> Cancel
                                 </button>
                             </motion.form>
@@ -394,11 +394,11 @@ export default function LoginPage() {
                                 exit={{ opacity: 0, scale: 1.05 }}
                                 className="text-center py-4"
                             >
-                                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-emerald-100">
+                                <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-emerald-100 dark:border-emerald-700">
                                     <CheckCircle size={40} className="text-emerald-500" strokeWidth={1.5} />
                                 </div>
-                                <h3 className="text-xl font-black text-slate-900 mb-2">Password Secured!</h3>
-                                <p className="text-slate-500 text-[15px] font-medium leading-relaxed mb-8">
+                                <h3 className="text-xl font-black text-foreground mb-2">Password Secured!</h3>
+                                <p className="text-muted-foreground text-[15px] font-medium leading-relaxed mb-8">
                                     Your account password has been updated. You can now sign in with your new credentials.
                                 </p>
                                 <button

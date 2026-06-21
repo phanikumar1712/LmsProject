@@ -18,7 +18,7 @@ const STATUS_META = {
 };
 
 const SEVERITY_META = {
-    none: 'bg-slate-100 text-slate-600',
+    none: 'bg-muted text-muted-foreground',
     minor: 'bg-amber-50 text-amber-700 border border-amber-200',
     major: 'bg-rose-50 text-rose-700 border border-rose-200',
 };
@@ -49,13 +49,13 @@ export default function SystemHealth() {
         fetchData();
     };
 
-    if (loading) return <div className="p-10 text-center animate-pulse text-slate-400 font-bold">Diagnosing Systems...</div>;
+    if (loading) return <div className="p-10 text-center animate-pulse text-muted-foreground/60 font-bold">Diagnosing Systems...</div>;
 
     if (!health) return (
         <div className="p-20 text-center max-w-sm mx-auto">
             <XCircle size={48} className="mx-auto text-rose-500 mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Diagnosis Failed</h2>
-            <p className="text-slate-500 text-sm mb-6">We couldn't connect to the system health probes. Please check your server connection.</p>
+            <h2 className="text-xl font-bold text-foreground mb-2">Diagnosis Failed</h2>
+            <p className="text-muted-foreground text-sm mb-6">We couldn't connect to the system health probes. Please check your server connection.</p>
             <button onClick={refresh} className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold">Retry Diagnostic</button>
         </div>
     );
@@ -73,7 +73,7 @@ export default function SystemHealth() {
                     <button
                         onClick={refresh}
                         disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-60"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border rounded-xl text-foreground/80 font-bold text-sm hover:bg-muted/40 transition-colors shadow-sm disabled:opacity-60"
                     >
                         <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /> Refresh
                     </button>
@@ -82,35 +82,35 @@ export default function SystemHealth() {
 
             {/* Metrics Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Heap Used</p>
-                            <h4 className="text-2xl font-black text-slate-900">{health?.memory?.heapUsed || 0}MB</h4>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Heap Used</p>
+                            <h4 className="text-2xl font-black text-foreground">{health?.memory?.heapUsed || 0}MB</h4>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <Cpu size={20} />
                         </div>
                     </div>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Uptime</p>
-                            <h4 className="text-2xl font-black text-slate-900">{Math.floor((health?.uptime || 0) / 3600)}h {Math.floor(((health?.uptime || 0) % 3600) / 60)}m</h4>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Uptime</p>
+                            <h4 className="text-2xl font-black text-foreground">{Math.floor((health?.uptime || 0) / 3600)}h {Math.floor(((health?.uptime || 0) % 3600) / 60)}m</h4>
                         </div>
                         <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                             <Activity size={20} />
                         </div>
                     </div>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Environment</p>
-                            <h4 className="text-2xl font-black text-slate-900">{health?.platform || 'Unknown'} <span className="text-xs font-bold text-slate-400">Node {health?.nodeVersion?.split('.')[0] || '??'}</span></h4>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Environment</p>
+                            <h4 className="text-2xl font-black text-foreground">{health?.platform || 'Unknown'} <span className="text-xs font-bold text-muted-foreground/60">Node {health?.nodeVersion?.split('.')[0] || '??'}</span></h4>
                         </div>
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-muted/40 text-muted-foreground flex items-center justify-center">
                             <Server size={20} />
                         </div>
                     </div>
@@ -136,32 +136,32 @@ export default function SystemHealth() {
             </div>
 
             {/* Services */}
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="text-slate-900 font-bold text-lg">Infrastructure Stack</h3>
+            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-border flex justify-between items-center">
+                    <h3 className="text-foreground font-bold text-lg">Infrastructure Stack</h3>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-border">
                     {services.map(svc => {
                         const meta = STATUS_META[svc.status] || STATUS_META.operational;
                         const StatusIcon = meta.icon;
                         const SvcIcon = ICON_MAP[svc.icon] || Server;
                         return (
-                            <div key={svc.name} className="flex items-center gap-5 px-6 py-5 hover:bg-slate-50 transition-colors">
-                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                    <SvcIcon size={18} className="text-slate-600" />
+                            <div key={svc.name} className="flex items-center gap-5 px-6 py-5 hover:bg-muted/40 transition-colors">
+                                <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <SvcIcon size={18} className="text-muted-foreground" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-slate-900 font-bold text-sm">{svc.name}</p>
-                                    <p className="text-slate-500 text-xs font-medium">{svc.desc}</p>
+                                    <p className="text-foreground font-bold text-sm">{svc.name}</p>
+                                    <p className="text-muted-foreground text-xs font-medium">{svc.desc}</p>
                                 </div>
                                 <div className="flex items-center gap-6 flex-shrink-0 text-right">
                                     <div className="hidden sm:block">
-                                        <p className="text-slate-900 font-bold text-sm">{svc.uptime}</p>
-                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-tighter">Uptime</p>
+                                        <p className="text-foreground font-bold text-sm">{svc.uptime}</p>
+                                        <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-tighter">Uptime</p>
                                     </div>
                                     <div>
-                                        <p className="text-slate-900 font-bold text-sm tracking-tight">{svc.latency}</p>
-                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-tighter">Latency</p>
+                                        <p className="text-foreground font-bold text-sm tracking-tight">{svc.latency}</p>
+                                        <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-tighter">Latency</p>
                                     </div>
                                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black border uppercase tracking-wider ${meta.cls}`}>
                                         <StatusIcon size={13} />
@@ -175,16 +175,16 @@ export default function SystemHealth() {
             </div>
 
             {/* Incidents */}
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
-                    <h3 className="text-slate-900 font-bold text-lg">System Log</h3>
+            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-border">
+                    <h3 className="text-foreground font-bold text-lg">System Log</h3>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-border">
                     {INCIDENTS.map((inc, i) => (
                         <div key={i} className="px-6 py-5">
                             <div className="flex items-start justify-between gap-4 mb-2">
                                 <div className="flex items-center gap-3">
-                                    <h4 className="text-slate-900 font-bold text-sm leading-none">{inc.title}</h4>
+                                    <h4 className="text-foreground font-bold text-sm leading-none">{inc.title}</h4>
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tight ${SEVERITY_META[inc.severity]}`}>
                                         {inc.severity === 'none' ? 'info' : inc.severity}
                                     </span>
@@ -192,9 +192,9 @@ export default function SystemHealth() {
                                         {inc.status}
                                     </span>
                                 </div>
-                                <span className="text-slate-400 text-xs font-bold">{inc.date}</span>
+                                <span className="text-muted-foreground/60 text-xs font-bold">{inc.date}</span>
                             </div>
-                            <p className="text-slate-500 text-sm font-medium leading-relaxed">{inc.desc}</p>
+                            <p className="text-muted-foreground text-sm font-medium leading-relaxed">{inc.desc}</p>
                         </div>
                     ))}
                 </div>

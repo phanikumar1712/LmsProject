@@ -79,16 +79,16 @@ export default function InstructorStudents() {
                 emptyText="No students found matching your filters."
             >
                 {tableRows.map((row, idx) => (
-                    <tr key={`${row.studentId}-${row.courseId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
+                    <tr key={`${row.studentId}-${row.courseId}-${idx}`} className="hover:bg-muted/40 transition-colors group">
                         <td className="px-6 py-4">
                             <UserCell name={row.studentName} email={row.studentEmail} avatar={row.studentAvatar} />
                         </td>
                         <td className="px-6 py-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center flex-shrink-0">
                                     <BookOpen size={16} className="text-indigo-600" />
                                 </div>
-                                <span className="font-semibold text-slate-700 truncate max-w-[220px]" title={row.courseName}>
+                                <span className="font-semibold text-foreground truncate max-w-[220px]" title={row.courseName}>
                                     {row.courseName}
                                 </span>
                             </div>
@@ -100,12 +100,12 @@ export default function InstructorStudents() {
                                 color={row.progress === 100 ? 'success' : 'primary'}
                             />
                         </td>
-                        <td className="px-6 py-4 text-[13px] font-medium text-slate-500">
+                        <td className="px-6 py-4 text-[13px] font-medium text-muted-foreground">
                             {row.enrolledAt
                                 ? new Date(row.enrolledAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
                                 : '—'}
                         </td>
-                        <td className="px-6 py-4 text-[13px] font-medium text-slate-500">
+                        <td className="px-6 py-4 text-[13px] font-medium text-muted-foreground">
                             {row.lastAccessed
                                 ? new Date(row.lastAccessed).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
                                 : 'Never'}
@@ -113,7 +113,7 @@ export default function InstructorStudents() {
                         <td className="px-6 py-4 text-right">
                             <a
                                 href={`mailto:${row.studentEmail}`}
-                                className="p-2.5 inline-flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-slate-50 transition-all shadow-sm"
+                                className="p-2.5 inline-flex items-center justify-center rounded-xl bg-card border border-border text-muted-foreground hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all shadow-sm"
                                 title="Email Student"
                             >
                                 <Mail size={18} />

@@ -90,10 +90,23 @@ export function Navbar({ onMobileMenuClick }) {
         if (searchQuery.trim()) navigate(`/courses?search=${encodeURIComponent(searchQuery)}`);
     };
 
+    const handleMarkRead = async (notif) => {
+        try {
+            await notificationsAPI.markRead(user.id, notif.id);
+            setNotifications(notifications.map(n => n.id === notif.id ? { ...n, read: true } : n));
+            if (notif.link) {
+                navigate(notif.link);
+                setNotifOpen(false);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const handleMarkAllRead = async () => {
         try {
             await notificationsAPI.markAllRead(user.id);
-            setNotifications(notifications.map(n => ({ ...n, read: true })));
+            setNotifications([]);
             setNotifOpen(false);
         } catch (error) {
             console.error(error);
@@ -126,18 +139,49 @@ export function Navbar({ onMobileMenuClick }) {
                                 EduNexus
                             </span>
                         </Link>
-                        <Link
-                            to="/courses"
-                            className="hidden md:flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-indigo-600 transition-colors"
-                        >
-                            Explore <ChevronDown size={14} className="opacity-50" />
-                        </Link>
+
+                        <div className="relative group hidden md:block">
+                            <button
+                                className="flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-indigo-600 transition-colors py-4"
+                            >
+                                Explore <ChevronDown size={14} className="opacity-50 group-hover:rotate-180 transition-transform" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            <div className="absolute top-full left-0 w-64 bg-popover border border-border rounded-2xl shadow-2xl py-3 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-50">
+                                <div className="px-4 py-2 border-b border-border/50 mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Browse Categories</span>
+                                </div>
+                                <Link to="/courses" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">📚</div>
+                                    All Courses
+                                </Link>
+                                <Link to="/courses?category=development" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">💻</div>
+                                    Development
+                                </Link>
+                                <Link to="/courses?category=design" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">🎨</div>
+                                    Design
+                                </Link>
+                                <Link to="/courses?category=business" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">💼</div>
+                                    Business
+                                </Link>
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                    <Link to="/become-instructor" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-indigo-600 hover:bg-indigo-50 transition-colors">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">🌟</div>
+                                        Become an Instructor
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Middle: Search bar (Glassmorphism) */}
                     <div className="hidden md:flex flex-1 max-w-md mx-8">
                         <form onSubmit={handleSearch} className="w-full relative group">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Search courses, skills, or mentors..."
@@ -167,7 +211,7 @@ export function Navbar({ onMobileMenuClick }) {
                             <div className="flex items-center gap-5">
 
                                 {user.role === 'STUDENT' && (
-                                    <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100/50 text-orange-600" title="Learning streak">
+                                    <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-100/50 dark:border-orange-500/20 text-orange-600 dark:text-orange-400" title="Learning streak">
                                         <Flame size={14} className="fill-orange-500" />
                                         <span className="text-xs font-bold tracking-wide">{streak}</span>
                                     </div>
@@ -185,11 +229,11 @@ export function Navbar({ onMobileMenuClick }) {
                                 <div className="relative" ref={notifRef}>
                                     <button
                                         onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
-                                        className="text-slate-400 hover:text-slate-900 transition-colors relative p-1.5"
+                                        className="text-muted-foreground hover:text-foreground transition-colors relative p-1.5"
                                     >
                                         <Bell size={18} />
                                         {unreadCount > 0 && (
-                                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+                                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-background"></span>
                                         )}
                                     </button>
 
@@ -203,13 +247,17 @@ export function Navbar({ onMobileMenuClick }) {
                                             </div>
                                             <div className="max-h-72 overflow-y-auto">
                                                 {notifications.length === 0 ? (
-                                                    <div className="px-4 py-8 text-center text-slate-400">
+                                                    <div className="px-4 py-8 text-center text-muted-foreground/50">
                                                         <Bell size={24} className="mx-auto mb-2 opacity-30" />
                                                         <p className="text-sm font-medium">You're all caught up!</p>
                                                     </div>
                                                 ) : (
                                                     notifications.map(notif => (
-                                                        <div key={notif.id} className={`px-4 py-3 cursor-pointer relative transition-colors ${notif.read ? 'bg-transparent hover:bg-slate-50/80' : 'bg-indigo-50/30 hover:bg-indigo-50/80'}`}>
+                                                        <div
+                                                            key={notif.id}
+                                                            onClick={() => handleMarkRead(notif)}
+                                                            className={`px-4 py-3 cursor-pointer relative transition-colors ${notif.read ? 'bg-transparent hover:bg-muted/50' : 'bg-indigo-50/10 dark:bg-indigo-900/10 hover:bg-indigo-50/30'}`}
+                                                        >
                                                             {!notif.read && <div className="absolute left-2.5 top-4 w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                                                             <p className={`text-sm ${notif.read ? 'font-medium text-muted-foreground' : 'font-bold text-foreground pl-3'} mb-0.5 leading-snug`}>{notif.message}</p>
                                                             <p className={`text-[10px] uppercase tracking-wider font-bold text-muted-foreground mt-1 ${!notif.read && 'pl-3'}`}>{formatDate(notif.createdAt || notif.timestamp)}</p>
@@ -218,8 +266,8 @@ export function Navbar({ onMobileMenuClick }) {
                                                 )}
                                             </div>
                                             {notifications.length > 0 && (
-                                                <div className="border-t border-slate-100 pt-2 pb-1 bg-slate-50/50">
-                                                    <button onClick={handleMarkAllRead} className="w-full text-center text-indigo-600 text-xs font-bold py-1 hover:text-indigo-800 transition-colors">Mark all as read</button>
+                                                <div className="border-t border-border pt-2 pb-1 bg-muted/30">
+                                                    <button onClick={handleMarkAllRead} className="w-full text-center text-indigo-600 dark:text-indigo-400 text-xs font-bold py-1 hover:text-indigo-800 transition-colors">Clear all notifications</button>
                                                 </div>
                                             )}
                                         </div>
@@ -227,7 +275,7 @@ export function Navbar({ onMobileMenuClick }) {
                                 </div>
 
                                 {/* Profile dropdown */}
-                                <div className="relative pl-2 border-l border-slate-200" ref={profileRef}>
+                                <div className="relative pl-2 border-l border-border" ref={profileRef}>
                                     <button
                                         onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
                                         className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)] text-indigo-700 font-bold hover:scale-105 transition-all overflow-hidden"
@@ -245,23 +293,23 @@ export function Navbar({ onMobileMenuClick }) {
                                                 <p className="text-popover-foreground text-sm font-extrabold truncate">{user?.name}</p>
                                                 <p className="text-muted-foreground text-xs font-medium truncate">{user?.email}</p>
                                                 <div className="mt-2 inline-flex items-center w-fit">
-                                                    <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">{user?.role?.replace('_', ' ')}</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground px-2 py-0.5 rounded-full border border-border">{user?.role?.replace('_', ' ')}</span>
                                                 </div>
                                             </div>
 
                                             <div className="py-2 px-2">
-                                                <button onClick={() => { navigate(dashboardPath); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+                                                <button onClick={() => { navigate(dashboardPath); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                                                     <LayoutDashboard size={16} /> Dashboard
                                                 </button>
-                                                <button onClick={() => { navigate('/profile'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+                                                <button onClick={() => { navigate('/profile'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                                                     <User size={16} /> Profile
                                                 </button>
-                                                <button onClick={() => { navigate('/courses'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+                                                <button onClick={() => { navigate('/courses'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                                                     <BookOpen size={16} /> My Learning
                                                 </button>
                                             </div>
 
-                                            <div className="border-t border-slate-100 mt-1 pt-2 px-2">
+                                            <div className="border-t border-border mt-1 pt-2 px-2">
                                                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold text-rose-600 hover:bg-rose-50 transition-colors">
                                                     <LogOut size={16} /> Sign out
                                                 </button>
@@ -274,7 +322,7 @@ export function Navbar({ onMobileMenuClick }) {
                     </div>
 
                     {/* Mobile menu button */}
-                    <button onClick={() => onMobileMenuClick ? onMobileMenuClick() : setMenuOpen(!menuOpen)} className="md:hidden text-slate-600 hover:text-slate-900 transition-colors p-2">
+                    <button onClick={() => onMobileMenuClick ? onMobileMenuClick() : setMenuOpen(!menuOpen)} className="md:hidden text-muted-foreground hover:text-foreground transition-colors p-2">
                         {menuOpen ? <X size={24} /> : <Menu size={24} />}
                     </button>
                 </div>
@@ -289,28 +337,28 @@ export function Navbar({ onMobileMenuClick }) {
                         </form>
 
                         {isAuthenticated && (
-                            <div className="flex items-center gap-3 pb-4 pt-2 border-b border-slate-100">
-                                <div className="w-12 h-12 rounded-full border border-slate-200 bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center overflow-hidden flex-shrink-0">
+                            <div className="flex items-center gap-3 pb-4 pt-2 border-b border-border">
+                                <div className="w-12 h-12 rounded-full border border-border bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center overflow-hidden flex-shrink-0">
                                     {user?.avatar ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> : user?.name?.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-base font-bold text-slate-900 leading-tight">{user?.name}</p>
-                                    <p className="text-xs font-medium text-slate-500 mt-0.5">{user?.email}</p>
+                                    <p className="text-base font-bold text-foreground leading-tight">{user?.name}</p>
+                                    <p className="text-xs font-medium text-muted-foreground mt-0.5">{user?.email}</p>
                                 </div>
                             </div>
                         )}
 
                         <div className="flex flex-col gap-1">
-                            <Link to="/courses" className="text-base font-bold text-slate-700 px-2 py-3 rounded-xl hover:bg-slate-50">Explore Catalog</Link>
+                            <Link to="/courses" className="text-base font-bold text-foreground/80 px-2 py-3 rounded-xl hover:bg-muted/40">Explore Catalog</Link>
                             {isAuthenticated ? (
                                 <>
-                                    <button onClick={() => { navigate(dashboardPath); setMenuOpen(false); }} className="text-left text-base font-bold text-slate-700 px-2 py-3 rounded-xl hover:bg-slate-50">Dashboard</button>
-                                    <button onClick={() => { navigate('/profile'); setMenuOpen(false); }} className="text-left text-base font-bold text-slate-700 px-2 py-3 rounded-xl hover:bg-slate-50">Profile Settings</button>
+                                    <button onClick={() => { navigate(dashboardPath); setMenuOpen(false); }} className="text-left text-base font-bold text-foreground/80 px-2 py-3 rounded-xl hover:bg-muted/40">Dashboard</button>
+                                    <button onClick={() => { navigate('/profile'); setMenuOpen(false); }} className="text-left text-base font-bold text-foreground/80 px-2 py-3 rounded-xl hover:bg-muted/40">Profile Settings</button>
                                     <button onClick={handleLogout} className="text-left text-base font-bold text-rose-600 px-2 py-3 rounded-xl hover:bg-rose-50 mt-2">Sign out</button>
                                 </>
                             ) : (
                                 <div className="grid grid-cols-2 gap-3 mt-4">
-                                    <Link to="/login" className="text-center font-bold text-slate-900 bg-slate-100 py-3 rounded-xl hover:bg-slate-200 transition-colors">Log in</Link>
+                                    <Link to="/login" className="text-center font-bold text-foreground bg-muted py-3 rounded-xl hover:bg-muted/70 transition-colors">Log in</Link>
                                     <Link to="/register" className="text-center font-bold text-white bg-slate-900 py-3 rounded-xl hover:bg-slate-800 transition-colors">Sign up</Link>
                                 </div>
                             )}

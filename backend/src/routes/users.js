@@ -8,6 +8,7 @@ router.get('/instructor/:id', optionalAuth, asyncHandler(ctrl.getInstructorProfi
 router.post('/instructor/:id/follow', authenticate, asyncHandler(ctrl.followInstructor));
 router.post('/instructor/:id/unfollow', authenticate, asyncHandler(ctrl.unfollowInstructor));
 
+router.post('/invite-admin', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.inviteAdmin));
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));
 router.put('/:id/toggle-status', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.toggleStatus));

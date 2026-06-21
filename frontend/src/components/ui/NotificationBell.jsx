@@ -95,7 +95,7 @@ export function NotificationBell() {
                                 <div
                                     key={notif.id}
                                     onClick={() => handleMarkRead(notif)}
-                                    className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors border-b border-white/5 ${!notif.read ? 'bg-purple-500/5' : ''}`}
+                                    className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-card/5 transition-colors border-b border-white/5 ${!notif.read ? 'bg-purple-500/5' : ''}`}
                                 >
                                     <span className="text-lg flex-shrink-0">{TYPE_ICONS[notif.type] || '🔔'}</span>
                                     <div className="flex-1 min-w-0">

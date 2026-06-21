@@ -69,27 +69,27 @@ export default function AdminUsers() {
                             a.download = `Users_Export_${new Date().toISOString().split('T')[0]}.csv`;
                             a.click();
                         }}
-                        className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-slate-50 transition-colors"
+                        className="bg-card border border-border text-foreground px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted transition-colors"
                     >
                         Export CSV
                     </button>
                 }
             />
 
-            <div className="flex border-b border-slate-200 gap-6">
+            <div className="flex border-b border-border gap-6">
                 <button
                     onClick={() => setActiveTab('users')}
-                    className={`pb-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+                    className={`pb-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                 >
                     All Users ({safeUsers.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('requests')}
-                    className={`pb-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'requests' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+                    className={`pb-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'requests' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                 >
                     Instructor Requests
                     {requests?.length > 0 && (
-                        <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-0.5 rounded-full">{requests.length}</span>
+                        <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-full">{requests.length}</span>
                     )}
                 </button>
             </div>
@@ -112,7 +112,7 @@ export default function AdminUsers() {
                         emptyText="No users found matching your search."
                     >
                         {filteredUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                            <tr key={user.id} className="hover:bg-muted/40 transition-colors">
                                 <td className="py-4 px-4">
                                     <UserCell name={user.name} email={user.email} avatar={user.avatar} />
                                 </td>
@@ -120,7 +120,7 @@ export default function AdminUsers() {
                                     <select
                                         value={user.role}
                                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                        className="bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 shadow-sm transition-colors cursor-pointer"
+                                        className="bg-card border border-border text-foreground text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 shadow-sm transition-colors cursor-pointer"
                                     >
                                         <option value="STUDENT">Student</option>
                                         <option value="INSTRUCTOR">Instructor</option>
@@ -132,15 +132,15 @@ export default function AdminUsers() {
                                         )}
                                     </select>
                                 </td>
-                                <td className="py-4 px-4 text-slate-600 font-medium text-[13px]">
+                                <td className="py-4 px-4 text-muted-foreground font-medium text-[13px]">
                                     {new Date(user.createdAt).toLocaleDateString()}
                                 </td>
                                 <td className="py-4 px-4">
                                     <button
                                         onClick={() => handleToggleStatus(user.id)}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm ${user.active !== false
-                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
-                                            : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'}`}
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100'
+                                            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-200 dark:border-rose-700 hover:bg-rose-100'}`}
                                     >
                                         {user.active !== false
                                             ? <><CheckCircle size={14} /> Active</>
@@ -148,7 +148,7 @@ export default function AdminUsers() {
                                     </button>
                                 </td>
                                 <td className="py-4 px-4 text-right">
-                                    <button className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">
+                                    <button className="p-2 text-muted-foreground hover:text-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
                                         <MoreVertical size={18} />
                                     </button>
                                 </td>
@@ -167,26 +167,26 @@ export default function AdminUsers() {
                     emptyText="No pending instructor requests."
                 >
                     {requests?.map((req) => (
-                        <tr key={req.id} className="hover:bg-slate-50 transition-colors">
+                        <tr key={req.id} className="hover:bg-muted/40 transition-colors">
                             <td className="py-4 px-4">
                                 <UserCell name={req.userName} email={req.userEmail} />
                             </td>
                             <td className="py-4 px-4">
                                 <div className="text-sm">
-                                    <p className="font-bold text-slate-900">{req.expertise}</p>
-                                    <p className="text-xs text-slate-500">{req.experience} experience</p>
+                                    <p className="font-bold text-foreground">{req.expertise}</p>
+                                    <p className="text-xs text-muted-foreground">{req.experience} experience</p>
                                 </div>
                             </td>
-                            <td className="py-4 px-4 text-sm text-slate-600">
+                            <td className="py-4 px-4 text-sm text-muted-foreground">
                                 {req.sampleTopic}
                             </td>
-                            <td className="py-4 px-4 text-slate-600 font-medium text-[13px]">
+                            <td className="py-4 px-4 text-muted-foreground font-medium text-[13px]">
                                 {new Date(req.createdAt).toLocaleDateString()}
                             </td>
                             <td className="py-4 px-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                    <button onClick={() => handleRequestAction(req.id, 'APPROVE')} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Approve</button>
-                                    <button onClick={() => handleRequestAction(req.id, 'REJECT')} className="bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Reject</button>
+                                    <button onClick={() => handleRequestAction(req.id, 'APPROVE')} className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Approve</button>
+                                    <button onClick={() => handleRequestAction(req.id, 'REJECT')} className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded text-xs font-bold transition-colors">Reject</button>
                                 </div>
                             </td>
                         </tr>

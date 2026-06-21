@@ -156,7 +156,7 @@ export default function HomePage() {
                 .hp-hero__title {
                     font-size: clamp(2.8rem, 5vw, 4.2rem);
                     font-weight: 900; line-height: 1;
-                    color: var(--color-foreground, #0f172a); margin-bottom: 1.5rem;
+                    color: var(--color-foreground); margin-bottom: 1.5rem;
                     letter-spacing: -0.04em;
                 }
                 .hp-hero__title-gradient {
@@ -174,7 +174,7 @@ export default function HomePage() {
                 .hp-btn-outline {
                     background: var(--color-background, white);
                     border: 1px solid var(--color-border, #e2e8f0);
-                    color: var(--color-foreground, #0f172a); cursor: pointer;
+                    color: var(--color-foreground); cursor: pointer;
                     padding: 0.85rem 1.75rem; border-radius: 12px;
                     font-size: 1rem; font-weight: 700;
                     transition: all 0.2s;
@@ -204,11 +204,11 @@ export default function HomePage() {
                     display: flex; gap: 3rem; flex-wrap: wrap;
                 }
                 .hp-hero__stat-num {
-                    font-size: 1.75rem; font-weight: 800; color: var(--color-foreground, #0f172a);
+                    font-size: 1.75rem; font-weight: 800; color: var(--color-foreground);
                     margin-bottom: 0.25rem;
                 }
                 .hp-hero__stat-label {
-                    font-size: 0.85rem; color: var(--color-muted-foreground, #64748b); font-weight: 600;
+                    font-size: 0.85rem; color: var(--color-muted-foreground); font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.05em;
                 }
 
@@ -232,11 +232,7 @@ export default function HomePage() {
                     width: 100%; height: auto;
                     border-radius: 24px;
                     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-                    animation: float 6s ease-in-out infinite;
-                }
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px) rotate(0deg); }
-                    50% { transform: translateY(-15px) rotate(1deg); }
+                    /* Animation removed per user request */
                 }
 
                 /* Floating badges */
@@ -246,16 +242,9 @@ export default function HomePage() {
                     border: 1px solid var(--color-border, #e2e8f0);
                     border-radius: 16px; padding: 0.85rem 1.25rem;
                     display: flex; align-items: center; gap: 12px;
-                    font-size: 0.85rem; font-weight: 700; color: var(--color-foreground, #0f172a);
+                    font-size: 0.85rem; font-weight: 700; color: var(--color-foreground);
                     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-                    animation: float-badge 5s ease-in-out infinite;
-                }
-                .hp-hero__float-badge--a { top: 10%; left: -10%; animation-delay: 0s; }
-                .hp-hero__float-badge--b { bottom: 15%; right: -5%; animation-delay: 1.5s; }
-                .hp-hero__float-badge--c { top: 45%; right: -12%; animation-delay: 0.8s; }
-                @keyframes float-badge {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-10px); }
+                    /* Animation removed per user request */
                 }
                 .hp-badge-icon {
                     width: 36px; height: 36px; border-radius: 10px;
@@ -275,17 +264,29 @@ export default function HomePage() {
                 }
                 .hp-section__title {
                     font-size: clamp(2rem, 3.5vw, 2.75rem);
-                    font-weight: 900; color: var(--color-foreground, #0f172a);
+                    font-weight: 900; color: var(--color-foreground);
                     letter-spacing: -0.03em; margin-bottom: 1rem;
                 }
                 .hp-section__subtitle {
-                    color: var(--color-muted-foreground, #64748b); font-size: 1.1rem; max-width: 600px;
+                    color: var(--color-muted-foreground); font-size: 1.1rem; max-width: 600px;
                     font-weight: 500;
                 }
                 .hp-section__header {
                     display: flex; justify-content: space-between;
                     align-items: flex-end; flex-wrap: wrap; gap: 2rem;
                     margin-bottom: 4rem;
+                }
+                .hp-view-all {
+                    display: inline-flex; align-items: center; gap: 6px;
+                    color: #4f46e5; text-decoration: none; font-weight: 800;
+                    font-size: 0.9rem; transition: all 0.2s;
+                    padding: 8px 18px; border-radius: 100px;
+                    background: #eef2ff; border: 1px solid #e0e7ff;
+                }
+                .hp-view-all:hover {
+                    background: #e0e7ff; gap: 10px;
+                    transform: translateX(4px);
+                    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
                 }
 
                 /* ── Features ──────────────────────────────────── */
@@ -315,9 +316,9 @@ export default function HomePage() {
                 .hp-feature-icon--blue { background: #eff6ff; color: #3b82f6; }
                 .hp-feature-icon--teal { background: #f0fdfa; color: #14b8a6; }
                 .hp-feature-card h3 {
-                    font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 0.75rem;
+                    font-size: 1.25rem; font-weight: 800; color: var(--color-foreground); margin-bottom: 0.75rem;
                 }
-                .hp-feature-card p { font-size: 1rem; color: #64748b; line-height: 1.6; font-weight: 500; }
+                .hp-feature-card p { font-size: 1rem; color: var(--color-muted-foreground); line-height: 1.6; font-weight: 500; }
 
                 /* ── Courses Grid ──────────────────────────────── */
                 .hp-courses { background: var(--color-background, white); }
@@ -386,8 +387,8 @@ export default function HomePage() {
                     text-transform: uppercase;
                     letter-spacing: 0.06em;
                     color: #4f46e5;
-                    background: white;
-                    border: 1px solid #e0e7ff;
+                    background: var(--color-card);
+                    border: 1px solid var(--color-border);
                     padding: 0.35rem 0.85rem;
                     border-radius: 100px;
                     margin-bottom: 1rem;
@@ -395,14 +396,14 @@ export default function HomePage() {
                 .hp-empty-courses__title {
                     font-size: 1.65rem;
                     font-weight: 900;
-                    color: #0f172a;
+                    color: var(--color-foreground);
                     letter-spacing: -0.03em;
                     margin-bottom: 0.75rem;
                     line-height: 1.2;
                 }
                 .hp-empty-courses__text {
                     font-size: 1rem;
-                    color: #64748b;
+                    color: var(--color-muted-foreground);
                     font-weight: 500;
                     line-height: 1.65;
                     margin-bottom: 2rem;
@@ -423,9 +424,9 @@ export default function HomePage() {
                 .hp-empty-courses__hint {
                     font-size: 0.8rem;
                     font-weight: 700;
-                    color: #475569;
-                    background: rgba(255, 255, 255, 0.85);
-                    border: 1px solid #e2e8f0;
+                    color: var(--color-muted-foreground);
+                    background: var(--color-accent);
+                    border: 1px solid var(--color-border);
                     padding: 0.4rem 0.85rem;
                     border-radius: 100px;
                 }
@@ -441,7 +442,7 @@ export default function HomePage() {
                     height: 48px;
                     margin: 0 auto 1rem;
                     border-radius: 14px;
-                    background: white;
+                    background: var(--color-card);
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -450,12 +451,12 @@ export default function HomePage() {
                 .hp-state-box__title {
                     font-size: 1.15rem;
                     font-weight: 800;
-                    color: #0f172a;
+                    color: var(--color-foreground);
                     margin-bottom: 0.5rem;
                 }
                 .hp-state-box__text {
                     font-size: 0.95rem;
-                    color: #64748b;
+                    color: var(--color-muted-foreground);
                     font-weight: 500;
                     margin-bottom: 1.25rem;
                 }
@@ -500,8 +501,8 @@ export default function HomePage() {
                     position: absolute; top: 12px; left: 12px;
                     font-size: 0.7rem; font-weight: 800;
                     padding: 4px 12px; border-radius: 100px;
-                    background: white;
                     color: #4f46e5; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    background: var(--color-card);
                     text-transform: uppercase; letter-spacing: 0.05em;
                 }
                 .hp-card__body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; }
@@ -511,7 +512,7 @@ export default function HomePage() {
                     letter-spacing: 0.05em; margin-bottom: 0.75rem;
                 }
                 .hp-card__title {
-                    font-size: 1.1rem; font-weight: 800; color: #0f172a;
+                    font-size: 1.1rem; font-weight: 800; color: var(--color-foreground);
                     line-height: 1.4; margin-bottom: 1rem;
                     display: -webkit-box; -webkit-line-clamp: 2;
                     -webkit-box-orient: vertical; overflow: hidden;
@@ -522,7 +523,7 @@ export default function HomePage() {
                     margin-bottom: 1rem;
                 }
                 .hp-card__rating-num {
-                    font-size: 0.9rem; font-weight: 800; color: #0f172a;
+                    font-size: 0.9rem; font-weight: 800; color: var(--color-foreground);
                 }
                 .hp-card__review-count {
                     font-size: 0.85rem; color: #94a3b8; font-weight: 500;
@@ -532,10 +533,10 @@ export default function HomePage() {
                     padding-top: 1rem; border-top: 1px solid #f1f5f9;
                 }
                 .hp-card__instructor {
-                    font-size: 0.85rem; color: #64748b; font-weight: 600;
+                    font-size: 0.85rem; color: var(--color-muted-foreground); font-weight: 600;
                 }
                 .hp-card__price {
-                    font-size: 1.15rem; font-weight: 800; color: #0f172a;
+                    font-size: 1.15rem; font-weight: 800; color: var(--color-foreground);
                 }
                 .hp-card__price-free { color: #059669; }
                 .hp-card__dur {
@@ -562,10 +563,10 @@ export default function HomePage() {
                     gap: 2rem; text-align: center;
                 }
                 .hp-statsbar__num {
-                    font-size: 2.25rem; font-weight: 900; color: var(--color-foreground, #0f172a);
+                    font-size: 2.25rem; font-weight: 900; color: var(--color-foreground);
                     margin-bottom: 0.5rem;
                 }
-                .hp-statsbar__label { font-size: 0.95rem; color: var(--color-muted-foreground, #64748b); font-weight: 600; }
+                .hp-statsbar__label { font-size: 0.95rem; color: var(--color-muted-foreground); font-weight: 600; }
 
                 /* ── CTA Banner ────────────────────────────────── */
                 .hp-cta-banner {
@@ -599,8 +600,8 @@ export default function HomePage() {
 
                 /* ── Footer ────────────────────────────────────── */
                 .hp-footer {
-                    background: var(--color-background, white);
-                    border-top: 1px solid var(--color-border, #e2e8f0);
+                    background: var(--color-background);
+                    border-top: 1px solid var(--color-border);
                     padding: 5rem 2rem 2rem;
                 }
                 .hp-footer__inner {
@@ -608,15 +609,15 @@ export default function HomePage() {
                     display: grid; grid-template-columns: 2fr 1fr 1fr;
                     gap: 4rem; margin-bottom: 4rem;
                 }
-                .hp-footer__brand-text { color: var(--color-muted-foreground, #64748b); font-size: 0.95rem; line-height: 1.6; margin-top: 1rem; max-width: 300px; font-weight: 500; }
-                .hp-footer__col h4 { color: var(--color-foreground, #0f172a); font-size: 0.9rem; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+                .hp-footer__brand-text { color: var(--color-muted-foreground); font-size: 0.95rem; line-height: 1.6; margin-top: 1rem; max-width: 300px; font-weight: 500; }
+                .hp-footer__col h4 { color: var(--color-foreground); font-size: 0.9rem; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
                 .hp-footer__col ul li { margin-bottom: 1rem; list-style: none; }
-                .hp-footer__col ul li a { color: var(--color-muted-foreground, #64748b); font-size: 0.95rem; text-decoration: none; transition: color 0.2s; font-weight: 600; }
-                .hp-footer__col ul li a:hover { color: #4f46e5; }
+                .hp-footer__col ul li a { color: var(--color-muted-foreground); font-size: 0.95rem; text-decoration: none; transition: color 0.2s; font-weight: 600; }
+                .hp-footer__col ul li a:hover { color: var(--color-primary); }
                 .hp-footer__bottom {
-                    border-top: 1px solid var(--color-border, #f1f5f9);
+                    border-top: 1px solid var(--color-border);
                     padding-top: 2rem;
-                    text-align: center; color: var(--color-muted-foreground, #94a3b8); font-size: 0.9rem; font-weight: 600;
+                    text-align: center; color: var(--color-muted-foreground); font-size: 0.9rem; font-weight: 600;
                 }
 
                 /* ── Responsive ────────────────────────────────── */
@@ -705,39 +706,6 @@ export default function HomePage() {
                                     alt="Student learning on EduNexus platform"
                                     className="hp-hero__img"
                                 />
-
-                                {/* Floating badge A */}
-                                <div className="hp-hero__float-badge hp-hero__float-badge--a">
-                                    <div className="hp-badge-icon hp-badge-icon--purple">
-                                        <Award size={16} />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 800 }}>Certificate Earned</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>React Developer</div>
-                                    </div>
-                                </div>
-
-                                {/* Floating badge B */}
-                                <div className="hp-hero__float-badge hp-hero__float-badge--b">
-                                    <div className="hp-badge-icon hp-badge-icon--green">
-                                        <TrendingUp size={16} />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 800 }}>Progress</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700 }}>100% Complete 🎉</div>
-                                    </div>
-                                </div>
-
-                                {/* Floating badge C */}
-                                <div className="hp-hero__float-badge hp-hero__float-badge--c">
-                                    <div className="hp-badge-icon hp-badge-icon--blue">
-                                        <Users size={16} />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 800 }}>Active Learners</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600 }}>{stats?.totalStudents ? `${Math.floor(stats.totalStudents * 0.12).toLocaleString()} online now` : '2.4K online now'}</div>
-                                    </div>
-                                </div>
                             </div>
                         </motion.div>
                     </div>
@@ -747,10 +715,10 @@ export default function HomePage() {
                 <div className="hp-statsbar">
                     <div className="hp-statsbar__inner">
                         {[
-                            { icon: <Users size={20} />, num: stats?.totalStudents ? `${stats.totalStudents.toLocaleString()}+` : '10,000+', label: 'Happy Learners' },
-                            { icon: <BookOpen size={20} />, num: stats?.totalCourses ? `${stats.totalCourses}+` : '50+', label: 'Courses Published' },
-                            { icon: <GraduationCap size={20} />, num: stats?.totalInstructors ? `${stats.totalInstructors}+` : '20+', label: 'Expert Instructors' },
-                            { icon: <Award size={20} />, num: stats?.satisfactionRate ? `${stats.satisfactionRate}%` : '98%', label: 'Satisfaction Rate' },
+                            { icon: <Users size={20} />, num: stats?.totalStudents ? `${stats.totalStudents}+` : '18+', label: 'Happy Learners' },
+                            { icon: <BookOpen size={20} />, num: stats?.totalCourses ? `${stats.totalCourses}+` : '1+', label: 'Courses Published' },
+                            { icon: <GraduationCap size={20} />, num: stats?.totalInstructors ? `${stats.totalInstructors}+` : '3+', label: 'Expert Instructors' },
+                            { icon: <Award size={20} />, num: stats?.satisfactionRate ? `${stats.satisfactionRate}%` : '60%', label: 'Satisfaction Rate' },
                         ].map((s, i) => (
                             <motion.div
                                 key={i}
