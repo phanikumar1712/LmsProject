@@ -21,6 +21,7 @@ export default function QuizPage() {
     const [started, setStarted] = useState(false);
     const [finished, setFinished] = useState(false);
     const [result, setResult] = useState(null);
+    const [attemptId, setAttemptId] = useState(null);
 
     const [currentQ, setCurrentQ] = useState(0);
     const [answers, setAnswers] = useState({});
@@ -39,10 +40,6 @@ export default function QuizPage() {
     useEffect(() => {
         quizzesAPI.getById(quizId).then(q => {
             setQuiz(q);
-            // Randomize questions
-            const shuffled = [...(q.questions || [])].sort(() => Math.random() - 0.5);
-            setQuestions(shuffled);
-            setTimeLeft((q.timeLimit || 10) * 60);
         }).catch((err) => {
             toast.error(err.message || 'Failed to load quiz. Redirecting back...');
             navigate(`/courses/${courseId}/learn`);
@@ -54,23 +51,22 @@ export default function QuizPage() {
         submittingRef.current = true;
         clearInterval(timerRef.current);
 
-        const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000 / 60);
         try {
-            const answerArr = quiz.questions.map(origQ => {
-                const idx = questions.findIndex(sq => sq.id === origQ.id);
-                if (idx === -1) return null;
-                const ans = finalAnswers[idx];
+            const answerPayload = {};
+            questions.forEach((question, index) => {
+                const ans = finalAnswers[index];
                 if (ans !== undefined && ans !== null) {
-                    if (origQ.type === 'MCQ' || origQ.type === 'MCQ_SINGLE' || origQ.type === 'TRUE_FALSE') {
-                        return origQ.options[ans];
-                    } else if (origQ.type === 'MCQ_MULTI') {
+                    if (question.type === 'MCQ' || question.type === 'MCQ_SINGLE' || question.type === 'TRUE_FALSE') {
+                        answerPayload[question.id] = question.options[ans];
+                    } else if (question.type === 'MCQ_MULTI') {
                         const sortedIndices = [...ans].sort((a, b) => a - b);
-                        return sortedIndices.map(i => origQ.options[i]);
+                        answerPayload[question.id] = sortedIndices.map(i => question.options[i]);
+                    } else {
+                        answerPayload[question.id] = ans;
                     }
                 }
-                return ans ?? null;
             });
-            const res = await quizzesAPI.submitAttempt(quizId, user.id, answerArr, finalViolations, timeTaken);
+            const res = await quizzesAPI.submitAttempt(quizId, attemptId, answerPayload, finalViolations);
             setResult(res);
             setFinished(true);
             if (auto) toast.error('Quiz auto-submitted due to violations!');
@@ -78,15 +74,16 @@ export default function QuizPage() {
             if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
 
             // Mark the quiz lesson as complete in enrollment progress
-            if (quiz.lessonId && courseId && user?.id) {
+            if (res.passed && quiz.lessonId && courseId && user?.id) {
                 try {
                     await enrollmentsAPI.markLessonComplete(user.id, courseId, quiz.lessonId);
                 } catch { /* non-blocking */ }
             }
         } catch (err) {
+            submittingRef.current = false;
             toast.error('Failed to submit: ' + err.message);
         }
-    }, [questions, quizId, user.id]);
+    }, [attemptId, courseId, questions, quiz, quizId, user.id]);
 
     // Timer
     useEffect(() => {
@@ -231,9 +228,22 @@ export default function QuizPage() {
     };
 
     const startQuiz = async () => {
-        await enterFullscreen();
-        startTimeRef.current = Date.now();
-        setStarted(true);
+        try {
+            const startedAttempt = await quizzesAPI.startAttempt(quizId);
+            const startedQuiz = startedAttempt.quiz;
+            setQuiz(startedQuiz);
+            setAttemptId(startedAttempt.attemptId);
+            setQuestions([...(startedQuiz.questions || [])].sort(() => Math.random() - 0.5));
+            const remainingSeconds = Math.max(0, Math.floor(
+                (new Date(startedAttempt.expiresAt).getTime() - Date.now()) / 1000
+            ));
+            setTimeLeft(remainingSeconds);
+            await enterFullscreen();
+            startTimeRef.current = Date.now();
+            setStarted(true);
+        } catch (err) {
+            toast.error(err.message || 'Unable to start quiz');
+        }
     };
 
     const handleAnswer = (val) => {
@@ -335,7 +345,7 @@ export default function QuizPage() {
 
                     <div className="grid grid-cols-3 gap-4 mb-8">
                         <div className="bg-muted/40 border border-border rounded-xl p-4 text-center shadow-sm">
-                            <p className="text-foreground font-black text-2xl mb-1">{quiz?.questions?.length}</p>
+                            <p className="text-foreground font-black text-2xl mb-1">{quiz?.questionCount ?? quiz?.questions?.length ?? 0}</p>
                             <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-wider">Questions</p>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-4 text-center shadow-sm">
@@ -508,7 +518,13 @@ export default function QuizPage() {
 
                             {currentQ === questions.length - 1 ? (
                                 <button
-                                    onClick={() => submitQuiz(answers, violations)}
+                                    onClick={() => {
+                                        const finalAnswers = { ...answers };
+                                        if (q?.type === 'FILL_BLANK' && fillText.trim()) {
+                                            finalAnswers[currentQ] = fillText.trim();
+                                        }
+                                        submitQuiz(finalAnswers, violations);
+                                    }}
                                     className="bg-indigo-600 hover:bg-indigo-700 px-8 py-3 rounded-lg text-white text-[15px] font-bold shadow-sm transition-colors flex items-center gap-2"
                                 >
                                     <CheckCircle size={18} /> Submit Quiz

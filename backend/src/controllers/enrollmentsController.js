@@ -76,16 +76,31 @@ const updateProgress = async (req, res) => {
     );
     if (!enrollment.rows.length) throw createError('Not enrolled in this course', 403);
 
+    const lessons = await query('SELECT id, type FROM lessons WHERE course_id = $1', [courseId]);
+    const lesson = lessons.rows.find(row => row.id === lessonId);
+    if (!lesson) throw createError('Lesson does not belong to this course', 400);
+
+    if (lesson.type === 'quiz') {
+        const passed = await query(`
+            SELECT 1
+            FROM quiz_attempts qa
+            JOIN quizzes q ON q.id = qa.quiz_id
+            WHERE qa.student_id = $1 AND q.lesson_id = $2 AND q.course_id = $3 AND qa.passed = true
+            LIMIT 1
+        `, [req.user.id, lessonId, courseId]);
+        if (!passed.rows.length) throw createError('You must pass this quiz before completing the lesson', 403);
+    }
+
     const current = enrollment.rows[0];
-    const completedLessons = current.completed_lessons || [];
+    const validLessonIds = new Set(lessons.rows.map(row => row.id));
+    const completedLessons = (current.completed_lessons || []).filter(id => validLessonIds.has(id));
 
     if (!completedLessons.includes(lessonId)) {
         completedLessons.push(lessonId);
     }
 
     // Calculate progress
-    const totalLessons = await query('SELECT COUNT(*) FROM lessons WHERE course_id = $1', [courseId]);
-    const total = parseInt(totalLessons.rows[0].count) || 1;
+    const total = lessons.rows.length || 1;
     const progress = Math.min(100, Math.round((completedLessons.length / total) * 100));
 
     const result = await query(

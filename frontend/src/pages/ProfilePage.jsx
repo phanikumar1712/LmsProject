@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { User, Lock, Camera, Save, Shield, Mail, Calendar, CreditCard, CheckCircle, Upload, Loader2, MessageSquare, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, uploadAPI, ratingsAPI } from '../services/api';

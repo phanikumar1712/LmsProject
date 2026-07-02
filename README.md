@@ -257,37 +257,12 @@ npm run lint       # Run ESLint
 
 ---
 
+
+
+   
+
+
+
 ## 📄 License
 
 This project is licensed under the **ISC License**.
-
-
-
-
-
-
-Findings
-
-Unpublished and paid lesson content is publicly exposed
-courses.js (line 9) exposes GET /api/courses/:id and GET /api/courses/:id/lessons without auth, and coursesController.js (line 86) / line 99 (line 99) do not check status, enrollment, preview, or subscription plan. Anyone with a course id can fetch draft/rejected course metadata and all lesson content_urls.
-
-Any instructor can modify any course’s sections/lessons
-Routes authorize the role only at courses.js (line 16), but createSection, updateSection, deleteSection, createLesson, updateLesson, and deleteLesson never verify the course belongs to req.user. See coursesController.js (line 275) and line 286 (line 286). A logged-in instructor can edit another instructor’s curriculum by id.
-
-Progress can be faked with arbitrary lesson ids
-enrollmentsController.js (line 69) accepts { courseId, lessonId }, checks only enrollment, then pushes lessonId into completed_lessons. It never validates that the lesson exists or belongs to that course. A student can mark unrelated UUIDs complete and reach 100%.
-
-Instructor stats leak student data across instructors
-enrollments.js (line 9) lets any INSTRUCTOR call /stats/:instructorId, and enrollmentsController.js (line 114) does not require req.user.id === instructorId unless admin. One instructor can view another instructor’s students, names, emails, and progress.
-
-Quiz attempts are readable by any authenticated user
-quizzes.js (line 7) only requires authentication for /attempts/:studentId, and quizzesController.js (line 114) does no owner/admin check. Any logged-in user can fetch another student’s quiz history.
-
-Quiz creation upsert will fail at runtime
-quizzesController.js (line 49) uses ON CONFLICT (lesson_id), but the migration defines lesson_id without a unique constraint at migrate.js (line 124). PostgreSQL will reject this with “no unique or exclusion constraint matching the ON CONFLICT specification.”
-
-Section/lesson update SQL references missing columns
-coursesController.js (line 289) and line 335 (line 335) set updated_at, but sections and lessons only define created_at in migrate.js (line 97) and line 108 (line 108). Updating sections/lessons will fail.
-
-Duplicate enrollment likely returns a raw 500
-enrollmentsController.js (line 48) inserts directly into a table with UNIQUE(student_id, course_id) but does not pre-check or handle conflict. Re-enrolling in the same course should return a clean 409, not a database error.

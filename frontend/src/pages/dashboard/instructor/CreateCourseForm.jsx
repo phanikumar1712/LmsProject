@@ -174,7 +174,7 @@ export default function CreateCourseForm() {
             newCurr[sIdx].lessons[lIdx].questions = [];
         }
         newCurr[sIdx].lessons[lIdx].questions.push({
-            id: `q${Date.now()}`,
+            id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             type: 'MCQ_SINGLE',
             text: '',
             options: ['', ''],
@@ -311,7 +311,11 @@ export default function CreateCourseForm() {
                             text: q.text,
                             type: q.type,
                             options: q.options || [],
-                            correctAnswer: q.type === 'FILL_BLANK' ? (q.correctAnswers[0] || '') : q.correctAnswers[0]
+                            correctAnswer: q.type === 'FILL_BLANK'
+                                ? (q.correctAnswers[0] || '')
+                                : q.type === 'MCQ_MULTI'
+                                    ? q.correctAnswers.map(index => q.options[index])
+                                    : q.options[q.correctAnswers[0]]
                         }));
 
                         await quizzesAPI.createQuiz({
