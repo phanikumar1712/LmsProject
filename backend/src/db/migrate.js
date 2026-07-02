@@ -130,7 +130,8 @@ const createTables = async () => {
                 passing_score   INT DEFAULT 70,
                 time_limit      INT DEFAULT 30,
                 questions       JSONB NOT NULL DEFAULT '[]',
-                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT quizzes_lesson_id_key UNIQUE (lesson_id)
             );
         `);
 
@@ -161,6 +162,17 @@ const createTables = async () => {
                 time_taken  INT DEFAULT 0,
                 results     JSONB DEFAULT '[]',
                 completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS quiz_attempt_sessions (
+                id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                quiz_id      UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+                student_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                expires_at   TIMESTAMPTZ NOT NULL,
+                submitted_at TIMESTAMPTZ
             );
         `);
 
@@ -277,6 +289,7 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_instructor_requests_user ON instructor_requests(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_quiz_sessions_student_quiz ON quiz_attempt_sessions(student_id, quiz_id); `);
 
         // ── PATCH EXISTING DATABASES ──────────────────────────────────────────
         await client.query(`
@@ -290,6 +303,23 @@ const createTables = async () => {
         await client.query(`
             ALTER TABLE notifications
             ADD COLUMN IF NOT EXISTS link TEXT DEFAULT '';
+        `);
+        await client.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conrelid = 'quizzes'::regclass
+                      AND contype = 'u'
+                      AND conkey = ARRAY[
+                          (SELECT attnum FROM pg_attribute
+                           WHERE attrelid = 'quizzes'::regclass AND attname = 'lesson_id')
+                      ]::smallint[]
+                ) THEN
+                    ALTER TABLE quizzes
+                    ADD CONSTRAINT quizzes_lesson_id_key UNIQUE (lesson_id);
+                END IF;
+            END $$;
         `);
         await client.query(`
             UPDATE enrollments SET completed_at = last_accessed

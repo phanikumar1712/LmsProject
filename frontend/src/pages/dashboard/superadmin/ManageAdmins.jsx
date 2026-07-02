@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User } from 'lucide-react';
+import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users } from 'lucide-react';
 import { usersAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';

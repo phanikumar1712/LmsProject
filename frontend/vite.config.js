@@ -15,5 +15,18 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+          if (id.includes('react-router')) return 'router';
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor';
+        }
+      }
+    }
   }
 })

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, GripVertical, CheckCircle, ChevronDown, ChevronUp, CheckSquare, Circle, Type, FileText } from 'lucide-react';
+import { Plus, Trash2, Save, GripVertical, CheckCircle, ChevronDown, ChevronUp, CheckSquare, Circle, Type } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coursesAPI, quizzesAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
@@ -8,8 +8,7 @@ import { useNavigate } from 'react-router-dom';
 const QUESTION_TYPES = [
     { value: 'MCQ_SINGLE', label: 'Single Choice (Radio)', icon: Circle },
     { value: 'MCQ_MULTI', label: 'Multiple Choice (Checkbox)', icon: CheckSquare },
-    { value: 'FILL_BLANK', label: 'Fill in the Blank', icon: Type },
-    { value: 'LONG_ANSWER', label: 'Custom Long Answer', icon: FileText }
+    { value: 'FILL_BLANK', label: 'Fill in the Blank', icon: Type }
 ];
 
 export default function InstructorQuizBuilder() {
@@ -23,7 +22,7 @@ export default function InstructorQuizBuilder() {
     });
 
     const [questions, setQuestions] = useState([
-        { id: `q${Date.now()}`, type: 'MCQ_SINGLE', text: '', options: ['', ''], correctAnswers: [0], isExpanded: true }
+        { id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type: 'MCQ_SINGLE', text: '', options: ['', ''], correctAnswers: [0], isExpanded: true }
     ]);
 
     useEffect(() => {
@@ -36,7 +35,7 @@ export default function InstructorQuizBuilder() {
 
     const addQuestion = (type) => {
         setQuestions([...questions, {
-            id: `q${Date.now()}`, type, text: '',
+            id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type, text: '',
             options: type.includes('MCQ') ? ['', ''] : [],
             correctAnswers: type === 'MCQ_SINGLE' ? [0] : [],
             isExpanded: true
@@ -172,7 +171,7 @@ export default function InstructorQuizBuilder() {
 
             <div className="space-y-5">
                 {questions.map((q, qIdx) => {
-                    const QIcon = QUESTION_TYPES.find(t => t.value === q.type)?.icon || FileText;
+                    const QIcon = QUESTION_TYPES.find(t => t.value === q.type)?.icon || Type;
                     return (
                         <div key={q.id} className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden transition-all">
                             <div className="bg-muted/40 border-b border-border p-4 flex items-center gap-3">
@@ -216,12 +215,6 @@ export default function InstructorQuizBuilder() {
                                         </div>
                                     )}
 
-                                    {q.type === 'LONG_ANSWER' && (
-                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3">
-                                            <span className="w-1.5 rounded-full bg-amber-400"></span>
-                                            <p className="text-[13px] font-semibold text-amber-800">Instructors must manually grade LONG_ANSWER questions in the analytics tab.</p>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                         </div>

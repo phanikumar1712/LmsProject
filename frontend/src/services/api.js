@@ -151,8 +151,11 @@ export const quizzesAPI = {
     getById: async (id) =>
         http('GET', `/quizzes/${id}`, null, getToken()),
 
-    submitAttempt: async (quizId, studentId, answers, violations, timeTaken) =>
-        http('POST', `/quizzes/${quizId}/attempt`, { answers, violations, timeTaken }, getToken()),
+    startAttempt: async (quizId) =>
+        http('POST', `/quizzes/${quizId}/start`, {}, getToken()),
+
+    submitAttempt: async (quizId, attemptId, answers, violations) =>
+        http('POST', `/quizzes/${quizId}/attempt`, { attemptId, answers, violations }, getToken()),
 
     getAttempts: async (studentId) =>
         http('GET', `/quizzes/attempts/${studentId}`, null, getToken()),
