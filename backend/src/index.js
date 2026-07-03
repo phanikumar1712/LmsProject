@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const helmet = require('helmet');
+const compression = require('compression');
 
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -25,6 +26,7 @@ const PORT = process.env.PORT || 5000;
 
 // ── Security & Parsing ────────────────────────────────────────────────────────
 app.use(helmet());
+app.use(compression());
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (curl, mobile apps, etc.)

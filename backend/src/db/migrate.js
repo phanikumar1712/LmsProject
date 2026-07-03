@@ -290,6 +290,14 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_instructor_requests_user ON instructor_requests(user_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_quiz_sessions_student_quiz ON quiz_attempt_sessions(student_id, quiz_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_lessons_section ON lessons(section_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_ratings_student ON ratings(student_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_quiz_attempts_student ON quiz_attempts(student_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_student ON quiz_attempts(quiz_id, student_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(user_id, action, created_at DESC); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_at ON enrollments(enrolled_at); `);
 
         // ── PATCH EXISTING DATABASES ──────────────────────────────────────────
         await client.query(`

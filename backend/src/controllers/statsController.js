@@ -19,26 +19,26 @@ const getPlatform = async (req, res) => {
 
     const usersCount = parseInt(users.rows[0].count);
 
-    const usersByRoleQuery = await query(`SELECT role, COUNT(*) as count FROM users GROUP BY role`);
+    const [usersByRoleQuery, monthlyStatsQuery, topCatQuery] = await Promise.all([
+        query(`SELECT role, COUNT(*) as count FROM users GROUP BY role`),
+        query(`
+            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, COALESCE(SUM(c.discount_price), SUM(c.price), 0) as revenue
+            FROM enrollments e JOIN courses c ON e.course_id = c.id
+            WHERE e.enrolled_at >= NOW() - INTERVAL '6 months'
+            GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
+            ORDER BY DATE_TRUNC('month', e.enrolled_at) ASC
+        `),
+        query(`
+            SELECT cat.name, COUNT(e.id) as enrollments
+            FROM categories cat
+            JOIN courses c ON c.category_id = cat.id
+            JOIN enrollments e ON e.course_id = c.id
+            GROUP BY cat.name ORDER BY enrollments DESC LIMIT 5
+        `),
+    ]);
     const usersByRole = usersByRoleQuery.rows.map(r => ({ role: r.role, count: parseInt(r.count) }));
-
-    const monthlyStatsQuery = await query(`
-        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, COALESCE(SUM(c.discount_price), SUM(c.price), 0) as revenue
-        FROM enrollments e JOIN courses c ON e.course_id = c.id
-        WHERE e.enrolled_at >= NOW() - INTERVAL '6 months'
-        GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
-        ORDER BY DATE_TRUNC('month', e.enrolled_at) ASC
-    `);
     const monthlyRevenue = monthlyStatsQuery.rows.map(r => ({ month: r.month, revenue: parseFloat(r.revenue) }));
     const enrollmentsByMonth = monthlyStatsQuery.rows.map(r => ({ month: r.month, count: parseInt(r.count) }));
-
-    const topCatQuery = await query(`
-        SELECT cat.name, COUNT(e.id) as enrollments
-        FROM categories cat
-        JOIN courses c ON c.category_id = cat.id
-        JOIN enrollments e ON e.course_id = c.id
-        GROUP BY cat.name ORDER BY enrollments DESC LIMIT 5
-    `);
     const topCategories = topCatQuery.rows.map(r => ({ name: r.name, enrollments: parseInt(r.enrollments) }));
 
     let revenueGrowth = 0;
@@ -200,10 +200,12 @@ const deleteCategory = async (req, res) => {
 // GET /api/stats/public — lightweight, no auth required
 const getPublicStats = async (req, res) => {
     try {
-        const students = await query("SELECT COUNT(*) FROM users WHERE role = 'STUDENT'");
-        const instructors = await query("SELECT COUNT(*) FROM users WHERE role = 'INSTRUCTOR'");
-        const courses = await query("SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED'");
-        const ratings = await query("SELECT ROUND(COALESCE(AVG(stars), 4.9), 1) as avg_rating FROM ratings");
+        const [students, instructors, courses, ratings] = await Promise.all([
+            query("SELECT COUNT(*) FROM users WHERE role = 'STUDENT'"),
+            query("SELECT COUNT(*) FROM users WHERE role = 'INSTRUCTOR'"),
+            query("SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED'"),
+            query("SELECT ROUND(COALESCE(AVG(stars), 4.9), 1) as avg_rating FROM ratings"),
+        ]);
 
         const avg = parseFloat(ratings.rows[0]?.avg_rating || 4.9);
         const satisfactionRate = Math.round((avg / 5) * 100);
