@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, Search, User, Calendar, ExternalLink, RefreshCw } from 'lucide-react';
+import { Search, Loader2, Edit, CreditCard, ChevronRight, User, Calendar, ExternalLink, RefreshCw } from 'lucide-react';
 import { usersAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
@@ -100,8 +100,8 @@ export default function AdminSubscriptions() {
                                 <tr key={user.id} className="hover:bg-muted/40/50 transition-colors group">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-bold border border-border">
-                                                {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full object-cover" /> : user.name.charAt(0)}
+                                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-bold border border-border overflow-hidden">
+                                                {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full object-cover" /> : <User size={18} className="text-muted-foreground" />}
                                             </div>
                                             <div>
                                                 <p className="font-bold text-foreground text-sm leading-none">{user.name}</p>

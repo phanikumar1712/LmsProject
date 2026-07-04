@@ -229,6 +229,17 @@ const createTables = async () => {
             );
         `);
 
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS subscription_plan_courses (
+                plan_id     UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                priority    INT NOT NULL DEFAULT 1,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (plan_id, course_id),
+                UNIQUE (plan_id, priority)
+            );
+        `);
+
         // ── INSTRUCTOR REQUESTS ───────────────────────────────────────────────
         await client.query(`
             CREATE TABLE IF NOT EXISTS instructor_requests (
@@ -298,11 +309,32 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(user_id, action, created_at DESC); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_at ON enrollments(enrolled_at); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_plan_courses_course ON subscription_plan_courses(course_id); `);
 
         // ── PATCH EXISTING DATABASES ──────────────────────────────────────────
         await client.query(`
             ALTER TABLE subscription_plans
             ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS subscription_plan_courses (
+                plan_id     UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                priority    INT NOT NULL DEFAULT 1,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (plan_id, course_id)
+            );
+        `);
+        await client.query(`
+            ALTER TABLE subscription_plan_courses
+            ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 1,
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+        `);
+        await client.query(`
+            ALTER TABLE users
+            ALTER COLUMN subscription_plan DROP DEFAULT,
+            ALTER COLUMN subscription_plan TYPE VARCHAR(100) USING subscription_plan::text,
+            ALTER COLUMN subscription_plan SET DEFAULT 'FREE';
         `);
         await client.query(`
             ALTER TABLE enrollments
@@ -396,7 +428,7 @@ const createTables = async () => {
         const hashedPassword = await bcrypt.hash('admin123', 12);
         await client.query(`
             INSERT INTO users(name, email, password, role, avatar)
-        VALUES('Super Admin', 'superadmin@lms.com', $1, 'SUPER_ADMIN', 'https://api.dicebear.com/7.x/avataaars/svg?seed=SuperAdmin')
+        VALUES('Super Admin', 'superadmin@lms.com', $1, 'SUPER_ADMIN', '')
             ON CONFLICT(email) DO NOTHING;
         `, [hashedPassword]);
 
@@ -410,10 +442,13 @@ const createTables = async () => {
         for (const u of demoUsers) {
             await client.query(`
                 INSERT INTO users(name, email, password, role, avatar)
-        VALUES($1, $2, $3, $4, $5)
+        VALUES($1, $2, $3, $4, '')
                 ON CONFLICT(email) DO NOTHING;
-        `, [u.name, u.email, demoPass, u.role, `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`]);
+        `, [u.name, u.email, demoPass, u.role]);
         }
+
+        // ── CLEANUP: blank out any legacy DiceBear cartoon avatars ────────────
+        await client.query(`UPDATE users SET avatar = '' WHERE avatar LIKE '%api.dicebear.com%';`);
 
         await client.query('COMMIT');
         console.log('✅ Database migrated successfully!');

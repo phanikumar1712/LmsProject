@@ -7,6 +7,12 @@ const courseFields = `
     c.level, c.language, c.tags, c.what_you_learn, c.requirements,
     c.status, c.rating, c.review_count, c.enrollment_count, c.duration,
     c.certificate, c.required_plan, c.created_at, c.updated_at,
+    COALESCE((
+        SELECT array_agg(sp.name ORDER BY spc.priority ASC)
+        FROM subscription_plan_courses spc
+        JOIN subscription_plans sp ON sp.id = spc.plan_id
+        WHERE spc.course_id = c.id
+    ), '{}'::text[]) as "accessiblePlans",
     (SELECT COUNT(*)::int FROM lessons l WHERE l.course_id = c.id) as "lessonsCount",
     u.id as "instructorId", u.name as "instructorName", u.avatar as "instructorAvatar", u.bio as "instructorBio",
     u.role as "instructorRole", u.earnings as "instructorEarnings", u.subscription_plan as "instructorPlan",
@@ -15,6 +21,33 @@ const courseFields = `
 `;
 
 const isAdminUser = (user) => user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+
+const COURSE_UPDATE_ALIASES = {
+    shortDesc: 'short_desc',
+    discountPrice: 'discount_price',
+    categoryId: 'category_id',
+    requiredPlan: 'required_plan',
+};
+
+const normalizeCourseUpdateBody = (body) => {
+    const normalized = { ...body };
+    Object.entries(COURSE_UPDATE_ALIASES).forEach(([from, to]) => {
+        if (normalized[to] === undefined && normalized[from] !== undefined) {
+            normalized[to] = normalized[from];
+        }
+    });
+    ['price', 'discount_price'].forEach((field) => {
+        if (normalized[field] === undefined) return;
+        if (normalized[field] === '' || normalized[field] === null) {
+            normalized[field] = field === 'price' ? 0 : null;
+            return;
+        }
+        const value = Number(normalized[field]);
+        if (!Number.isFinite(value)) throw createError(`Invalid ${field}`, 400);
+        normalized[field] = value;
+    });
+    return normalized;
+};
 
 // GET /api/courses
 const getAll = async (req, res) => {
@@ -141,10 +174,10 @@ const getByInstructor = async (req, res) => {
 // POST /api/courses
 const create = async (req, res) => {
     const {
-        title, description, short_desc, thumbnail, price = 0, discount_price,
-        level = 'Beginner', language = 'English', tags = [], what_you_learn = [],
-        requirements = [], category_id, duration = '0h', certificate = true,
-        required_plan = 'FREE', status: bodyStatus
+        title, description, short_desc, shortDesc, thumbnail, price = 0, discount_price, discountPrice,
+        level = 'Beginner', language = 'English', tags = [], what_you_learn = [], whatYouLearn,
+        requirements = [], category_id, categoryId, duration = '0h', certificate = true,
+        required_plan = 'FREE', requiredPlan, status: bodyStatus
     } = req.body;
 
     if (!title) throw createError('Title is required', 400);
@@ -158,9 +191,9 @@ const create = async (req, res) => {
         `INSERT INTO courses (title, description, short_desc, instructor_id, category_id, thumbnail, price, discount_price, level, language, tags, what_you_learn, requirements, duration, certificate, required_plan, status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING id`,
-        [title, description, short_desc, req.user.id, category_id || null, thumbnail,
-            price, discount_price || null, level, language, tags, what_you_learn, requirements,
-            duration, certificate, normalizePlan(required_plan), status]
+        [title, description, short_desc || shortDesc, req.user.id, category_id || categoryId || null, thumbnail,
+            price, discount_price || discountPrice || null, level, language, tags, what_you_learn || whatYouLearn || [], requirements,
+            duration, certificate, normalizePlan(required_plan || requiredPlan), status]
     );
 
     await query(
@@ -178,7 +211,8 @@ const create = async (req, res) => {
 // PUT /api/courses/:id
 const update = async (req, res) => {
     const { id } = req.params;
-    const existing = await query('SELECT instructor_id, status FROM courses WHERE id = $1', [id]);
+    const body = normalizeCourseUpdateBody(req.body);
+    const existing = await query('SELECT instructor_id, status, title FROM courses WHERE id = $1', [id]);
     if (!existing.rows.length) throw createError('Course not found', 404);
     if (req.user.role === 'INSTRUCTOR' && existing.rows[0].instructor_id !== req.user.id) {
         throw createError('Not your course', 403);
@@ -191,15 +225,16 @@ const update = async (req, res) => {
     let i = 1;
 
     fields.forEach(f => {
-        if (req.body[f] !== undefined) {
+        if (body[f] !== undefined) {
             updates.push(`${f} = $${i++}`);
-            values.push(f === 'required_plan' ? normalizePlan(req.body[f]) : req.body[f]);
+            values.push(f === 'required_plan' ? normalizePlan(body[f]) : body[f]);
         }
     });
 
-    if (req.body.status !== undefined) {
+    let appliedStatus = null;
+    if (body.status !== undefined) {
         const validStatuses = ['DRAFT', 'PENDING', 'PUBLISHED', 'REJECTED', 'ARCHIVED'];
-        const newStatus = String(req.body.status).toUpperCase();
+        const newStatus = String(body.status).toUpperCase();
         if (!validStatuses.includes(newStatus)) throw createError('Invalid status', 400);
         if (['PUBLISHED', 'REJECTED', 'ARCHIVED'].includes(newStatus) && !isAdminUser(req.user)) {
             throw createError('Only admins can set this status', 403);
@@ -207,6 +242,7 @@ const update = async (req, res) => {
         if (['DRAFT', 'PENDING'].includes(newStatus) || isAdminUser(req.user)) {
             updates.push(`status = $${i++}`);
             values.push(newStatus);
+            appliedStatus = newStatus;
         }
     }
 
@@ -215,6 +251,25 @@ const update = async (req, res) => {
     values.push(id);
 
     await query(`UPDATE courses SET ${updates.join(',')} WHERE id = $${i}`, values);
+
+    // Notify the instructor when an admin sends a course back to Draft (or rejects) with a reason.
+    const { instructor_id: instructorId, title } = existing.rows[0];
+    const reason = (body.reviewNote || body.reason || '').trim();
+    if (isAdminUser(req.user) && instructorId !== req.user.id && ['DRAFT', 'REJECTED'].includes(appliedStatus)) {
+        const movedToDraft = appliedStatus === 'DRAFT';
+        const message = movedToDraft
+            ? `Your course "${title}" was moved back to Draft.${reason ? ` Reason: ${reason}` : ''}`
+            : `Your course "${title}" was rejected.${reason ? ` Reason: ${reason}` : ' Please review our guidelines.'}`;
+        await query(
+            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
+            [instructorId, message, movedToDraft ? 'info' : 'error', '/instructor/courses']
+        ).catch(() => { });
+        await query(
+            `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+            [req.user.id, movedToDraft ? 'COURSE_MOVED_TO_DRAFT' : 'COURSE_REJECTED', 'courses', id, JSON.stringify({ reason })]
+        ).catch(() => { });
+    }
+
     const result = await query(
         `SELECT ${courseFields} FROM courses c JOIN users u ON c.instructor_id = u.id LEFT JOIN categories cat ON c.category_id = cat.id WHERE c.id = $1`,
         [id]
@@ -301,26 +356,28 @@ const deleteSection = async (req, res) => {
 
 // POST /api/courses/:id/lessons
 const createLesson = async (req, res) => {
-    const { section_id, title, type = 'video', content_url = '', duration = '', preview = false, order = 1 } = req.body;
-    if (!section_id || !title) throw createError('section_id and title are required', 400);
+    const { section_id, sectionId, title, type = 'video', content_url = '', contentUrl = '', duration = '', preview = false, order = 1 } = req.body;
+    const finalSectionId = section_id || sectionId;
+    const finalContentUrl = content_url || contentUrl;
+    if (!finalSectionId || !title) throw createError('section_id and title are required', 400);
     const result = await query(
         `INSERT INTO lessons (section_id, course_id, title, type, content_url, duration, preview, "order")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [section_id, req.params.id, title, type, content_url, duration, preview, order]
+        [finalSectionId, req.params.id, title, type, finalContentUrl, duration, preview, order]
     );
     res.status(201).json(result.rows[0]);
 };
 
 // PUT /api/courses/lessons/:id
 const updateLesson = async (req, res) => {
-    const { title, type, content_url, duration, preview, order } = req.body;
+    const { title, type, content_url, contentUrl, duration, preview, order } = req.body;
     const { id } = req.params;
 
     const updates = [];
     const values = [];
     let i = 1;
 
-    const fields = { title, type, content_url, duration, preview, "order": order };
+    const fields = { title, type, content_url: content_url || contentUrl, duration, preview, "order": order };
     for (const [key, val] of Object.entries(fields)) {
         if (val !== undefined) {
             updates.push(`"${key}" = $${i++}`);

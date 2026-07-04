@@ -45,7 +45,6 @@ import SubscriptionPlans from './pages/dashboard/superadmin/SubscriptionPlans';
 import AdminCategories from './pages/dashboard/admin/AdminCategories';
 import ModerateReviews from './pages/dashboard/admin/ModerateReviews';
 import AdminReports from './pages/dashboard/admin/AdminReports';
-import AdminSubscriptions from './pages/dashboard/admin/AdminSubscriptions';
 
 // Placeholder empty page for other routes
 const Placeholder = ({ title }) => (
@@ -119,7 +118,7 @@ export default function App() {
             <Route path="/admin/categories" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminCategories /></ProtectedRoute>} />
             <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><ModerateReviews /></ProtectedRoute>} />
             <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminReports /></ProtectedRoute>} />
-            <Route path="/admin/subscriptions" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminSubscriptions /></ProtectedRoute>} />
+            <Route path="/admin/subscriptions" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><SubscriptionPlans /></ProtectedRoute>} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />

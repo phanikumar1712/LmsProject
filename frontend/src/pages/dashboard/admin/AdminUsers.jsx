@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, Ban, MoreVertical } from 'lucide-react';
+import { CheckCircle, Ban, Trash2 } from 'lucide-react';
 import { usersAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -9,7 +9,7 @@ import { DataTable, UserCell } from '../../../components/ui/DataTable';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function AdminUsers() {
-    const { isSuperAdmin } = useAuth();
+    const { isSuperAdmin, user: currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState('users');
     const [searchTerm, setSearchTerm] = useState('');
     const { data: users, loading, reload: reloadUsers } = useAsyncData(() => usersAPI.getAll(), []);
@@ -20,8 +20,8 @@ export default function AdminUsers() {
             await usersAPI.updateRole(userId, newRole);
             reloadUsers();
             toast.success(`User role updated to ${newRole}`);
-        } catch {
-            toast.error('Failed to update role');
+        } catch (err) {
+            toast.error(err.message || 'Failed to update role');
         }
     };
 
@@ -31,8 +31,8 @@ export default function AdminUsers() {
             reloadRequests();
             reloadUsers();
             toast.success(`Application ${action.toLowerCase()}`);
-        } catch {
-            toast.error(`Failed to ${action.toLowerCase()} application`);
+        } catch (err) {
+            toast.error(err.message || `Failed to ${action.toLowerCase()} application`);
         }
     };
 
@@ -41,8 +41,19 @@ export default function AdminUsers() {
             await usersAPI.toggleStatus(userId);
             reloadUsers();
             toast.success('User status updated');
-        } catch {
-            toast.error('Failed to update status');
+        } catch (err) {
+            toast.error(err.message || 'Failed to update status');
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm('Are you sure you want to permanently delete this user?')) return;
+        try {
+            await usersAPI.delete(userId);
+            reloadUsers();
+            toast.success('User deleted');
+        } catch (err) {
+            toast.error(err.message || 'Failed to delete user. They might be tied to existing courses/data.');
         }
     };
 
@@ -138,7 +149,9 @@ export default function AdminUsers() {
                                 <td className="py-4 px-4">
                                     <button
                                         onClick={() => handleToggleStatus(user.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm ${user.active !== false
+                                        disabled={user.id === currentUser?.id}
+                                        title={user.id === currentUser?.id ? "You can't change your own status" : undefined}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${user.active !== false
                                             ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100'
                                             : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-200 dark:border-rose-700 hover:bg-rose-100'}`}
                                     >
@@ -148,8 +161,13 @@ export default function AdminUsers() {
                                     </button>
                                 </td>
                                 <td className="py-4 px-4 text-right">
-                                    <button className="p-2 text-muted-foreground hover:text-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                                        <MoreVertical size={18} />
+                                    <button
+                                        onClick={() => handleDeleteUser(user.id)}
+                                        disabled={user.id === currentUser?.id}
+                                        className="p-2 text-rose-500 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                        title={user.id === currentUser?.id ? "You can't delete your own account" : 'Delete User'}
+                                    >
+                                        <Trash2 size={18} />
                                     </button>
                                 </td>
                             </tr>

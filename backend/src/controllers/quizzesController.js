@@ -44,10 +44,20 @@ const assertCourseAccess = async (course, user) => {
     if (course.status !== 'PUBLISHED' && course.course_status !== 'PUBLISHED') {
         throw createError('Course is not published', 403);
     }
-    if (!hasRequiredPlan(user, course.required_plan)) throw createError('Subscription upgrade required', 403);
+    const courseId = course.course_id || course.id;
+    if (!hasRequiredPlan(user, course.required_plan)) {
+        const explicitAccess = await query(`
+            SELECT 1
+            FROM subscription_plan_courses spc
+            JOIN subscription_plans sp ON sp.id = spc.plan_id
+            WHERE spc.course_id = $1 AND UPPER(sp.name) = UPPER($2)
+            LIMIT 1
+        `, [courseId, user.subscription_plan || 'FREE']);
+        if (!explicitAccess.rows.length) throw createError('Subscription upgrade required', 403);
+    }
     const enrollment = await query(
         'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
-        [user.id, course.id || course.course_id]
+        [user.id, courseId]
     );
     if (!enrollment.rows.length) throw createError('You must be enrolled in this course', 403);
     return 'STUDENT';

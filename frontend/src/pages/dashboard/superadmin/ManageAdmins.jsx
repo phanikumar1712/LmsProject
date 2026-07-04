@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users, Phone, Lock } from 'lucide-react';
 import { usersAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -7,7 +7,7 @@ import { useAsyncData } from '../../../hooks/useAsyncData';
 export default function ManageAdmins() {
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '' });
     const [inviting, setInviting] = useState(false);
 
     const { data: allUsers, loading, reload } = useAsyncData(() => usersAPI.getAll(), []);
@@ -48,15 +48,19 @@ export default function ManageAdmins() {
 
     const handleInvite = async (e) => {
         e.preventDefault();
+        if (!inviteData.password || inviteData.password.length < 8) {
+            toast.error('Password must be at least 8 characters');
+            return;
+        }
         setInviting(true);
         try {
             await usersAPI.inviteAdmin(inviteData);
-            toast.success(`Invitation sent to ${inviteData.email}`);
+            toast.success(`Admin account created for ${inviteData.email}`);
             setIsModalOpen(false);
-            setInviteData({ name: '', email: '', role: 'ADMIN' });
+            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '' });
             reload();
         } catch (err) {
-            toast.error(err.message || 'Failed to send invitation');
+            toast.error(err.message || 'Failed to create admin');
         } finally {
             setInviting(false);
         }
@@ -80,7 +84,7 @@ export default function ManageAdmins() {
                     onClick={() => setIsModalOpen(true)}
                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
                 >
-                    <Plus size={16} /> Invite Admin
+                    <Plus size={16} /> Add Admin
                 </button>
             </div>
 
@@ -89,14 +93,14 @@ export default function ManageAdmins() {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
-                            <h3 className="text-xl font-extrabold text-foreground tracking-tight">Invite New Admin</h3>
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight">Add New Admin</h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
                                 <X size={20} className="text-muted-foreground" />
                             </button>
                         </div>
                         <form onSubmit={handleInvite} className="p-8 space-y-5">
                             <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Full Name</label>
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Full Name *</label>
                                 <div className="relative">
                                     <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
                                     <input
@@ -110,7 +114,7 @@ export default function ManageAdmins() {
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address</label>
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
                                 <div className="relative">
                                     <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
                                     <input
@@ -122,6 +126,34 @@ export default function ManageAdmins() {
                                         className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
                                     />
                                 </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Phone Number</label>
+                                <div className="relative">
+                                    <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input
+                                        type="tel"
+                                        placeholder="+91 98765 43210"
+                                        value={inviteData.phone}
+                                        onChange={e => setInviteData({ ...inviteData, phone: e.target.value })}
+                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Password *</label>
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input
+                                        required
+                                        type="password"
+                                        placeholder="Min. 8 characters"
+                                        value={inviteData.password}
+                                        onChange={e => setInviteData({ ...inviteData, password: e.target.value })}
+                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                    />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">The admin can change this password after first login.</p>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Admin Role</label>
@@ -147,12 +179,9 @@ export default function ManageAdmins() {
                                     disabled={inviting}
                                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]"
                                 >
-                                    {inviting ? 'Inviting...' : 'Send Invitation'}
+                                    {inviting ? 'Creating...' : 'Create Admin Account'}
                                 </button>
                             </div>
-                            <p className="text-[11px] text-center text-muted-foreground/70 font-medium pt-2 italic">
-                                * Temporary password will be sent via email
-                            </p>
                         </form>
                     </div>
                 </div>

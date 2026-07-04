@@ -60,6 +60,8 @@ export function DataTable({
     );
 }
 
+import { User } from 'lucide-react';
+
 /**
  * UserCell – avatar + name + email table cell content.
  */
@@ -73,8 +75,8 @@ export function UserCell({ name, email, avatar }) {
                     className="w-10 h-10 rounded-full object-cover border border-border shadow-sm flex-shrink-0"
                 />
             ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 border border-border shadow-sm">
-                    <span className="text-white text-sm font-bold">{name?.charAt(0)?.toUpperCase()}</span>
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 border border-border shadow-sm">
+                    <User size={20} className="text-muted-foreground" />
                 </div>
             )}
             <div>

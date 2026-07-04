@@ -170,11 +170,17 @@ export default function InstructorProfilePage() {
 
                     <div className="flex flex-col md:flex-row gap-8 items-start">
                         <div className="relative group">
-                            <img
-                                src={instructor.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'}
-                                alt={instructor.name}
-                                className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg border-4 border-card transition-transform duration-500 group-hover:scale-[1.02]"
-                            />
+                            {instructor.avatar ? (
+                                <img
+                                    src={instructor.avatar}
+                                    alt={instructor.name}
+                                    className="w-32 h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg border-4 border-card transition-transform duration-500 group-hover:scale-[1.02]"
+                                />
+                            ) : (
+                                <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl shadow-lg border-4 border-card bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center transition-transform duration-500 group-hover:scale-[1.02]">
+                                    <span className="text-white text-5xl font-extrabold">{instructor.name?.charAt(0)?.toUpperCase()}</span>
+                                </div>
+                            )}
                             <div className="absolute -bottom-2 -right-2 bg-indigo-600 text-white p-2.5 rounded-xl shadow-lg border-2 border-card">
                                 <Award size={20} />
                             </div>
