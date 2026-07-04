@@ -25,6 +25,7 @@ export default function ProfilePage() {
     const [saving, setSaving] = useState(false);
     const [changingPwd, setChangingPwd] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [removingPhoto, setRemovingPhoto] = useState(false);
     const [myReviews, setMyReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const fileInputRef = useRef(null);
@@ -62,8 +63,18 @@ export default function ProfilePage() {
         setUploadingPhoto(true);
         try {
             const result = await uploadAPI.uploadProfilePhoto(file);
-            setForm(prev => ({ ...prev, avatar: result.url }));
-            toast.success('Photo uploaded!');
+            const newAvatar = result.url;
+            setForm(prev => ({ ...prev, avatar: newAvatar }));
+
+            // Also immediately save to backend and update auth context so it propagates everywhere
+            const updated = await authAPI.updateProfile(user.id, {
+                name: form.name.trim() || user.name,
+                bio: form.bio?.trim() || user.bio || '',
+                avatar: newAvatar,
+            });
+            updateUser(updated);
+
+            toast.success('Profile photo updated successfully!');
         } catch (err) {
             toast.error(err.message || 'Failed to upload photo');
         } finally {
@@ -118,17 +129,45 @@ export default function ProfilePage() {
     };
 
     useEffect(() => {
-        if (activeTab === 'reviews' && user) {
-            setLoadingReviews(true);
-            ratingsAPI.getByStudent(user.id)
-                .then(setMyReviews)
-                .catch(() => toast.error('Failed to load reviews'))
-                .finally(() => setLoadingReviews(false));
-        }
+        if (activeTab !== 'reviews' || !user) return;
+
+        let cancelled = false;
+        const loadReviews = async () => {
+            try {
+                setLoadingReviews(true);
+                const reviews = await ratingsAPI.getByStudent(user.id);
+                if (!cancelled) setMyReviews(reviews);
+            } catch {
+                if (!cancelled) toast.error('Failed to load reviews');
+            } finally {
+                if (!cancelled) setLoadingReviews(false);
+            }
+        };
+
+        loadReviews();
+        return () => { cancelled = true; };
     }, [activeTab, user]);
 
-    const handleRemovePhoto = () => {
+    const handleRemovePhoto = async () => {
+        if (!user || removingPhoto) return;
+        const previousAvatar = form.avatar;
+
+        setRemovingPhoto(true);
         setForm(prev => ({ ...prev, avatar: '' }));
+        try {
+            const updated = await authAPI.updateProfile(user.id, {
+                name: form.name.trim() || user.name,
+                bio: form.bio?.trim() || user.bio || '',
+                avatar: '',
+            });
+            updateUser(updated);
+            toast.success('Profile photo removed');
+        } catch (err) {
+            setForm(prev => ({ ...prev, avatar: previousAvatar }));
+            toast.error(err.message || 'Failed to remove photo');
+        } finally {
+            setRemovingPhoto(false);
+        }
     };
 
     const inputCls = 'w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow';
@@ -251,9 +290,10 @@ export default function ProfilePage() {
                                     <button
                                         type="button"
                                         onClick={handleRemovePhoto}
-                                        className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                                        disabled={removingPhoto}
+                                        className="text-xs font-bold text-rose-500 hover:text-rose-700 disabled:opacity-60 transition-colors"
                                     >
-                                        Remove Photo
+                                        {removingPhoto ? 'Removing...' : 'Remove Photo'}
                                     </button>
                                 )}
                             </div>

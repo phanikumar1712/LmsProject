@@ -1,11 +1,11 @@
-import { BookOpen, Clock, Users, Star, Heart, Play, Lock } from 'lucide-react';
+import { BookOpen, Clock, Users, Heart, Play, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { ProgressBar } from './ProgressBar';
 import { RatingDisplay } from './RatingStars';
 import { useAuth } from '../../contexts/AuthContext';
-import { wishlistAPI, enrollmentsAPI } from '../../services/api';
-import { PLAN_ORDER } from '../../lib/constants';
+import { wishlistAPI } from '../../services/api';
+import { canAccessCourse } from '../../lib/courseAccess';
 import toast from 'react-hot-toast';
 
 const LEVEL_COLORS = {
@@ -14,13 +14,13 @@ const LEVEL_COLORS = {
     Advanced: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
 };
 
-export function CourseCard({ course, enrollment, compact = false }) {
+export function CourseCard({ course, enrollment }) {
     const navigate = useNavigate();
     const { user, updateUser } = useAuth();
     const [wishlisted, setWishlisted] = useState(user?.wishlist?.includes(course.id) || false);
     const [hearting, setHearting] = useState(false);
 
-    const canAccess = user && PLAN_ORDER[user.subscriptionPlan] >= PLAN_ORDER[course.requiredPlan];
+    const canAccess = canAccessCourse(user, course);
     const isEnrolled = !!enrollment;
 
     const handleWishlist = async (e) => {
@@ -39,7 +39,8 @@ export function CourseCard({ course, enrollment, compact = false }) {
         navigate(`/courses/${course.id}`);
     };
 
-    const discountPct = course.price > 0
+    const effectivePrice = course.discountPrice ?? course.price ?? 0;
+    const discountPct = course.price > 0 && course.discountPrice !== null
         ? Math.round((1 - course.discountPrice / course.price) * 100)
         : 0;
 
@@ -138,8 +139,8 @@ export function CourseCard({ course, enrollment, compact = false }) {
                                 <span className="text-emerald-600 font-bold text-lg leading-none">Free</span>
                             ) : (
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-foreground font-bold text-lg leading-none">₹{course.discountPrice?.toLocaleString()}</span>
-                                    {course.discountPrice < course.price && (
+                                    <span className="text-foreground font-bold text-lg leading-none">₹{effectivePrice.toLocaleString()}</span>
+                                    {course.discountPrice !== null && course.discountPrice < course.price && (
                                         <span className="text-muted-foreground text-sm line-through decoration-slate-300 dark:decoration-slate-700">₹{course.price?.toLocaleString()}</span>
                                     )}
                                 </div>

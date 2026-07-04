@@ -13,10 +13,13 @@ const http = async (method, path, body = null, token = null) => {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-        if (res.status === 401 || data.error === 'Invalid token' || data.error === 'Token expired') {
+        if (res.status === 401) {
             console.error('Authentication Error Details:', data);
-            // localStorage.removeItem('lms_token'); // Don't clear yet
-            // window.location.href = '/login?expired=true';
+            // Clear stale token and redirect to login
+            localStorage.removeItem('lms_token');
+            if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login?expired=true';
+            }
         }
         throw new Error(data.error || data.message || `HTTP ${res.status}`);
     }
@@ -245,6 +248,12 @@ export const subscriptionsAPI = {
 
     updatePlan: async (planId, data) =>
         http('PUT', `/subscriptions/plans/${planId}`, data, getToken()),
+
+    createPlan: async (data) =>
+        http('POST', '/subscriptions/plans', data, getToken()),
+
+    deletePlan: async (planId) =>
+        http('DELETE', `/subscriptions/plans/${planId}`, null, getToken()),
 };
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────

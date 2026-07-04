@@ -24,6 +24,9 @@ export default function CreateCourseForm() {
     const [thumbnailPreview, setThumbnailPreview] = useState('');
     const thumbnailInputRef = useRef(null);
 
+    const [deletedSections, setDeletedSections] = useState([]);
+    const [deletedLessons, setDeletedLessons] = useState([]);
+
     const [curriculum, setCurriculum] = useState([
         {
             id: 's1', title: 'Introduction', isExpanded: true, lessons: [
@@ -129,6 +132,8 @@ export default function CreateCourseForm() {
     const deleteSection = (secIdx) => {
         if (window.confirm('Are you sure you want to delete this module and all its lessons?')) {
             const newCurr = [...curriculum];
+            const sec = newCurr[secIdx];
+            if (sec.dbId) setDeletedSections(prev => [...prev, sec.dbId]);
             newCurr.splice(secIdx, 1);
             setCurriculum(newCurr);
         }
@@ -149,6 +154,8 @@ export default function CreateCourseForm() {
 
     const deleteLesson = (secIdx, lessIdx) => {
         const newCurr = [...curriculum];
+        const ls = newCurr[secIdx].lessons[lessIdx];
+        if (ls.dbId) setDeletedLessons(prev => [...prev, ls.dbId]);
         newCurr[secIdx].lessons.splice(lessIdx, 1);
         setCurriculum(newCurr);
     };
@@ -238,8 +245,8 @@ export default function CreateCourseForm() {
             return;
         }
 
-        if (curriculum.length === 0 || curriculum.some(s => !s.title || s.lessons.length === 0)) {
-            toast.error('Please ensure all modules have a title and at least one lesson.');
+        if (curriculum.length === 0 || curriculum.some(s => !s.title || s.lessons.length === 0 || s.lessons.some(l => !l.title.trim()))) {
+            toast.error('Please ensure all modules have a title, at least one lesson, and every lesson has a title.');
             return;
         }
 
@@ -269,6 +276,14 @@ export default function CreateCourseForm() {
             } else {
                 const newCourse = await coursesAPI.create(dbFormat);
                 targetCourseId = newCourse.id;
+            }
+
+            // Handle deletions first
+            for (const dLesson of deletedLessons) {
+                await coursesAPI.deleteLesson(dLesson).catch(() => { });
+            }
+            for (const dSection of deletedSections) {
+                await coursesAPI.deleteSection(dSection).catch(() => { });
             }
 
             // Sync curriculum

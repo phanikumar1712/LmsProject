@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, BookOpen, Award, CreditCard, BarChart2, Users, Settings,
     ShieldCheck, FileText, GraduationCap, PlusCircle, Star, Bell, Database,
-    ChevronLeft, LogOut, ClipboardList, MessageSquare, Flag, Heart
+    ChevronLeft, LogOut, ClipboardList, MessageSquare, Flag, Heart, User
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState } from 'react';
@@ -79,8 +79,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
                 {user?.avatar ? (
                     <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full flex-shrink-0 object-cover border border-border" />
                 ) : (
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center flex-shrink-0">
-                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    <div className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                        <User size={20} className="text-muted-foreground" />
                     </div>
                 )}
                 {!collapsed && (

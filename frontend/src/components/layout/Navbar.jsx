@@ -283,7 +283,7 @@ export function Navbar({ onMobileMenuClick }) {
                                         {user?.avatar ? (
                                             <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
-                                            user?.name?.charAt(0).toUpperCase() || 'U'
+                                            <User size={18} className="text-indigo-600" />
                                         )}
                                     </button>
 
@@ -338,8 +338,8 @@ export function Navbar({ onMobileMenuClick }) {
 
                         {isAuthenticated && (
                             <div className="flex items-center gap-3 pb-4 pt-2 border-b border-border">
-                                <div className="w-12 h-12 rounded-full border border-border bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center overflow-hidden flex-shrink-0">
-                                    {user?.avatar ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> : user?.name?.charAt(0).toUpperCase()}
+                                <div className="w-12 h-12 rounded-full border border-border bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    {user?.avatar ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> : <User size={24} className="text-muted-foreground" />}
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-base font-bold text-foreground leading-tight">{user?.name}</p>

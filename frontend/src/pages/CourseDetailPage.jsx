@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     BookOpen, Clock, Users, Star, Award, Play, CheckCircle, Lock, ChevronDown,
-    ChevronUp, ArrowLeft, FileText, ShoppingCart, Heart, Unlock, Video
+    ChevronUp, ArrowLeft, FileText, ShoppingCart, Heart, Unlock
 } from 'lucide-react';
 import ReactPlayer from 'react-player';
 import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI } from '../services/api';
@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { RatingDisplay, RatingStars } from '../components/ui/RatingStars';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import toast from 'react-hot-toast';
-import { PLAN_ORDER } from '../lib/constants';
+import { canAccessCourse } from '../lib/courseAccess';
 
 export default function CourseDetailPage() {
     const { id } = useParams();
@@ -52,7 +52,7 @@ export default function CourseDetailPage() {
             console.error(err);
         }).finally(() => setLoading(false));
 
-        if (user) {
+        if (user?.role === 'STUDENT') {
             enrollmentsAPI.getByStudent(user.id).then(enrolls => {
                 const e = enrolls.find(e => e.courseId === id);
                 if (e) setEnrollment(e);
@@ -69,12 +69,15 @@ export default function CourseDetailPage() {
     }, [id, user]);
 
     const requiredPlan = course?.requiredPlan || 'FREE';
-    const canAccess = user && (PLAN_ORDER[user.subscriptionPlan || 'FREE'] >= PLAN_ORDER[requiredPlan]);
-    const isEnrolled = !!enrollment;
+    const canAccess = canAccessCourse(user, course);
+    const isAdminPreview = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role);
+    const effectivePrice = course?.discountPrice ?? course?.price ?? 0;
+    const isEnrolled = user?.role === 'STUDENT' && !!enrollment;
     const existingRating = Array.isArray(ratings) ? ratings.find(r => r.studentId === user?.id) : null;
     const hasRated = !!existingRating;
 
     const handleEnroll = async () => {
+        if (isAdminPreview) { toast('Admins can preview courses without enrolling'); return; }
         if (!user) { navigate('/login'); return; }
         if (!canAccess) { navigate('/student/subscription'); toast.error(`Upgrade to ${course.requiredPlan} plan to access this course`); return; }
         setEnrolling(true);
@@ -88,6 +91,7 @@ export default function CourseDetailPage() {
     };
 
     const handleWishlist = async () => {
+        if (isAdminPreview) { toast('Wishlist is available for student accounts'); return; }
         if (!user) { navigate('/login'); return; }
         const newWishlist = await wishlistAPI.toggle(user.id, id);
         setWishlisted(newWishlist.includes(id));
@@ -281,6 +285,11 @@ export default function CourseDetailPage() {
                                                                 onClick={() => {
                                                                     if (isEnrolled) {
                                                                         navigate(`/courses/${id}/learn`, { state: { lessonId: lesson.id } });
+                                                                    } else if (isAdminPreview) {
+                                                                        if (lesson.type === 'video' && lesson.contentUrl) {
+                                                                            setActiveTab('preview');
+                                                                            setPreviewVideo(lesson);
+                                                                        }
                                                                     } else if (lesson.preview) {
                                                                         setActiveTab('preview');
                                                                         setPreviewVideo(lesson);
@@ -299,11 +308,14 @@ export default function CourseDetailPage() {
                                                                     <p className="text-[14px] font-medium text-muted-foreground group-hover:text-indigo-600 transition-colors truncate">{lesson.title}</p>
                                                                 </div>
                                                                 <div className="flex items-center gap-3">
-                                                                    {lesson.preview && !isEnrolled && (
+                                                                    {lesson.preview && !isEnrolled && !isAdminPreview && (
                                                                         <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Preview</span>
                                                                     )}
+                                                                    {isAdminPreview && (
+                                                                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Admin Preview</span>
+                                                                    )}
                                                                     <span className="text-xs font-medium text-muted-foreground/60">{lesson.duration}</span>
-                                                                    {!isEnrolled && !lesson.preview && <Lock size={14} className="text-muted-foreground/30" />}
+                                                                    {!isEnrolled && !isAdminPreview && !lesson.preview && <Lock size={14} className="text-muted-foreground/30" />}
                                                                     {enrollment?.completedLessons?.includes(lesson.id) && (
                                                                         <CheckCircle size={16} className="text-emerald-500" />
                                                                     )}
@@ -360,7 +372,7 @@ export default function CourseDetailPage() {
                                         <p className="text-muted-foreground font-medium text-sm mt-2">{course.reviewCount?.toLocaleString()} reviews</p>
                                     </div>
                                     <div className="flex-1 w-full space-y-3">
-                                        {ratingDist.map(({ stars, count, pct }) => (
+                                        {ratingDist.map(({ stars, pct }) => (
                                             <div key={stars} className="flex items-center gap-3 text-sm font-medium">
                                                 <div className="flex items-center gap-1 w-10 text-muted-foreground">
                                                     <span>{stars}</span>
@@ -471,8 +483,8 @@ export default function CourseDetailPage() {
                                 <p className="text-4xl font-extrabold text-emerald-600 tracking-tight">Free</p>
                             ) : (
                                 <div className="flex items-end gap-3">
-                                    <p className="text-4xl font-extrabold text-foreground tracking-tight">₹{course.discountPrice?.toLocaleString()}</p>
-                                    {course.discountPrice < course.price && (
+                                    <p className="text-4xl font-extrabold text-foreground tracking-tight">₹{effectivePrice.toLocaleString()}</p>
+                                    {course.discountPrice !== null && course.discountPrice < course.price && (
                                         <p className="text-muted-foreground font-medium text-lg line-through mb-1">₹{course.price?.toLocaleString()}</p>
                                     )}
                                 </div>
@@ -500,7 +512,14 @@ export default function CourseDetailPage() {
                         )}
 
                         {/* CTA */}
-                        {isEnrolled ? (
+                        {isAdminPreview ? (
+                            <button
+                                onClick={() => navigate(user.role === 'SUPER_ADMIN' ? '/super-admin/courses' : '/admin/courses')}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl text-[15px] font-bold mb-4 shadow-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Unlock size={18} /> Admin Preview Mode
+                            </button>
+                        ) : isEnrolled ? (
                             <button
                                 onClick={() => navigate(`/courses/${id}/learn`)}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl text-[15px] font-bold mb-4 shadow-sm transition-colors flex items-center justify-center gap-2"
@@ -519,10 +538,12 @@ export default function CourseDetailPage() {
                             </button>
                         )}
 
-                        <button onClick={handleWishlist} disabled={wishlisted && !user} className="w-full bg-card border border-border hover:bg-muted/50 py-3.5 rounded-xl text-foreground font-bold text-[14px] flex items-center justify-center gap-2 transition-colors">
-                            <Heart size={18} className={wishlisted ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground/60'} />
-                            {wishlisted ? 'Saved to Wishlist' : 'Add to Wishlist'}
-                        </button>
+                        {!isAdminPreview && (
+                            <button onClick={handleWishlist} disabled={wishlisted && !user} className="w-full bg-card border border-border hover:bg-muted/50 py-3.5 rounded-xl text-foreground font-bold text-[14px] flex items-center justify-center gap-2 transition-colors">
+                                <Heart size={18} className={wishlisted ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground/60'} />
+                                {wishlisted ? 'Saved to Wishlist' : 'Add to Wishlist'}
+                            </button>
+                        )}
 
                         <hr className="my-6 border-border" />
 
@@ -551,9 +572,11 @@ export default function CourseDetailPage() {
             {/* Mobile sticky enroll button */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border shadow-[0_-10px_20px_rgba(0,0,0,0.05)] lg:hidden z-50 flex items-center justify-between gap-4">
                 <div>
-                    {course.price === 0 ? <p className="font-bold text-lg text-emerald-600">Free</p> : <p className="font-bold text-lg text-foreground">₹{course.discountPrice?.toLocaleString()}</p>}
+                    {course.price === 0 ? <p className="font-bold text-lg text-emerald-600">Free</p> : <p className="font-bold text-lg text-foreground">₹{effectivePrice.toLocaleString()}</p>}
                 </div>
-                {isEnrolled ? (
+                {isAdminPreview ? (
+                    <button onClick={() => navigate(user.role === 'SUPER_ADMIN' ? '/super-admin/courses' : '/admin/courses')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Admin Preview</button>
+                ) : isEnrolled ? (
                     <button onClick={() => navigate(`/courses/${id}/learn`)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Continue</button>
                 ) : (
                     <button onClick={handleEnroll} disabled={enrolling} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px] disabled:opacity-60">
