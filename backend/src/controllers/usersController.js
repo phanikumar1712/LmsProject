@@ -242,11 +242,20 @@ const unfollowInstructor = async (req, res) => {
 
 // POST /api/users/invite-admin
 const inviteAdmin = async (req, res) => {
-    const { name, email, role, password: providedPassword, phone } = req.body;
+    const { name, role, password: providedPassword, phone } = req.body;
+    if (!name || !req.body.email) throw createError('Name and email are required', 400);
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) throw createError('Invalid admin role', 400);
+
+    // Normalize email the same way register/login do, so the created admin
+    // can actually log in (login looks up by lowercased email).
+    const email = req.body.email.trim().toLowerCase();
 
     const bcrypt = require('bcryptjs');
     const crypto = require('crypto');
+
+    if (providedPassword && providedPassword.length < 8) {
+        throw createError('Password must be at least 8 characters', 400);
+    }
 
     // Check if user exists
     const checkUser = await query('SELECT id FROM users WHERE email = $1', [email]);
@@ -256,10 +265,6 @@ const inviteAdmin = async (req, res) => {
     const tempPassword = providedPassword && providedPassword.length >= 8
         ? providedPassword
         : crypto.randomBytes(8).toString('hex');
-
-    if (providedPassword && providedPassword.length < 8) {
-        throw createError('Password must be at least 8 characters', 400);
-    }
 
     const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
