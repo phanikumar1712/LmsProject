@@ -238,6 +238,21 @@ export const usersAPI = {
         http('POST', '/users/invite-admin', data, getToken()),
 };
 
+// ─── DEPARTMENTS ──────────────────────────────────────────────────────────────
+export const departmentsAPI = {
+    list: async () =>
+        http('GET', '/departments', null, getToken()),
+
+    create: async (data) =>
+        http('POST', '/departments', data, getToken()),
+
+    update: async (id, data) =>
+        http('PUT', `/departments/${id}`, data, getToken()),
+
+    delete: async (id) =>
+        http('DELETE', `/departments/${id}`, null, getToken()),
+};
+
 // ─── SUBSCRIPTIONS ────────────────────────────────────────────────────────────
 export const subscriptionsAPI = {
     getPlans: async () =>

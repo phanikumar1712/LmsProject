@@ -63,6 +63,18 @@ const createTables = async () => {
             );
         `);
 
+        // ── DEPARTMENTS ────────────────────────────────────────────────────────
+        // A department groups one or more categories. ADMINs are scoped to a
+        // single department; SUPER_ADMINs are global (department_id NULL).
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS departments (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name        VARCHAR(100) UNIQUE NOT NULL,
+                icon        VARCHAR(10) DEFAULT '🏛️',
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
         // ── COURSES ────────────────────────────────────────────────────────────
         await client.query(`
             CREATE TABLE IF NOT EXISTS courses (
@@ -376,6 +388,18 @@ const createTables = async () => {
                         ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
         `);
 
+        // -- DEPARTMENT ISOLATION: scope admins/categories to a department --
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL;
+        `);
+        await client.query(`
+            ALTER TABLE categories
+            ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_categories_department ON categories(department_id); `);
+
         // ── SEED DEFAULT CATEGORIES ───────────────────────────────────────────
         await client.query(`
             INSERT INTO categories(name, icon) VALUES
@@ -383,6 +407,42 @@ const createTables = async () => {
             ('Business', '💼'), ('Data Science', '📈'), ('Photography', '📷'),
             ('Music', '🎵'), ('Health', '🏃'), ('Personal Development', '🚀'), ('Finance', '💰')
             ON CONFLICT(name) DO NOTHING;
+        `);
+
+        // ── SEED ACADEMIC DEPARTMENTS + SUBJECT CATEGORIES ────────────────────
+        // Each department owns a set of subject categories. An ADMIN assigned a
+        // department (e.g. CSE) only manages courses/lessons in that department's
+        // subjects — nothing from ECE, Mechanical, etc.
+        const academicDepartments = {
+            CSE: { icon: '💻', categories: ['Programming', 'Data Structures', 'Algorithms', 'Databases', 'Artificial Intelligence'] },
+            ECE: { icon: '📡', categories: ['Digital Electronics', 'Signals & Systems', 'VLSI Design', 'Communication Systems'] },
+            EEE: { icon: '⚡', categories: ['Electric Circuits', 'Power Systems', 'Electrical Machines'] },
+            Mechanical: { icon: '⚙️', categories: ['Thermodynamics', 'Fluid Mechanics', 'Manufacturing', 'Machine Design'] },
+            Civil: { icon: '🏗️', categories: ['Structural Engineering', 'Geotechnical Engineering', 'Surveying', 'Transportation'] },
+        };
+        for (const [dept, { icon }] of Object.entries(academicDepartments)) {
+            await client.query(
+                `INSERT INTO departments(name, icon) VALUES ($1, $2) ON CONFLICT(name) DO NOTHING;`,
+                [dept, icon]
+            );
+        }
+        // Seed each subject category and (re)map it to its department. ON CONFLICT
+        // keeps the mapping correct on re-runs even if the category already exists.
+        for (const [dept, { icon, categories }] of Object.entries(academicDepartments)) {
+            for (const cat of categories) {
+                await client.query(
+                    `INSERT INTO categories(name, icon, department_id)
+                     VALUES ($1, $2, (SELECT id FROM departments WHERE name = $3))
+                     ON CONFLICT(name) DO UPDATE
+                       SET department_id = (SELECT id FROM departments WHERE name = $3);`,
+                    [cat, icon, dept]
+                );
+            }
+        }
+        // Assign the demo admin to CSE so department isolation is testable out of the box.
+        await client.query(`
+            UPDATE users SET department_id = (SELECT id FROM departments WHERE name = 'CSE')
+            WHERE email = 'admin@demo.com' AND department_id IS NULL;
         `);
 
         // ── SEED SUBSCRIPTION PLANS ───────────────────────────────────────────
@@ -454,7 +514,7 @@ const createTables = async () => {
         console.log('✅ Database migrated successfully!');
         console.log('\n📋 Demo Accounts:');
         console.log('   Super Admin : superadmin@lms.com / admin123');
-        console.log('   Admin       : admin@demo.com / demo123');
+        console.log('   Admin       : admin@demo.com / demo123  (CSE department — scoped)');
         console.log('   Instructor  : instructor@demo.com / demo123');
         console.log('   Student     : student@demo.com / demo123');
     } catch (err) {

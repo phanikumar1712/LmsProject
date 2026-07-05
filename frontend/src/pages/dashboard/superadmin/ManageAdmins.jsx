@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users, Phone, Lock } from 'lucide-react';
-import { usersAPI } from '../../../services/api';
+import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users, Phone, Lock, Building2 } from 'lucide-react';
+import { usersAPI, departmentsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 
 export default function ManageAdmins() {
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentId: '' });
     const [inviting, setInviting] = useState(false);
 
     const { data: allUsers, loading, reload } = useAsyncData(() => usersAPI.getAll(), []);
+    const { data: departments } = useAsyncData(() => departmentsAPI.list(), []);
+    const deptName = (id) => (departments || []).find(d => d.id === id)?.name || null;
 
     const users = (allUsers || []).filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN');
 
@@ -57,7 +59,7 @@ export default function ManageAdmins() {
             await usersAPI.inviteAdmin(inviteData);
             toast.success(`Admin account created for ${inviteData.email}`);
             setIsModalOpen(false);
-            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '' });
+            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentId: '' });
             reload();
         } catch (err) {
             toast.error(err.message || 'Failed to create admin');
@@ -166,6 +168,23 @@ export default function ManageAdmins() {
                                     <option value="SUPER_ADMIN">Super Admin</option>
                                 </select>
                             </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Department</label>
+                                <div className="relative">
+                                    <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <select
+                                        value={inviteData.departmentId}
+                                        onChange={e => setInviteData({ ...inviteData, departmentId: e.target.value })}
+                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium appearance-none"
+                                    >
+                                        <option value="">Global (all departments)</option>
+                                        {(departments || []).map(d => (
+                                            <option key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">Standard admins are limited to their department. Leave global for full access.</p>
+                            </div>
                             <div className="pt-4 flex gap-3">
                                 <button
                                     type="button"
@@ -236,6 +255,10 @@ export default function ManageAdmins() {
                                             </span>
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${user.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
                                                 {user.active !== false ? 'Active' : 'Suspended'}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700 flex items-center gap-1">
+                                                <Building2 size={11} />
+                                                {deptName(user.departmentId) || 'Global'}
                                             </span>
                                         </div>
                                     </div>
