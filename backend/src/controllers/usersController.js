@@ -1,8 +1,9 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser, mapInstructorRequest } = require('../utils/formatters');
+const { getDepartmentScope } = require('../utils/scope');
 
-const safeUserFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, created_at`;
+const safeUserFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, department_id, created_at`;
 
 // GET /api/users
 const getAll = async (req, res) => {
@@ -21,6 +22,14 @@ const getAll = async (req, res) => {
         conditions.push(`(name ILIKE $${i} OR email ILIKE $${i})`);
         values.push(`%${search}%`);
         i++;
+    }
+
+    // Department isolation: a scoped ADMIN sees users in their own department,
+    // plus all students (who are not tied to any department).
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (scoped) {
+        conditions.push(`(department_id = $${i++} OR role = 'STUDENT')`);
+        values.push(departmentId);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -124,12 +133,17 @@ const submitInstructorRequest = async (req, res) => {
 
 // GET /api/users/instructor-requests
 const getInstructorRequests = async (req, res) => {
+    // A scoped ADMIN only sees requests from applicants in their department.
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const deptFilter = scoped ? 'AND u.department_id = $1' : '';
+    const values = scoped ? [departmentId] : [];
     const result = await query(
-        `SELECT ir.*, u.name as user_name, u.email as user_email 
+        `SELECT ir.*, u.name as user_name, u.email as user_email
          FROM instructor_requests ir
          JOIN users u ON ir.user_id = u.id
-         WHERE ir.status = 'PENDING'
-         ORDER BY ir.created_at DESC`
+         WHERE ir.status = 'PENDING' ${deptFilter}
+         ORDER BY ir.created_at DESC`,
+        values
     );
     res.json(result.rows.map(mapInstructorRequest));
 };
@@ -242,7 +256,7 @@ const unfollowInstructor = async (req, res) => {
 
 // POST /api/users/invite-admin
 const inviteAdmin = async (req, res) => {
-    const { name, role, password: providedPassword, phone } = req.body;
+    const { name, role, password: providedPassword, phone, departmentId } = req.body;
     if (!name || !req.body.email) throw createError('Name and email are required', 400);
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) throw createError('Invalid admin role', 400);
 
@@ -257,6 +271,15 @@ const inviteAdmin = async (req, res) => {
         throw createError('Password must be at least 8 characters', 400);
     }
 
+    // Validate the department assignment (SUPER_ADMINs are typically global, but
+    // a department may still be assigned to either role if provided).
+    let deptId = null;
+    if (departmentId) {
+        const dept = await query('SELECT id FROM departments WHERE id = $1', [departmentId]);
+        if (!dept.rows.length) throw createError('Invalid department', 400);
+        deptId = departmentId;
+    }
+
     // Check if user exists
     const checkUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (checkUser.rows.length) throw createError('User already exists', 409);
@@ -269,8 +292,8 @@ const inviteAdmin = async (req, res) => {
     const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
     const result = await query(
-        `INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING ${safeUserFields}`,
-        [name, email, hashedPassword, role]
+        `INSERT INTO users (name, email, password, role, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING ${safeUserFields}`,
+        [name, email, hashedPassword, role, deptId]
     );
 
     await query(

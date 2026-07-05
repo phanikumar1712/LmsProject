@@ -1,6 +1,7 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapCourse, normalizePlan } = require('../utils/formatters');
+const { getDepartmentScope } = require('../utils/scope');
 
 const courseFields = `
     c.id, c.title, c.description, c.short_desc, c.thumbnail, c.price, c.discount_price,
@@ -21,6 +22,23 @@ const courseFields = `
 `;
 
 const isAdminUser = (user) => user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+
+// For a department-scoped ADMIN, ensure the course belongs to their department
+// (via course → category → department). Throws 403 on cross-department access.
+const assertCourseInScope = async (req, courseId) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (!scoped) return;
+    const r = await query(
+        `SELECT cat.department_id FROM courses c
+         LEFT JOIN categories cat ON c.category_id = cat.id
+         WHERE c.id = $1`,
+        [courseId]
+    );
+    if (!r.rows.length) throw createError('Course not found', 404);
+    if (r.rows[0].department_id !== departmentId) {
+        throw createError('This course is outside your department', 403);
+    }
+};
 
 const COURSE_UPDATE_ALIASES = {
     shortDesc: 'short_desc',
@@ -67,6 +85,14 @@ const getAll = async (req, res) => {
 
     if (category) { conditions.push(`cat.id = $${i++}`); values.push(category); }
     if (level) { conditions.push(`c.level = $${i++}`); values.push(level); }
+
+    // Department isolation: a scoped ADMIN only manages courses whose category
+    // belongs to their department.
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (adminView && scoped) {
+        conditions.push(`cat.department_id = $${i++}`);
+        values.push(departmentId);
+    }
     if (search) {
         conditions.push(`(c.title ILIKE $${i} OR u.name ILIKE $${i})`);
         values.push(`%${search}%`); i++;
@@ -279,6 +305,7 @@ const update = async (req, res) => {
 
 // PUT /api/courses/:id/approve
 const approve = async (req, res) => {
+    await assertCourseInScope(req, req.params.id);
     const result = await query(
         `UPDATE courses SET status = 'PUBLISHED', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
         [req.params.id]
@@ -298,6 +325,7 @@ const approve = async (req, res) => {
 
 // PUT /api/courses/:id/reject
 const reject = async (req, res) => {
+    await assertCourseInScope(req, req.params.id);
     const result = await query(
         `UPDATE courses SET status = 'REJECTED', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
         [req.params.id]

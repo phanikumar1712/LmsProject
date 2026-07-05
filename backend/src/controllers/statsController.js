@@ -1,5 +1,6 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
+const { getDepartmentScope } = require('../utils/scope');
 
 // GET /api/stats/platform
 const getPlatform = async (req, res) => {
@@ -137,13 +138,18 @@ const getInstructor = async (req, res) => {
 
 // GET /api/stats/audit-logs
 const getAuditLogs = async (req, res) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    // A scoped ADMIN only sees audit entries produced by users in their department.
+    const where = scoped ? 'WHERE u.department_id = $1' : '';
+    const values = scoped ? [departmentId] : [];
     const result = await query(`
         SELECT al.*, u.name as user_name, u.email as user_email, u.role as user_role
         FROM audit_logs al
         LEFT JOIN users u ON al.user_id = u.id
+        ${where}
         ORDER BY al.created_at DESC
         LIMIT 200
-    `);
+    `, values);
     const formatted = result.rows.map(log => ({
         id: log.id,
         userName: log.user_name || 'System',
@@ -158,29 +164,49 @@ const getAuditLogs = async (req, res) => {
 
 // GET /api/stats/categories
 const getCategories = async (req, res) => {
+    // Public endpoint (no auth) → getDepartmentScope returns unscoped for anonymous
+    // callers, so browsing is unaffected; a scoped ADMIN sees only their categories.
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const where = scoped ? 'WHERE cat.department_id = $1' : '';
+    const values = scoped ? [departmentId] : [];
     const result = await query(`
         SELECT cat.*, COUNT(c.id) as course_count
         FROM categories cat
         LEFT JOIN courses c ON c.category_id = cat.id AND c.status = 'PUBLISHED'
+        ${where}
         GROUP BY cat.id
         ORDER BY cat.name ASC
-    `);
+    `, values);
     const { mapCategory } = require('../utils/formatters');
     res.json(result.rows.map(mapCategory));
+};
+
+// A scoped ADMIN may only touch categories in their own department.
+const assertCategoryInScope = async (req, categoryId) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (!scoped) return;
+    const r = await query('SELECT department_id FROM categories WHERE id = $1', [categoryId]);
+    if (!r.rows.length) throw createError('Category not found', 404);
+    if (r.rows[0].department_id !== departmentId) {
+        throw createError('This category is outside your department', 403);
+    }
 };
 
 const createCategory = async (req, res) => {
     const { name, icon } = req.body;
     if (!name) throw createError('Category name is required', 400);
+    // New categories created by a scoped ADMIN are stamped with their department.
+    const { scoped, departmentId } = getDepartmentScope(req);
     const result = await query(
-        `INSERT INTO categories (name, icon) VALUES ($1, $2) RETURNING *`,
-        [name, icon || '📚']
+        `INSERT INTO categories (name, icon, department_id) VALUES ($1, $2, $3) RETURNING *`,
+        [name, icon || '📚', scoped ? departmentId : (req.body.departmentId || null)]
     );
     const { mapCategory } = require('../utils/formatters');
     res.status(201).json(mapCategory(result.rows[0]));
 };
 
 const updateCategory = async (req, res) => {
+    await assertCategoryInScope(req, req.params.id);
     const { name, icon } = req.body;
     const result = await query(
         `UPDATE categories SET name = $1, icon = $2 WHERE id = $3 RETURNING *`,
@@ -192,6 +218,7 @@ const updateCategory = async (req, res) => {
 };
 
 const deleteCategory = async (req, res) => {
+    await assertCategoryInScope(req, req.params.id);
     const result = await query('DELETE FROM categories WHERE id = $1 RETURNING id', [req.params.id]);
     if (!result.rows.length) throw createError('Category not found', 404);
     res.json({ success: true });

@@ -19,6 +19,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const notificationsRoutes = require('./routes/notifications');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const uploadRoutes = require('./routes/upload');
+const departmentsRoutes = require('./routes/departments');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -69,6 +70,7 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/departments', departmentsRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

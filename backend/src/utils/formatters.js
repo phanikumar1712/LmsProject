@@ -31,9 +31,16 @@ const mapUser = (u) => {
         subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
         currentStreak: parseInt(u.current_streak ?? u.currentStreak ?? 0),
         longestStreak: parseInt(u.longest_streak ?? u.longestStreak ?? 0),
+        departmentId: u.department_id ?? u.departmentId ?? null,
+        departmentName: u.department_name ?? u.departmentName ?? null,
         createdAt: u.created_at || u.createdAt,
     };
 };
+
+const mapDepartment = (d) => ({
+    ...d,
+    createdAt: d.created_at || d.createdAt,
+});
 
 const mapCourse = (c) => ({
     ...c,
@@ -125,6 +132,7 @@ module.exports = {
     mapUser,
     mapCourse,
     mapCategory,
+    mapDepartment,
     mapInstructorRequest,
     mapEnrollment,
     mapNotification,
