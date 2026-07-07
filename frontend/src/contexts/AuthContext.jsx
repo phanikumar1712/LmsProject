@@ -65,8 +65,8 @@ export function AuthProvider({ children }) {
         return safeUser;
     };
 
-    const register = async (name, email, password, role) => {
-        const { user, token } = await authAPI.register(name, email, password, role);
+    const register = async (name, email, password, role, departmentId = null) => {
+        const { user, token } = await authAPI.register(name, email, password, role, departmentId);
         const safeUser = mapUser(user);
         localStorage.setItem('lms_token', token);
         dispatch({ type: 'SET_USER', payload: { user: safeUser, token } });

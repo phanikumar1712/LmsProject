@@ -1,20 +1,36 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Download, PieChart as PieIcon, Layers } from 'lucide-react';
-import { statsAPI } from '../../../services/api';
+import { BarChart3, TrendingUp, Download, PieChart as PieIcon, Layers, Building2 } from 'lucide-react';
+import { statsAPI, departmentsAPI } from '../../../services/api';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { CHART_COLORS, CHART_AXIS_STYLE, CHART_MARGIN } from '../../../lib/constants';
 import { ChartTooltip } from '../../../components/ui/ChartComponents';
+import { FilterSelect } from '../../../components/ui/SearchInput';
+import { useAuth } from '../../../contexts/AuthContext';
+
+const PERIOD_DAYS = { '30': 30, '90': 90, '365': 365 };
 
 export default function AdminReports() {
+    const { isSuperAdmin } = useAuth();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [period, setPeriod] = useState('');
+    const [departmentId, setDepartmentId] = useState('');
+    const [departments, setDepartments] = useState([]);
 
     useEffect(() => {
-        statsAPI.getPlatform().then(setStats).finally(() => setLoading(false));
-    }, []);
+        if (isSuperAdmin()) departmentsAPI.list().then(setDepartments).catch(() => { });
+    }, [isSuperAdmin]);
+
+    useEffect(() => {
+        setLoading(true);
+        const filters = {};
+        if (period && PERIOD_DAYS[period]) filters.from = new Date(Date.now() - PERIOD_DAYS[period] * 864e5).toISOString();
+        if (departmentId) filters.departmentId = departmentId;
+        statsAPI.getPlatform(filters).then(setStats).finally(() => setLoading(false));
+    }, [period, departmentId]);
 
     if (loading) return <div className="p-10 text-center animate-pulse text-muted-foreground/60 font-bold">Generating Reports...</div>;
 
@@ -58,12 +74,26 @@ export default function AdminReports() {
                     <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Platform Analytics</h1>
                     <p className="text-muted-foreground font-medium mt-1">Deep dive into course performance and revenue metrics</p>
                 </div>
-                <button
-                    onClick={exportData}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm shadow-indigo-200 transition-all active:scale-95"
-                >
-                    <Download size={18} /> Export Data
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <FilterSelect value={period} onChange={setPeriod}>
+                        <option value="">All time</option>
+                        <option value="30">Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="365">Last year</option>
+                    </FilterSelect>
+                    {isSuperAdmin() && (
+                        <FilterSelect value={departmentId} onChange={setDepartmentId} icon={Building2}>
+                            <option value="">All departments</option>
+                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </FilterSelect>
+                    )}
+                    <button
+                        onClick={exportData}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm shadow-indigo-200 transition-all active:scale-95"
+                    >
+                        <Download size={18} /> Export Data
+                    </button>
+                </div>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">

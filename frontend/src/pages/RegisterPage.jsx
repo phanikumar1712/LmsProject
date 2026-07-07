@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { departmentsAPI } from '../services/api';
 
 
 export default function RegisterPage() {
     const { register } = useAuth();
     const navigate = useNavigate();
-    const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'STUDENT' });
+    const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'STUDENT', departmentId: '' });
+    const [departments, setDepartments] = useState([]);
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        departmentsAPI.publicList().then(setDepartments).catch(() => setDepartments([]));
+    }, []);
 
     const ROLE_HOMES = { STUDENT: '/student', INSTRUCTOR: '/instructor' };
 
@@ -42,7 +48,7 @@ export default function RegisterPage() {
         if (err) { setError(err); return; }
         setLoading(true); setError('');
         try {
-            const user = await register(form.name, form.email, form.password, form.role);
+            const user = await register(form.name, form.email, form.password, form.role, form.departmentId || null);
             navigate(ROLE_HOMES[user.role] || '/', { replace: true });
         } catch (err) {
             setError(err.message);
@@ -92,6 +98,20 @@ export default function RegisterPage() {
                                 <input id="reg-email" type="email" placeholder="you@example.com"
                                     value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                                     className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground" autoComplete="email" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm text-foreground font-medium block mb-1.5">Department / Branch</label>
+                            <div className="relative">
+                                <Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <select id="reg-department" value={form.departmentId}
+                                    onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))}
+                                    className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors text-foreground appearance-none">
+                                    <option value="">Select your department (optional)</option>
+                                    {departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                         <div>

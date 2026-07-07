@@ -34,8 +34,8 @@ export const authAPI = {
         return http('POST', '/auth/login', { email, password });
     },
 
-    register: async (name, email, password, role = 'STUDENT') => {
-        return http('POST', '/auth/register', { name, email, password, role });
+    register: async (name, email, password, role = 'STUDENT', departmentId = null) => {
+        return http('POST', '/auth/register', { name, email, password, role, departmentId });
     },
 
     verifyToken: async (token) => {
@@ -199,9 +199,34 @@ export const ratingsAPI = {
 
 // ─── USERS (Admin) ────────────────────────────────────────────────────────────
 export const usersAPI = {
-    getAll: async () => {
-        const res = await http('GET', '/users', null, getToken());
+    getAll: async (filters = {}) => {
+        const params = new URLSearchParams();
+        if (filters.role) params.set('role', filters.role);
+        if (filters.status) params.set('status', filters.status);
+        if (filters.search) params.set('search', filters.search);
+        if (filters.from) params.set('from', filters.from);
+        if (filters.to) params.set('to', filters.to);
+        if (filters.departmentId) params.set('departmentId', filters.departmentId);
+        if (filters.limit) params.set('limit', filters.limit);
+        const qs = params.toString();
+        const res = await http('GET', `/users${qs ? `?${qs}` : ''}`, null, getToken());
         return res.data || res; // handle both wrapped and plain
+    },
+
+    createInstructor: async (data) =>
+        http('POST', '/users/instructors', data, getToken()),
+
+    importInstructors: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`${BASE_URL}/users/instructors/import`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` },
+            body: formData,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        return data;
     },
 
     updateRole: async (userId, role) =>
@@ -240,6 +265,9 @@ export const usersAPI = {
 
 // ─── DEPARTMENTS ──────────────────────────────────────────────────────────────
 export const departmentsAPI = {
+    publicList: async () =>
+        http('GET', '/departments/public'),
+
     list: async () =>
         http('GET', '/departments', null, getToken()),
 
@@ -296,8 +324,14 @@ export const statsAPI = {
     getPublic: async () =>
         http('GET', '/stats/public'),
 
-    getPlatform: async () =>
-        http('GET', '/stats/platform', null, getToken()),
+    getPlatform: async (filters = {}) => {
+        const params = new URLSearchParams();
+        if (filters.from) params.set('from', filters.from);
+        if (filters.to) params.set('to', filters.to);
+        if (filters.departmentId) params.set('departmentId', filters.departmentId);
+        const qs = params.toString();
+        return http('GET', `/stats/platform${qs ? `?${qs}` : ''}`, null, getToken());
+    },
 
     getInstructor: async (instructorId) =>
         http('GET', `/stats/instructor/${instructorId}`, null, getToken()),

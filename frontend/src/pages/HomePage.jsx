@@ -1,13 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+import CountUp from 'react-countup';
+import Marquee from 'react-fast-marquee';
+import Tilt from 'react-parallax-tilt';
+import { Typewriter } from 'react-simple-typewriter';
 import {
     ArrowRight, GraduationCap, Zap, Shield, TrendingUp,
     Play, Users, BookOpen, Award, Clock, ChevronRight, Menu, X,
-    Sparkles, Compass, RefreshCw
+    Sparkles, Compass, RefreshCw, Quote, Star
 } from 'lucide-react';
 import { coursesAPI, statsAPI } from '../services/api';
+import { testimonials, partnerBrands } from '../data/testimonials';
 import studentImg from '../assets/student.jpg';
+
+// ─── Animated stat: counts up on scroll, preserves prefix/suffix ──────────────
+function CountStat({ value, suffix = '', prefix = '', decimals = 0, reduced }) {
+    if (reduced) return <>{prefix}{value.toLocaleString()}{suffix}</>;
+    return (
+        <CountUp
+            end={value} decimals={decimals} duration={2} separator=","
+            prefix={prefix} suffix={suffix}
+            enableScrollSpy scrollSpyOnce scrollSpyDelay={100}
+        />
+    );
+}
 
 // ─── Dynamic Star Rating ──────────────────────────────────────────────────────
 function StarRating({ rating = 0, size = 16 }) {
@@ -56,6 +73,18 @@ export default function HomePage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
+    const [categories, setCategories] = useState([]);
+    const [activeTestimonial, setActiveTestimonial] = useState(0);
+
+    // Respect the user's reduced-motion preference: disables count-ups, tilt,
+    // the typewriter loop, and marquee autoplay for a calm, static experience.
+    const reduced = useReducedMotion();
+
+    // Hero parallax — the image + glow drift gently as the page scrolls.
+    const heroRef = useRef(null);
+    const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
+    const heroImgY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 90]);
+    const heroGlowY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 140]);
 
     useEffect(() => {
         // Fetch live courses from backend
@@ -73,7 +102,21 @@ export default function HomePage() {
         statsAPI.getPublic()
             .then(setStats)
             .catch(() => { });
+
+        // Fetch categories for the marquee strip
+        statsAPI.getCategories()
+            .then(data => setCategories(Array.isArray(data) ? data : []))
+            .catch(() => { });
     }, []);
+
+    // Auto-rotate testimonials (paused when reduced motion is requested).
+    useEffect(() => {
+        if (reduced || testimonials.length <= 1) return;
+        const id = setInterval(() => {
+            setActiveTestimonial(t => (t + 1) % testimonials.length);
+        }, 5500);
+        return () => clearInterval(id);
+    }, [reduced]);
 
     const fadeUp = {
         hidden: { opacity: 0, y: 32 },
@@ -620,6 +663,94 @@ export default function HomePage() {
                     text-align: center; color: var(--color-muted-foreground); font-size: 0.9rem; font-weight: 600;
                 }
 
+                /* ── Partner logo strip ────────────────────────── */
+                .hp-partners {
+                    background: var(--color-background, white);
+                    border-bottom: 1px solid var(--color-border, #e2e8f0);
+                    padding: 2.75rem 0;
+                }
+                .hp-partners__label {
+                    text-align: center; font-size: 0.8rem; font-weight: 800;
+                    letter-spacing: 0.12em; text-transform: uppercase;
+                    color: var(--color-muted-foreground, #94a3b8); margin-bottom: 1.75rem;
+                }
+                .hp-partner {
+                    display: inline-flex; align-items: center; gap: 10px;
+                    margin: 0 2.75rem; font-size: 1.35rem; font-weight: 900;
+                    letter-spacing: -0.02em; color: var(--color-muted-foreground, #94a3b8);
+                    opacity: 0.65; transition: opacity 0.2s, color 0.2s;
+                    white-space: nowrap;
+                }
+                .hp-partner:hover { opacity: 1; color: #4f46e5; }
+                .hp-partner__dot {
+                    width: 26px; height: 26px; border-radius: 8px;
+                    background: linear-gradient(135deg, #6366f1, #0ea5e9);
+                    display: inline-flex;
+                }
+
+                /* ── Category marquee ──────────────────────────── */
+                .hp-catmarquee { background: var(--color-muted, #f8fafc); padding: 3.5rem 0; overflow: hidden; }
+                .hp-catmarquee__head { text-align: center; margin-bottom: 2.25rem; padding: 0 2rem; }
+                .hp-cat-chip {
+                    display: inline-flex; align-items: center; gap: 10px;
+                    margin: 0 0.6rem; padding: 0.85rem 1.5rem;
+                    background: var(--color-card, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
+                    border-radius: 100px; text-decoration: none;
+                    font-size: 0.95rem; font-weight: 800; color: var(--color-foreground);
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+                    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+                    white-space: nowrap;
+                }
+                .hp-cat-chip:hover {
+                    transform: translateY(-3px); border-color: #4f46e5;
+                    box-shadow: 0 10px 20px -6px rgba(79, 70, 229, 0.25);
+                }
+                .hp-cat-chip__icon { font-size: 1.15rem; }
+
+                /* ── Testimonials ──────────────────────────────── */
+                .hp-testimonials { background: var(--color-background, white); }
+                .hp-testimonial-stage {
+                    max-width: 780px; margin: 0 auto; position: relative;
+                    min-height: 300px; display: flex; align-items: center; justify-content: center;
+                }
+                .hp-testimonial-card {
+                    background: var(--color-card, white);
+                    border: 1px solid var(--color-border, #e2e8f0);
+                    border-radius: 28px; padding: 3rem 3rem 2.5rem;
+                    text-align: center; width: 100%;
+                    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.12);
+                    position: relative;
+                }
+                .hp-testimonial-card__quote-icon {
+                    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+                    width: 48px; height: 48px; border-radius: 14px;
+                    background: #4f46e5; color: white;
+                    display: flex; align-items: center; justify-content: center;
+                    box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.5);
+                }
+                .hp-testimonial-card__stars { display: inline-flex; gap: 3px; color: #f59e0b; margin-bottom: 1.25rem; }
+                .hp-testimonial-card__text {
+                    font-size: 1.3rem; font-weight: 600; line-height: 1.55;
+                    color: var(--color-foreground); margin-bottom: 2rem; letter-spacing: -0.01em;
+                }
+                .hp-testimonial-card__person { display: inline-flex; align-items: center; gap: 12px; }
+                .hp-testimonial-card__avatar {
+                    width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+                    border: 2px solid var(--color-border, #e2e8f0);
+                }
+                .hp-testimonial-card__name { font-weight: 800; color: var(--color-foreground); font-size: 0.95rem; text-align: left; }
+                .hp-testimonial-card__role { font-size: 0.85rem; color: var(--color-muted-foreground); font-weight: 600; text-align: left; }
+                .hp-testimonial-dots { display: flex; gap: 8px; justify-content: center; margin-top: 2rem; }
+                .hp-testimonial-dot {
+                    width: 9px; height: 9px; border-radius: 50%; border: none; cursor: pointer;
+                    background: var(--color-border, #cbd5e1); transition: all 0.25s; padding: 0;
+                }
+                .hp-testimonial-dot--active { background: #4f46e5; width: 28px; border-radius: 100px; }
+
+                /* Tilt wrapper shouldn't clip card shadows */
+                .hp-tilt { height: 100%; border-radius: 20px; }
+
                 /* ── Responsive ────────────────────────────────── */
                 @media (max-width: 1024px) {
                     .hp-hero__inner { grid-template-columns: 1fr; text-align: center; gap: 4rem; }
@@ -632,12 +763,17 @@ export default function HomePage() {
                     .hp-nav__links { display: none; }
                     .hp-statsbar__inner { grid-template-columns: repeat(2, 1fr); }
                     .hp-footer__inner { grid-template-columns: 1fr; gap: 3rem; }
+                    .hp-testimonial-card { padding: 2.5rem 1.5rem 2rem; }
+                    .hp-testimonial-card__text { font-size: 1.1rem; }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .hp-hero__badge-dot { animation: none; }
                 }
             `}</style>
 
             <div className="hp-root">
                 {/* ── Hero ───────────────────────────────────────── */}
-                <section className="hp-hero">
+                <section className="hp-hero" ref={heroRef}>
                     <div className="hp-hero__bg" />
                     <div className="hp-hero__grid-lines" />
 
@@ -653,8 +789,20 @@ export default function HomePage() {
                                 {courses.length > 0 ? `NEW: ${courses[0].title}` : 'NEW: Generative AI Mastery Course'}
                             </div>
                             <h1 className="hp-hero__title">
-                                Master Skills with
-                                <span className="hp-hero__title-gradient">Expert Instructors</span>
+                                Master Skills in
+                                <span className="hp-hero__title-gradient">
+                                    {reduced ? 'Design & Code' : (
+                                        <Typewriter
+                                            words={['Design', 'Development', 'Data Science', 'Business', 'AI & ML']}
+                                            loop={0}
+                                            cursor
+                                            cursorStyle="|"
+                                            typeSpeed={90}
+                                            deleteSpeed={55}
+                                            delaySpeed={1800}
+                                        />
+                                    )}
+                                </span>
                             </h1>
                             <p className="hp-hero__subtitle">
                                 Access {stats?.totalCourses || 50}+ premium courses in design, development, and business.
@@ -673,19 +821,19 @@ export default function HomePage() {
                             <div className="hp-hero__stats">
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        {stats?.totalStudents ? `${(stats.totalStudents / 1000).toFixed(0)}K+` : '10K+'}
+                                        <CountStat value={stats?.totalStudents || 10000} suffix="+" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Students Enrolled</div>
                                 </div>
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        {stats?.totalCourses ? `${stats.totalCourses}+` : '50+'}
+                                        <CountStat value={stats?.totalCourses || 50} suffix="+" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Courses Available</div>
                                 </div>
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        {stats?.avgRating ? `${stats.avgRating}★` : '4.9★'}
+                                        <CountStat value={parseFloat(stats?.avgRating) || 4.9} decimals={1} suffix="★" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Avg. Rating</div>
                                 </div>
@@ -700,11 +848,12 @@ export default function HomePage() {
                             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
                         >
                             <div className="hp-hero__img-wrap">
-                                <div className="hp-hero__glow" />
-                                <img
+                                <motion.div className="hp-hero__glow" style={{ y: heroGlowY }} />
+                                <motion.img
                                     src={studentImg}
                                     alt="Student learning on EduNexus platform"
                                     className="hp-hero__img"
+                                    style={{ y: heroImgY }}
                                 />
                             </div>
                         </motion.div>
@@ -715,10 +864,10 @@ export default function HomePage() {
                 <div className="hp-statsbar">
                     <div className="hp-statsbar__inner">
                         {[
-                            { icon: <Users size={20} />, num: stats?.totalStudents ? `${stats.totalStudents}+` : '18+', label: 'Happy Learners' },
-                            { icon: <BookOpen size={20} />, num: stats?.totalCourses ? `${stats.totalCourses}+` : '1+', label: 'Courses Published' },
-                            { icon: <GraduationCap size={20} />, num: stats?.totalInstructors ? `${stats.totalInstructors}+` : '3+', label: 'Expert Instructors' },
-                            { icon: <Award size={20} />, num: stats?.satisfactionRate ? `${stats.satisfactionRate}%` : '60%', label: 'Satisfaction Rate' },
+                            { value: stats?.totalStudents || 18, suffix: '+', label: 'Happy Learners' },
+                            { value: stats?.totalCourses || 1, suffix: '+', label: 'Courses Published' },
+                            { value: stats?.totalInstructors || 3, suffix: '+', label: 'Expert Instructors' },
+                            { value: stats?.satisfactionRate || 60, suffix: '%', label: 'Satisfaction Rate' },
                         ].map((s, i) => (
                             <motion.div
                                 key={i}
@@ -727,12 +876,27 @@ export default function HomePage() {
                                 viewport={{ once: true }}
                                 transition={{ delay: i * 0.1 }}
                             >
-                                <div className="hp-statsbar__num">{s.num}</div>
+                                <div className="hp-statsbar__num">
+                                    <CountStat value={s.value} suffix={s.suffix} reduced={reduced} />
+                                </div>
                                 <div className="hp-statsbar__label">{s.label}</div>
                             </motion.div>
                         ))}
                     </div>
                 </div>
+
+                {/* ── Partner / trusted-by logo strip ────────────── */}
+                <section className="hp-partners">
+                    <div className="hp-partners__label">Trusted by teams and learners at</div>
+                    <Marquee gradient={false} speed={40} pauseOnHover play={!reduced} autoFill>
+                        {partnerBrands.map((brand, i) => (
+                            <span className="hp-partner" key={i}>
+                                <span className="hp-partner__dot" />
+                                {brand}
+                            </span>
+                        ))}
+                    </Marquee>
+                </section>
 
                 {/* ── Features ───────────────────────────────────── */}
                 <section id="features" className="hp-section hp-features">

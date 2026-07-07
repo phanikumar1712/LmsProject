@@ -2,40 +2,66 @@ const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { getDepartmentScope } = require('../utils/scope');
 
-// GET /api/stats/platform
+// GET /api/stats/platform?from=&to=&departmentId=
 const getPlatform = async (req, res) => {
+    // Department scope: a scoped ADMIN is locked to its department; SUPER_ADMIN may
+    // optionally pass departmentId. deptId NULL => whole platform. from/to bound the
+    // enrolment-based windows. Each query takes ($1 deptId, $2 from, $3 to).
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const deptId = scoped ? departmentId : (req.query.departmentId || null);
+    const from = req.query.from || null;
+    const to = req.query.to || null;
+    const p = [deptId, from, to];
+
+    // Reusable fragments. Courses/enrolments are tied to a department via the
+    // course's category.department_id.
+    const timeWin = `AND ($2::timestamptz IS NULL OR e.enrolled_at >= $2) AND ($3::timestamptz IS NULL OR e.enrolled_at <= $3)`;
+
     const [users, courses, enrollments, revenue, premiumSubs, avgRatingQuery] = await Promise.all([
-        query('SELECT COUNT(*) FROM users'),
+        query(`SELECT COUNT(*) FROM users WHERE ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
         query(`SELECT COUNT(*) as total,
-                      COUNT(*) FILTER (WHERE status='PUBLISHED') as published,
-                      COUNT(*) FILTER (WHERE status='PENDING') as pending
-               FROM courses WHERE status NOT IN ('REJECTED', 'ARCHIVED')`),
-        query('SELECT COUNT(*) FROM enrollments'),
-        query(`SELECT COALESCE(SUM(c.discount_price), SUM(c.price), 0) as total 
-               FROM enrollments e 
-               JOIN courses c ON e.course_id = c.id`),
-        query(`SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE'`),
-        query(`SELECT ROUND(AVG(stars)::numeric, 1) as avg_rating FROM ratings`),
+                      COUNT(*) FILTER (WHERE c.status='PUBLISHED') as published,
+                      COUNT(*) FILTER (WHERE c.status='PENDING') as pending
+               FROM courses c LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE c.status NOT IN ('REJECTED', 'ARCHIVED')
+                 AND ($1::uuid IS NULL OR cat.department_id = $1)`, [deptId]),
+        query(`SELECT COUNT(*) FROM enrollments e
+               JOIN courses c ON e.course_id = c.id
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
+        query(`SELECT COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) as total
+               FROM enrollments e
+               JOIN courses c ON e.course_id = c.id
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
+        query(`SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE' AND ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
+        query(`SELECT ROUND(AVG(r.stars)::numeric, 1) as avg_rating FROM ratings r
+               JOIN courses c ON r.course_id = c.id
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE ($1::uuid IS NULL OR cat.department_id = $1)`, [deptId]),
     ]);
 
     const usersCount = parseInt(users.rows[0].count);
 
     const [usersByRoleQuery, monthlyStatsQuery, topCatQuery] = await Promise.all([
-        query(`SELECT role, COUNT(*) as count FROM users GROUP BY role`),
+        query(`SELECT role, COUNT(*) as count FROM users WHERE ($1::uuid IS NULL OR department_id = $1) GROUP BY role`, [deptId]),
         query(`
-            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, COALESCE(SUM(c.discount_price), SUM(c.price), 0) as revenue
+            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) as revenue
             FROM enrollments e JOIN courses c ON e.course_id = c.id
+            LEFT JOIN categories cat ON c.category_id = cat.id
             WHERE e.enrolled_at >= NOW() - INTERVAL '6 months'
+              AND ($1::uuid IS NULL OR cat.department_id = $1)
             GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
             ORDER BY DATE_TRUNC('month', e.enrolled_at) ASC
-        `),
+        `, [deptId]),
         query(`
             SELECT cat.name, COUNT(e.id) as enrollments
             FROM categories cat
             JOIN courses c ON c.category_id = cat.id
             JOIN enrollments e ON e.course_id = c.id
+            WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}
             GROUP BY cat.name ORDER BY enrollments DESC LIMIT 5
-        `),
+        `, p),
     ]);
     const usersByRole = usersByRoleQuery.rows.map(r => ({ role: r.role, count: parseInt(r.count) }));
     const monthlyRevenue = monthlyStatsQuery.rows.map(r => ({ month: r.month, revenue: parseFloat(r.revenue) }));
@@ -96,7 +122,7 @@ const getInstructor = async (req, res) => {
     ]);
 
     const monthlyEarningsQuery = query(`
-        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COALESCE(SUM(c.discount_price), SUM(c.price), 0) * 0.8 as revenue
+        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) * 0.8 as revenue
         FROM enrollments e JOIN courses c ON e.course_id = c.id
         WHERE c.instructor_id = $1 AND e.enrolled_at >= NOW() - INTERVAL '6 months'
         GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
@@ -106,7 +132,7 @@ const getInstructor = async (req, res) => {
     const thisMonthQuery = query(`
         SELECT 
             COUNT(e.id) as enrollments,
-            COALESCE(SUM(c.discount_price), SUM(c.price), 0) * 0.8 as earnings
+            COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) * 0.8 as earnings
         FROM enrollments e 
         JOIN courses c ON e.course_id = c.id 
         WHERE c.instructor_id = $1 AND e.enrolled_at >= DATE_TRUNC('month', NOW())
