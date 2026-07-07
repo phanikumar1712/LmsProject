@@ -1,7 +1,11 @@
 const router = require('express').Router();
+const multer = require('multer');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const ctrl = require('../controllers/usersController');
+
+// In-memory upload for CSV/XLSX instructor import (parsed, never written to disk).
+const uploadSheet = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Public instructor profile (with optional auth for follower status)
 router.get('/instructor/:id', optionalAuth, asyncHandler(ctrl.getInstructorProfile));
@@ -9,6 +13,8 @@ router.post('/instructor/:id/follow', authenticate, asyncHandler(ctrl.followInst
 router.post('/instructor/:id/unfollow', authenticate, asyncHandler(ctrl.unfollowInstructor));
 
 router.post('/invite-admin', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.inviteAdmin));
+router.post('/instructors', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.createInstructor));
+router.post('/instructors/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), uploadSheet.single('file'), asyncHandler(ctrl.importInstructors));
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));
 router.put('/:id/toggle-status', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.toggleStatus));

@@ -20,6 +20,12 @@ const list = async (req, res) => {
     res.json(result.rows.map(mapDepartment));
 };
 
+// GET /api/departments/public — no auth; minimal list for the signup branch picker.
+const publicList = async (req, res) => {
+    const result = await query('SELECT id, name, icon FROM departments ORDER BY name ASC');
+    res.json(result.rows);
+};
+
 // POST /api/departments — SUPER_ADMIN only
 const create = async (req, res) => {
     const { name, icon } = req.body;
@@ -52,4 +58,4 @@ const remove = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { list, create, update, remove };
+module.exports = { list, publicList, create, update, remove };

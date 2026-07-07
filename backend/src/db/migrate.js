@@ -36,6 +36,7 @@ const createTables = async () => {
                 email       VARCHAR(255) UNIQUE NOT NULL,
                 password    VARCHAR(255) NOT NULL,
                 role        user_role NOT NULL DEFAULT 'STUDENT',
+                phone       VARCHAR(30) DEFAULT '',
                 avatar      TEXT DEFAULT '',
                 bio         TEXT DEFAULT '',
                 active      BOOLEAN NOT NULL DEFAULT true,
@@ -380,12 +381,13 @@ const createTables = async () => {
 
         // -- ENSURE USERS TABLE HAS ALL RECENT FIELDS --
         await client.query(`
-            ALTER TABLE users 
+            ALTER TABLE users
             ADD COLUMN IF NOT EXISTS current_streak INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS longest_streak INTEGER DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS last_activity_date DATE,
                     ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(6),
-                        ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
+                        ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP,
+                        ADD COLUMN IF NOT EXISTS phone VARCHAR(30) DEFAULT '';
         `);
 
         // -- DEPARTMENT ISOLATION: scope admins/categories to a department --

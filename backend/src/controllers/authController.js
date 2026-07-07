@@ -13,11 +13,11 @@ const getWishlistIds = async (userId) => {
     return res.rows.map(r => r.course_id);
 };
 
-const userFields = `id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, created_at`;
+const userFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, department_id, created_at`;
 
 // POST /api/auth/register
 const register = async (req, res) => {
-    const { name, email, password, role = 'STUDENT' } = req.body;
+    const { name, email, password, role = 'STUDENT', departmentId } = req.body;
     if (!name || !email || !password) throw createError('Name, email and password are required', 400);
 
     const allowedRoles = ['STUDENT', 'INSTRUCTOR'];
@@ -26,11 +26,19 @@ const register = async (req, res) => {
     const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
     if (existing.rows.length) throw createError('Email already registered', 409);
 
+    // Optional department/branch chosen at signup; validate it exists.
+    let deptId = null;
+    if (departmentId) {
+        const dept = await query('SELECT id FROM departments WHERE id = $1', [departmentId]);
+        if (!dept.rows.length) throw createError('Invalid department', 400);
+        deptId = departmentId;
+    }
+
     const hashed = await bcrypt.hash(password, 12);
 
     const result = await query(
-        `INSERT INTO users (name, email, password, role) VALUES ($1,$2,$3,$4) RETURNING ${userFields}`,
-        [name, email.toLowerCase(), hashed, userRole]
+        `INSERT INTO users (name, email, password, role, department_id) VALUES ($1,$2,$3,$4,$5) RETURNING ${userFields}`,
+        [name, email.toLowerCase(), hashed, userRole, deptId]
     );
     const user = result.rows[0];
     user.wishlist = await getWishlistIds(user.id);
