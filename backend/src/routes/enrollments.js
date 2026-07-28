@@ -7,5 +7,6 @@ router.get('/student/:studentId', authenticate, asyncHandler(ctrl.getByStudent))
 router.post('/', authenticate, authorize('STUDENT'), asyncHandler(ctrl.enroll));
 router.put('/progress', authenticate, authorize('STUDENT'), asyncHandler(ctrl.updateProgress));
 router.get('/stats/:instructorId', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getStats));
+router.post('/bulk', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.bulkEnroll));
 
 module.exports = router;

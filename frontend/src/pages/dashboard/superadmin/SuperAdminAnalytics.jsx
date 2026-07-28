@@ -1,4 +1,4 @@
-import { TrendingUp, Users, BookOpen, DollarSign, Star } from 'lucide-react';
+import { TrendingUp, Users, BookOpen, DollarSign, Star, CheckCircle, AlertTriangle, Layers, Building2 } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -13,6 +13,8 @@ import { CHART_COLORS, CHART_MARGIN, CHART_AXIS_STYLE } from '../../../lib/const
 
 export default function SuperAdminAnalytics() {
     const { data: stats, loading } = useAsyncData(() => statsAPI.getPlatform(), []);
+    const { data: adminOverview } = useAsyncData(() => statsAPI.getAdminOverview(), []);
+    const admins = adminOverview?.data || [];
 
     const kpis = stats ? [
         { label: 'Total Revenue', value: stats.totalRevenue >= 100000 ? `₹${(stats.totalRevenue / 100000).toFixed(1)}L` : `₹${stats.totalRevenue?.toLocaleString()}`, icon: DollarSign, color: '#16a34a', bg: 'bg-emerald-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% this month` },
@@ -39,7 +41,7 @@ export default function SuperAdminAnalytics() {
             </StatCardGrid>
 
             {/* Revenue + Enrollment Charts */}
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
                 <ChartCard title="Monthly Revenue">
                     {stats?.monthlyRevenue?.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -86,8 +88,8 @@ export default function SuperAdminAnalytics() {
             </div>
 
             {/* Users by Role + Categories */}
-            <div className="grid lg:grid-cols-2 gap-8">
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
+                <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
                     <h3 className="text-foreground font-bold text-lg mb-6">Users by Role</h3>
                     {stats?.usersByRole?.length > 0 ? (
                         <div className="flex items-center gap-8">
@@ -148,11 +150,76 @@ export default function SuperAdminAnalytics() {
                         </div>
                     ) : (
                         <div className="h-44 flex items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
-                            <BookOpen size={32} className="opacity-20 mb-2" />
+                            <Layers size={32} className="opacity-20 mb-2" />
                             <p className="text-sm font-medium">No category data</p>
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Per-Department overview */}
+            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h3 className="text-foreground font-bold text-lg mb-1 flex items-center gap-2">
+                    <Building2 size={20} className="text-indigo-600" /> Department Limits Overview
+                </h3>
+                <p className="text-muted-foreground text-sm font-medium mb-6">
+                    Students &amp; courses managed per department, against their limits.
+                    All admins in a department share the same quota.
+                    {adminOverview?.defaults ? ` Global defaults: ${adminOverview.defaults.maxStudents} students / ${adminOverview.defaults.maxCourses} courses.` : ''}
+                </p>
+                {admins.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[640px] text-sm">
+                            <thead>
+                                <tr className="text-left text-[11px] font-black uppercase tracking-widest text-muted-foreground border-b border-border">
+                                    <th className="py-3 pr-4">Department</th>
+                                    <th className="py-3 pr-4">Admins</th>
+                                    <th className="py-3 pr-4">Students</th>
+                                    <th className="py-3 pr-4">Courses</th>
+                                    <th className="py-3 pr-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {admins.map(d => (
+                                    <tr key={d.id} className="hover:bg-muted/30 transition-colors">
+                                        <td className="py-3 pr-4">
+                                            <p className="font-bold text-foreground">{d.departmentName}</p>
+                                        </td>
+                                        <td className="py-3 pr-4 text-foreground/80 font-medium">{d.adminCount || 0}</td>
+                                        <td className={`py-3 pr-4 font-bold ${d.studentsOver ? 'text-rose-600' : 'text-foreground/80'}`}>
+                                            {d.studentCount}/{d.maxStudents}
+                                            {d.maxStudentsOverride != null && (
+                                                <span className="ml-1.5 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-cyan-100 text-cyan-700">Custom</span>
+                                            )}
+                                        </td>
+                                        <td className={`py-3 pr-4 font-bold ${d.coursesOver ? 'text-rose-600' : 'text-foreground/80'}`}>
+                                            {d.courseCount}/{d.maxCourses}
+                                            {d.maxCoursesOverride != null && (
+                                                <span className="ml-1.5 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-cyan-100 text-cyan-700">Custom</span>
+                                            )}
+                                        </td>
+                                        <td className="py-3 pr-4">
+                                            {d.studentsOver || d.coursesOver ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-rose-100 text-rose-700">
+                                                    <AlertTriangle size={11} /> Over limit
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-emerald-100 text-emerald-700">
+                                                    <CheckCircle size={11} /> Within limit
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="h-32 flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
+                        <Building2 size={32} className="opacity-20 mb-2" />
+                        <p className="text-sm font-medium">No departments found</p>
+                    </div>
+                )}
             </div>
         </div>
     );

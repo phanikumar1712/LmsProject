@@ -38,4 +38,16 @@ const otpLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-module.exports = { apiLimiter, authLimiter, otpLimiter };
+// Import Rate Limiter (bulk CSV/XLSX uploads)
+const importLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: isDev ? 20 : 5, // 5 imports per 5 minutes in production
+    message: {
+        success: false,
+        message: 'Too many import requests. Please wait 5 minutes before trying again.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+module.exports = { apiLimiter, authLimiter, otpLimiter, importLimiter };

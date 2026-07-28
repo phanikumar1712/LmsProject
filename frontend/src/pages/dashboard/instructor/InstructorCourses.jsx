@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users, Star } from 'lucide-react';
+import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users } from 'lucide-react';
 import { coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SkeletonCard } from '../../../components/ui/CourseCard';
@@ -15,7 +15,9 @@ export default function InstructorCourses() {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
         fetchCourses();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user.id]);
 
     const fetchCourses = () => {
@@ -29,7 +31,7 @@ export default function InstructorCourses() {
                 await coursesAPI.delete(course.id);
                 toast.success('Course deleted successfully');
                 setCourses(prev => prev.filter(c => c.id !== course.id));
-            } catch (err) {
+            } catch {
                 toast.error('Failed to delete course');
             }
         }
@@ -46,7 +48,7 @@ export default function InstructorCourses() {
                     <h1 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">My Courses</h1>
                     <p className="text-muted-foreground font-medium">Manage, edit, and monitor your course portfolio</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     <Link to="/instructor/quiz-builder" className="bg-card border border-border text-indigo-600 px-5 py-2.5 rounded-xl text-[15px] font-bold flex items-center gap-2 whitespace-nowrap hover:bg-muted hover:border-border transition-colors shadow-sm">
                         <PlusCircle size={18} /> Build Quiz
                     </Link>

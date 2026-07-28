@@ -59,3 +59,29 @@ coverage/
 *.seed
 *.pid.lock
 login_output.json
+
+# ── OS generated files ─────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ── Backup files ───────────────────────────────────────────────
+*.bak
+*.swp
+*.swo
+*~
+
+# ── Secrets / Credentials ──────────────────────────────────────
+*.pem
+*.key
+*.cert
+*.crt
+
+# ── Logs (Deep) ────────────────────────────────────────────────
+*.log
+nginx-access.log
+nginx-error.log

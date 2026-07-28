@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ShieldCheck, Plus, Search, CheckCircle, Ban, Key, X, Mail, User, Users, Phone, Lock, Building2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, Plus, Search, CheckCircle, Key, X, Mail, User, Phone, Lock, Building2, AlertTriangle, Copy, LayoutDashboard, UserX, UserCheck, KeyRound, Crown, UserMinus } from 'lucide-react';
 import { usersAPI, departmentsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -7,11 +7,19 @@ import { useAsyncData } from '../../../hooks/useAsyncData';
 export default function ManageAdmins() {
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentId: '' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentIds: [] });
+    const [inviteCustomDept, setInviteCustomDept] = useState('');
+    const [creatingCustomDept, setCreatingCustomDept] = useState(false);
     const [inviting, setInviting] = useState(false);
 
     const { data: allUsers, loading, reload } = useAsyncData(() => usersAPI.getAll(), []);
-    const { data: departments } = useAsyncData(() => departmentsAPI.list(), []);
+    const { data: departments, reload: reloadDepts } = useAsyncData(() => departmentsAPI.list(), []);
+
+    // Multi-department state: which admin's depts are being edited
+    const [deptModal, setDeptModal] = useState(null); // admin object
+    const [selectedDeptIds, setSelectedDeptIds] = useState([]);
+    const [savingDepts, setSavingDepts] = useState(false);
+
     const deptName = (id) => (departments || []).find(d => d.id === id)?.name || null;
 
     const users = (allUsers || []).filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN');
@@ -23,6 +31,19 @@ export default function ManageAdmins() {
             reload();
         } catch {
             toast.error('Failed to update status');
+        }
+    };
+
+    const [resetResult, setResetResult] = useState(null); // { name, tempPassword }
+
+    const handleResetPassword = async (user) => {
+        if (!window.confirm(`Reset password for ${user.name}? A new temporary password will be generated.`)) return;
+        try {
+            const res = await usersAPI.resetPassword(user.id);
+            setResetResult({ name: user.name, tempPassword: res.tempPassword });
+            toast.success('Password reset');
+        } catch (err) {
+            toast.error(err.message || 'Failed to reset password');
         }
     };
 
@@ -56,15 +77,108 @@ export default function ManageAdmins() {
         }
         setInviting(true);
         try {
-            await usersAPI.inviteAdmin(inviteData);
+            const payload = { ...inviteData };
+            // If no departments selected, clear the array so backend treats it as global
+            if (payload.departmentIds.length === 0) {
+                delete payload.departmentId;
+                delete payload.departmentIds;
+            }
+            await usersAPI.inviteAdmin(payload);
             toast.success(`Admin account created for ${inviteData.email}`);
             setIsModalOpen(false);
-            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentId: '' });
+            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentIds: [] });
             reload();
         } catch (err) {
             toast.error(err.message || 'Failed to create admin');
         } finally {
             setInviting(false);
+        }
+    };
+
+    const [adminDepts, setAdminDepts] = useState({});
+
+    // Fetch multi-department assignments once users data loads
+    useEffect(() => {
+        if (!allUsers?.length || Object.keys(adminDepts).length > 0) return;
+        const fetchIt = async () => {
+            const result = {};
+            const admins = allUsers.filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').slice(0, 20);
+            await Promise.all(admins.map(async (u) => {
+                try {
+                    const depts = await usersAPI.getUserDepartments(u.id);
+                    if (Array.isArray(depts) && depts.length > 0) {
+                        result[u.id] = depts;
+                    }
+                } catch { /* ignore */ }
+            }));
+            setAdminDepts(result);
+        };
+        fetchIt();
+    }, [allUsers]);
+
+    const openDeptModal = async (user) => {
+        setDeptModal(user);
+        try {
+            const depts = await usersAPI.getUserDepartments(user.id);
+            const ids = (depts || []).map(d => d.id);
+            if (user.departmentId && !ids.includes(user.departmentId)) {
+                ids.unshift(user.departmentId);
+            }
+            setSelectedDeptIds(ids);
+        } catch {
+            setSelectedDeptIds(user.departmentId ? [user.departmentId] : []);
+        }
+    };
+
+    const handleSaveDepts = async (e) => {
+        e.preventDefault();
+        setSavingDepts(true);
+        try {
+            await usersAPI.setAdminDepartments(deptModal.id, selectedDeptIds);
+            toast.success('Departments updated');
+            setDeptModal(null);
+            reload();
+            setAdminDepts({});
+        } catch (err) {
+            toast.error(err.message || 'Failed to update departments');
+        } finally {
+            setSavingDepts(false);
+        }
+    };        const toggleDeptId = (deptId) => {
+        setSelectedDeptIds(prev =>
+            prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
+        );
+    };
+
+    const toggleInviteDeptId = (deptId) => {
+        setInviteData(prev => ({
+            ...prev,
+            departmentIds: prev.departmentIds.includes(deptId)
+                ? prev.departmentIds.filter(id => id !== deptId)
+                : [...prev.departmentIds, deptId]
+        }));
+    };
+
+    const handleAddCustomDept = async () => {
+        const name = inviteCustomDept.trim();
+        if (!name) { toast.error('Enter a department name'); return; }
+        setCreatingCustomDept(true);
+        try {
+            const dept = await departmentsAPI.create({ name, icon: '🏛️' });
+            toast.success(`Department "${name}" created`);
+            setInviteCustomDept('');
+            // Add the new department to the selected list and refresh
+            setInviteData(prev => ({
+                ...prev,
+                departmentIds: [...prev.departmentIds.filter(id => id !== ''), dept.id]
+            }));
+            // Refresh departments list
+            reloadDepts();
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Failed to create department');
+        } finally {
+            setCreatingCustomDept(false);
         }
     };
 
@@ -74,10 +188,9 @@ export default function ManageAdmins() {
     );
 
     return (
-        <div className="space-y-6 max-w-5xl">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 max-w-5xl">                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
                         <ShieldCheck size={28} className="text-rose-600" /> Manage Admins
                     </h1>
                     <p className="text-muted-foreground font-medium mt-1">Manage admin accounts and permissions</p>
@@ -169,22 +282,56 @@ export default function ManageAdmins() {
                                 </select>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Department</label>
-                                <div className="relative">
-                                    <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                                    <select
-                                        value={inviteData.departmentId}
-                                        onChange={e => setInviteData({ ...inviteData, departmentId: e.target.value })}
-                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium appearance-none"
-                                    >
-                                        <option value="">Global (all departments)</option>
-                                        {(departments || []).map(d => (
-                                            <option key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</option>
-                                        ))}
-                                    </select>
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Departments</label>
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1 border border-border rounded-2xl p-2 bg-muted/20">
+                                    {(departments || []).map(d => {
+                                        const isSelected = inviteData.departmentIds.includes(d.id);
+                                        return (
+                                            <label
+                                                key={d.id}
+                                                className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all ${
+                                                    isSelected ? 'bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200' : 'hover:bg-muted border border-transparent'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleInviteDeptId(d.id)}
+                                                    className="w-4 h-4 rounded accent-indigo-600"
+                                                />
+                                                <Building2 size={16} className={`text-muted-foreground shrink-0 ${isSelected ? 'text-indigo-600' : ''}`} strokeWidth={2.5} />
+                                                <span className="flex-1 text-sm font-bold text-foreground">{d.name}</span>
+                                                {isSelected && inviteData.departmentIds.indexOf(d.id) === 0 && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700">Primary</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                    {(!departments || departments.length === 0) && (
+                                        <p className="text-sm text-muted-foreground/60 text-center py-3 font-medium">No departments yet</p>
+                                    )}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">Standard admins are limited to their department. Leave global for full access.</p>
+                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">Select one or more departments. The first selected is the primary (for scoping).</p>
+                                {/* Quick-add custom department */}
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Create new department..."
+                                        value={inviteCustomDept}
+                                        onChange={e => setInviteCustomDept(e.target.value)}
+                                        className="flex-1 px-3 py-2 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-xs font-medium"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={creatingCustomDept || !inviteCustomDept.trim()}
+                                        onClick={handleAddCustomDept}
+                                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors whitespace-nowrap"
+                                    >
+                                        {creatingCustomDept ? '...' : '+ Create'}
+                                    </button>
+                                </div>
                             </div>
+
                             <div className="pt-4 flex gap-3">
                                 <button
                                     type="button"
@@ -206,15 +353,18 @@ export default function ManageAdmins() {
                 </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                    { label: 'Total Admins', value: users.filter(u => u.role === 'ADMIN').length, cls: 'text-amber-600 bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/20' },
-                    { label: 'Super Admins', value: users.filter(u => u.role === 'SUPER_ADMIN').length, cls: 'text-rose-600 bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20' },
-                    { label: 'Active', value: users.filter(u => u.active !== false).length, cls: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/20' },
-                ].map(({ label, value, cls }) => (
-                    <div key={label} className={`${cls} border rounded-2xl p-5 shadow-sm`}>
-                        <p className="text-3xl font-extrabold mb-1 tracking-tight">{value}</p>
-                        <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">{label}</p>
+                    { label: 'Total Admins', value: users.filter(u => u.role === 'ADMIN').length, icon: ShieldCheck, cls: 'text-amber-600 bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/20' },
+                    { label: 'Super Admins', value: users.filter(u => u.role === 'SUPER_ADMIN').length, icon: Key, cls: 'text-rose-600 bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/20' },
+                    { label: 'Active', value: users.filter(u => u.active !== false).length, icon: CheckCircle, cls: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/20' },
+                ].map(({ label, value, icon: Icon, cls }) => (
+                    <div key={label} className={`${cls} border rounded-2xl p-5 shadow-sm relative overflow-hidden`}>
+                        <div className="absolute top-3 right-3 opacity-20">
+                            <Icon size={40} className="text-current" strokeWidth={1.5} />
+                        </div>
+                        <p className="text-3xl font-extrabold mb-1 tracking-tight relative z-10">{value}</p>
+                        <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest relative z-10">{label}</p>
                     </div>
                 ))}
             </div>
@@ -257,9 +407,15 @@ export default function ManageAdmins() {
                                                 {user.active !== false ? 'Active' : 'Suspended'}
                                             </span>
                                             <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700 flex items-center gap-1">
-                                                <Building2 size={11} />
+                                                <Building2 size={12} strokeWidth={2.5} />
                                                 {deptName(user.departmentId) || 'Global'}
                                             </span>
+                                            {user.role === 'ADMIN' && adminDepts[user.id]?.length > 0 && (
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-purple-100 text-purple-700 flex items-center gap-1">
+                                                    <LayoutDashboard size={12} strokeWidth={2.5} />
+                                                    +{adminDepts[user.id].length} more
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="text-right hidden sm:block px-4 border-l border-border h-10 flex flex-col justify-center">
@@ -269,18 +425,28 @@ export default function ManageAdmins() {
                                     <div className="flex items-center gap-2 flex-shrink-0 pl-4 border-l border-border">
                                         <button onClick={() => handleToggleStatus(user.id)} title={user.active !== false ? 'Suspend Admin' : 'Activate Admin'}
                                             className={`p-2.5 rounded-xl transition-all ${user.active !== false ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`}>
-                                            {user.active !== false ? <Ban size={18} /> : <CheckCircle size={18} />}
+                                            {user.active !== false ? <UserX size={18} /> : <UserCheck size={18} />}
                                         </button>
+                                        <button onClick={() => handleResetPassword(user)} title="Reset password"
+                                            className="p-2.5 text-violet-600 hover:bg-violet-50 rounded-xl transition-all">
+                                            <KeyRound size={18} />
+                                        </button>
+                                        {user.role === 'ADMIN' && (
+                                            <button onClick={() => openDeptModal(user)} title="Assign departments"
+                                                className="p-2.5 text-purple-600 hover:bg-purple-50 rounded-xl transition-all">
+                                                <LayoutDashboard size={18} />
+                                            </button>
+                                        )}
                                         {user.role === 'ADMIN' && (
                                             <button onClick={() => handlePromote(user.id)} title="Promote to Super Admin"
                                                 className="p-2.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                                                <Key size={18} />
+                                                <Crown size={18} />
                                             </button>
                                         )}
                                         {user.role !== 'SUPER_ADMIN' && (
                                             <button onClick={() => handleDemote(user.id)} title="Demote to Instructor"
                                                 className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                                                <Users size={18} />
+                                                <UserMinus size={18} />
                                             </button>
                                         )}
                                     </div>
@@ -297,6 +463,104 @@ export default function ManageAdmins() {
                     </div>
                 )}
             </div>
+
+            {/* Reset Password Result Modal */}
+            {resetResult && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <KeyRound size={20} className="text-violet-600" /> Password Reset
+                            </h3>
+                            <button onClick={() => setResetResult(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-5">
+                            <p className="text-sm text-muted-foreground font-medium">
+                                A new temporary password was generated for <span className="font-bold text-foreground">{resetResult.name}</span>.
+                                Share it securely — it won't be shown again.
+                            </p>
+                            <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-2xl px-4 py-3">
+                                <code className="flex-1 font-mono text-sm font-bold text-foreground break-all">{resetResult.tempPassword}</code>
+                                <button
+                                    onClick={() => { navigator.clipboard?.writeText(resetResult.tempPassword); toast.success('Copied'); }}
+                                    className="p-2 text-violet-600 hover:bg-violet-50 rounded-xl transition-all flex-shrink-0" title="Copy">
+                                    <Copy size={16} />
+                                </button>
+                            </div>
+                            <button onClick={() => setResetResult(null)}
+                                className="w-full bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98]">
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Department Assignment Modal */}
+            {deptModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <LayoutDashboard size={20} className="text-purple-600" /> Assign Departments
+                            </h3>
+                            <button onClick={() => setDeptModal(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveDepts} className="p-8 space-y-4">
+                            <p className="text-sm text-muted-foreground font-medium">
+                                Manage department access for <span className="font-bold text-foreground">{deptModal.name}</span>.
+                                The first department is the <strong>primary</strong> (used for scoping).
+                            </p>
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                {(departments || []).map(d => {
+                                    const isSelected = selectedDeptIds.includes(d.id);
+                                    return (
+                                        <label
+                                            key={d.id}
+                                            className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
+                                                isSelected ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/10 dark:border-indigo-700' : 'border-border hover:border-indigo-200 hover:bg-muted/30'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleDeptId(d.id)}
+                                                className="w-4 h-4 rounded accent-indigo-600"
+                                            />
+                                            <Building2 size={18} className={`shrink-0 ${isSelected ? 'text-indigo-600' : 'text-muted-foreground'}`} strokeWidth={2.5} />
+                                            <span className="flex-1 text-sm font-bold text-foreground">{d.name}</span>
+                                            {isSelected && selectedDeptIds.indexOf(d.id) === 0 && (
+                                                <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700">Primary</span>
+                                            )}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            {selectedDeptIds.length === 0 && (
+                                <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                                    <AlertTriangle size={12} />
+                                    No departments selected. The admin will have no department scope.
+                                </p>
+                            )}
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setDeptModal(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={savingDepts}
+                                    className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98]">
+                                    {savingDepts ? 'Saving...' : 'Save Assignments'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

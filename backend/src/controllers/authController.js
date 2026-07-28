@@ -1,9 +1,16 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser } = require('../utils/formatters');
 const { sendOTPEmail } = require('../utils/mail');
+
+// Constant-time comparison to prevent timing attacks on OTP verification
+const timingSafeEqual = (a, b) => {
+    if (!a || !b || a.length !== b.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+};
 
 const generateToken = (userId, role) =>
     jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -13,11 +20,11 @@ const getWishlistIds = async (userId) => {
     return res.rows.map(r => r.course_id);
 };
 
-const userFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, department_id, created_at`;
+const userFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, department_id, roll_no, created_at`;
 
 // POST /api/auth/register
 const register = async (req, res) => {
-    const { name, email, password, role = 'STUDENT', departmentId } = req.body;
+    const { name, email, password, role = 'STUDENT', departmentId, rollNo } = req.body;
     if (!name || !email || !password) throw createError('Name, email and password are required', 400);
 
     const allowedRoles = ['STUDENT', 'INSTRUCTOR'];
@@ -34,11 +41,26 @@ const register = async (req, res) => {
         deptId = departmentId;
     }
 
+    // Roll number: required for STUDENT, must be unique per department.
+    const normRollNo = String(rollNo || '').trim() || null;
+    if (userRole === 'STUDENT' && !normRollNo) {
+        throw createError('Roll number is required for student registration', 400);
+    }
+    if (normRollNo) {
+        // Enforce uniqueness per department (the DB index enforces this at write,
+        // but we give a friendlier error upfront).
+        const dupRoll = await query(
+            `SELECT 1 FROM users WHERE roll_no = $1 AND (department_id = $2 OR (department_id IS NULL AND $2 IS NULL)) AND role = 'STUDENT'`,
+            [normRollNo, deptId]
+        );
+        if (dupRoll.rows.length) throw createError('This roll number is already registered in your department', 409);
+    }
+
     const hashed = await bcrypt.hash(password, 12);
 
     const result = await query(
-        `INSERT INTO users (name, email, password, role, department_id) VALUES ($1,$2,$3,$4,$5) RETURNING ${userFields}`,
-        [name, email.toLowerCase(), hashed, userRole, deptId]
+        `INSERT INTO users (name, email, password, role, department_id, roll_no) VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${userFields}`,
+        [name, email.toLowerCase(), hashed, userRole, deptId, normRollNo]
     );
     const user = result.rows[0];
     user.wishlist = await getWishlistIds(user.id);
@@ -181,7 +203,7 @@ const verifyOTP = async (req, res) => {
 
     const user = result.rows[0];
 
-    if (!user.reset_otp || user.reset_otp !== otp) {
+    if (!user.reset_otp || !timingSafeEqual(user.reset_otp, otp)) {
         throw createError('Invalid OTP', 400);
     }
 
@@ -189,6 +211,9 @@ const verifyOTP = async (req, res) => {
         throw createError('OTP has expired', 400);
     }
 
+    // Don't clear the OTP here — this endpoint only gates the UI to the
+    // password-entry step. resetPasswordByEmail re-validates the same OTP and
+    // is the single consumer that clears it once the password is updated.
     res.json({ success: true, message: 'OTP verified successfully.' });
 };
 
@@ -210,7 +235,7 @@ const resetPasswordByEmail = async (req, res) => {
 
     const user = result.rows[0];
 
-    if (!user.reset_otp || user.reset_otp !== otp) {
+    if (!user.reset_otp || !timingSafeEqual(user.reset_otp, otp)) {
         throw createError('Invalid OTP', 400);
     }
 
@@ -229,7 +254,9 @@ const resetPasswordByEmail = async (req, res) => {
     await query(
         `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
         [user.id, 'PASSWORD_RESET', 'users', user.id]
-    ).catch(() => { });
+    ).catch(err => {
+        console.error('[Audit] Failed to log password reset:', err.message);
+    });
 
     res.json({ success: true, message: 'Password has been reset successfully.' });
 };

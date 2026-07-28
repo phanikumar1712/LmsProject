@@ -11,7 +11,7 @@ function useDarkMode() {
         try {
             const saved = localStorage.getItem('lms_dark_mode');
             if (saved !== null) return saved === 'true';
-        } catch { }
+        } catch { /* noop */ }
         return window.matchMedia('(prefers-color-scheme: dark)').matches;
     });
 
@@ -22,7 +22,7 @@ function useDarkMode() {
         } else {
             root.classList.remove('dark');
         }
-        try { localStorage.setItem('lms_dark_mode', String(dark)); } catch { }
+        try { localStorage.setItem('lms_dark_mode', String(dark)); } catch { /* noop */ }
     }, [dark]);
 
     return [dark, () => setDark(d => !d)];
@@ -48,9 +48,17 @@ export function Navbar({ onMobileMenuClick }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [notifications, setNotifications] = useState([]);
     const [streak, setStreak] = useState(0);
+    const [categories, setCategories] = useState([]);
 
     const profileRef = useRef(null);
     const notifRef = useRef(null);
+
+    useEffect(() => {
+        // Real categories for the Explore dropdown (top 3 by course count)
+        statsAPI.getCategories()
+            .then(cats => setCategories((Array.isArray(cats) ? cats : []).slice(0, 3)))
+            .catch(() => { });
+    }, []);
 
     useEffect(() => {
         if (isAuthenticated && user) {
@@ -63,6 +71,7 @@ export function Navbar({ onMobileMenuClick }) {
                     setStreak(res.currentStreak || 0);
                 }).catch(() => setStreak(0));
             } else {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setStreak(0);
             }
         }
@@ -83,6 +92,7 @@ export function Navbar({ onMobileMenuClick }) {
     }, []);
 
     // Close mobile menu on route change
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
     const handleSearch = (e) => {
@@ -156,18 +166,12 @@ export function Navbar({ onMobileMenuClick }) {
                                     <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">📚</div>
                                     All Courses
                                 </Link>
-                                <Link to="/courses?category=development" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">💻</div>
-                                    Development
-                                </Link>
-                                <Link to="/courses?category=design" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
-                                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">🎨</div>
-                                    Design
-                                </Link>
-                                <Link to="/courses?category=business" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
-                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">💼</div>
-                                    Business
-                                </Link>
+                                {categories.map(cat => (
+                                    <Link key={cat.id} to={`/courses?category=${cat.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-foreground/80 hover:bg-muted hover:text-indigo-600 transition-colors">
+                                        <div className="w-8 h-8 rounded-lg bg-muted text-foreground/70 flex items-center justify-center">{cat.icon || '📖'}</div>
+                                        {cat.name}
+                                    </Link>
+                                ))}
                                 <div className="mt-2 pt-2 border-t border-border/50">
                                     <Link to="/become-instructor" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-indigo-600 hover:bg-indigo-50 transition-colors">
                                         <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">🌟</div>
@@ -179,12 +183,12 @@ export function Navbar({ onMobileMenuClick }) {
                     </div>
 
                     {/* Middle: Search bar (Glassmorphism) */}
-                    <div className="hidden md:flex flex-1 max-w-md mx-8">
+                    <div className="hidden md:flex flex-1 max-w-xs lg:max-w-md mx-4 lg:mx-8">
                         <form onSubmit={handleSearch} className="w-full relative group">
                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Search courses, skills, or mentors..."
+                                placeholder="Search courses..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="w-full bg-muted/50 backdrop-blur-md border border-border/60 rounded-full pl-10 pr-4 py-2 text-sm font-medium outline-none hover:bg-muted focus:bg-background focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner text-foreground"
@@ -304,7 +308,7 @@ export function Navbar({ onMobileMenuClick }) {
                                                 <button onClick={() => { navigate('/profile'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                                                     <User size={16} /> Profile
                                                 </button>
-                                                <button onClick={() => { navigate('/courses'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
+                                                <button onClick={() => { navigate(user.role === 'STUDENT' ? '/student/courses' : user.role === 'INSTRUCTOR' ? '/instructor/courses' : '/courses'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors">
                                                     <BookOpen size={16} /> My Learning
                                                 </button>
                                             </div>

@@ -33,6 +33,7 @@ const mapUser = (u) => {
         longestStreak: parseInt(u.longest_streak ?? u.longestStreak ?? 0),
         departmentId: u.department_id ?? u.departmentId ?? null,
         departmentName: u.department_name ?? u.departmentName ?? null,
+        rollNo: u.roll_no ?? u.rollNo ?? null,
         createdAt: u.created_at || u.createdAt,
     };
 };
@@ -88,6 +89,7 @@ const mapEnrollment = (e) => ({
     lastAccessed: e.last_accessed || e.lastAccessed,
     enrolledAt: e.enrolled_at || e.enrolledAt,
     completedAt: e.completed_at || e.completedAt || null,
+    versionId: e.version_id || e.versionId || null,
     courseId: e.courseId || e.course_id,
     course: {
         id: e.courseId || e.course_id,

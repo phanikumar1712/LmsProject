@@ -23,6 +23,7 @@ export default function InstructorProfilePage() {
     const [sending, setSending] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         usersAPI.getInstructorProfile(id)
             .then(res => {
@@ -30,7 +31,7 @@ export default function InstructorProfilePage() {
                 setFollowing(res.instructor.isFollowing);
                 setFollowerCount(res.instructor.followerCount || 0);
             })
-            .catch(err => {
+            .catch(() => {
                 toast.error('Failed to load instructor profile');
                 navigate('/courses');
             })
@@ -83,7 +84,7 @@ export default function InstructorProfilePage() {
             toast.success('Message sent successfully!');
             setIsContactModalOpen(false);
             setMessage('');
-        } catch (err) {
+        } catch {
             toast.error('Failed to send message');
         } finally {
             setSending(false);

@@ -20,12 +20,16 @@ net.Socket.prototype.connect = function (...args) {
     return originalConnect.apply(this, args);
 };
 
+// NeonDB serverless can take 5-30s to cold-start after idle.
+// A 60s timeout gives it plenty of runway while still failing fast enough
+// that users aren't waiting indefinitely.
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 30000,
+    max: 20,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000,
+    statement_timeout: 30000, // 30s query timeout at the Postgres level
 });
 
 pool.on('error', (err) => {

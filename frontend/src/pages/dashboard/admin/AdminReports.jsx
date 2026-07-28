@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Download, PieChart as PieIcon, Layers, Building2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Download, Layers, Building2 } from 'lucide-react';
 import { statsAPI, departmentsAPI } from '../../../services/api';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -25,6 +25,7 @@ export default function AdminReports() {
     }, [isSuperAdmin]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         const filters = {};
         if (period && PERIOD_DAYS[period]) filters.from = new Date(Date.now() - PERIOD_DAYS[period] * 864e5).toISOString();

@@ -1,6 +1,6 @@
 const API_URL = 'http://[::1]:5000/api';
 const users = [
-    { email: 'superadmin@lms.com', password: 'admin123', role: 'SUPER_ADMIN' },
+    { email: 'superadmin@lms.com', password: 'superadmin', role: 'SUPER_ADMIN' },
     { email: 'admin@demo.com', password: 'demo123', role: 'ADMIN' },
     { email: 'instructor@demo.com', password: 'demo123', role: 'INSTRUCTOR' },
     { email: 'student@demo.com', password: 'demo123', role: 'STUDENT' }

@@ -16,6 +16,14 @@ export default defineConfig({
       }
     }
   },
+  // These packages ship as CommonJS and are consumed with interop-sensitive
+  // imports (including a namespace import in HomePage.jsx). Pre-bundle them
+  // explicitly so Vite's dep optimizer resolves them consistently on cold and
+  // warm caches — otherwise a stale cache can serve a broken module and blank
+  // the whole page.
+  optimizeDeps: {
+    include: ['react-countup', 'react-fast-marquee', 'react-simple-typewriter'],
+  },
   build: {
     chunkSizeWarningLimit: 900,
     rollupOptions: {

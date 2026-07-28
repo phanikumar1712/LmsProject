@@ -53,9 +53,48 @@ const update = async (req, res) => {
 // DELETE /api/departments/:id — SUPER_ADMIN only.
 // FK is ON DELETE SET NULL, so categories/admins become unassigned (global) rather than breaking.
 const remove = async (req, res) => {
-    const result = await query('DELETE FROM departments WHERE id = $1 RETURNING id', [req.params.id]);
+    const result = await query('DELETE FROM departments WHERE id = $1 RETURNING id, name', [req.params.id]);
     if (!result.rows.length) throw createError('Department not found', 404);
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'DEPARTMENT_DELETED', 'departments', req.params.id,
+         JSON.stringify({ name: result.rows[0].name })]
+    ).catch(() => {});
+
     res.json({ success: true });
 };
 
-module.exports = { list, publicList, create, update, remove };
+// PUT /api/departments/:id/limits — SUPER_ADMIN sets department-wide student/course quotas.
+// A null/blank value clears the override so all admins in this department fall back to the
+// global default from platform_settings.
+const updateLimits = async (req, res) => {
+    const { maxStudents, maxCourses } = req.body;
+
+    const parseLimit = (v, label) => {
+        if (v === undefined || v === null || v === '') return null;
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 0) throw createError(`${label} must be a non-negative integer`, 400);
+        return n;
+    };
+    const maxStudentsVal = parseLimit(maxStudents, 'maxStudents');
+    const maxCoursesVal = parseLimit(maxCourses, 'maxCourses');
+
+    const exists = await query('SELECT id, name FROM departments WHERE id = $1', [req.params.id]);
+    if (!exists.rows.length) throw createError('Department not found', 404);
+
+    await query(
+        `UPDATE departments SET max_students = $1, max_courses = $2 WHERE id = $3`,
+        [maxStudentsVal, maxCoursesVal, req.params.id]
+    );
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'DEPARTMENT_LIMITS_UPDATED', 'departments', req.params.id,
+         JSON.stringify({ name: exists.rows[0].name, maxStudents: maxStudentsVal, maxCourses: maxCoursesVal })]
+    ).catch(() => {});
+
+    res.json({ success: true, maxStudents: maxStudentsVal, maxCourses: maxCoursesVal });
+};
+
+module.exports = { list, publicList, create, update, remove, updateLimits };

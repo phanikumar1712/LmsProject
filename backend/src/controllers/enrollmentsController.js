@@ -1,6 +1,7 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapEnrollment } = require('../utils/formatters');
+const { getDepartmentScope } = require('../utils/scope');
 
 // GET /api/enrollments/student/:studentId
 const getByStudent = async (req, res) => {
@@ -45,24 +46,57 @@ const enroll = async (req, res) => {
     const course = await query('SELECT id, enrollment_count FROM courses WHERE id = $1 AND status = $2', [courseId, 'PUBLISHED']);
     if (!course.rows.length) throw createError('Course not found or not published', 404);
 
-    const result = await query(
-        `INSERT INTO enrollments (student_id, course_id) VALUES ($1,$2) RETURNING *`,
+    // Check for existing enrollment to prevent duplicates
+    const existing = await query(
+        'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
         [req.user.id, courseId]
     );
-    // Increment enrollment count
-    await query('UPDATE courses SET enrollment_count = enrollment_count + 1 WHERE id = $1', [courseId]);
+    if (existing.rows.length) throw createError('Already enrolled in this course', 409);
 
-    await query(
-        `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
-        [req.user.id, 'COURSE_ENROLLED', 'courses', courseId]
-    ).catch(() => { });
+    // Get the latest version to assign at enrollment (so student sees the content that existed when they enrolled)
+    const latestVersion = await query(
+        'SELECT id FROM course_versions WHERE course_id = $1 ORDER BY version_number DESC LIMIT 1',
+        [courseId]
+    );
+    const versionId = latestVersion.rows.length ? latestVersion.rows[0].id : null;
 
-    await query(
-        `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-        [req.user.id, 'You enrolled in a new course. Start learning today!', 'enrollment', `/courses/${courseId}/learn`]
-    ).catch(() => { });
+    // Use a transaction to ensure atomicity of enrollment creation and counter increment
+    const client = await query.pool.connect();
+    try {
+        await client.query('BEGIN');
 
-    res.status(201).json(mapEnrollment(result.rows[0]));
+        const result = await client.query(
+            `INSERT INTO enrollments (student_id, course_id, version_id) VALUES ($1,$2,$3) RETURNING *`,
+            [req.user.id, courseId, versionId]
+        );
+
+        // Increment enrollment count atomically within the same transaction
+        await client.query('UPDATE courses SET enrollment_count = enrollment_count + 1 WHERE id = $1', [courseId]);
+
+        await client.query('COMMIT');
+
+        // Audit log and notifications (non-critical, can fail silently)
+        await query(
+            `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
+            [req.user.id, 'COURSE_ENROLLED', 'courses', courseId]
+        ).catch(err => {
+            console.error('[Audit] Failed to log enrollment:', err.message);
+        });
+
+        await query(
+            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
+            [req.user.id, 'You enrolled in a new course. Start learning today!', 'enrollment', `/courses/${courseId}/learn`]
+        ).catch(err => {
+            console.error('[Notification] Failed to create enrollment notification:', err.message);
+        });
+
+        res.status(201).json(mapEnrollment(result.rows[0]));
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
 };
 
 // PUT /api/enrollments/progress
@@ -115,12 +149,16 @@ const updateProgress = async (req, res) => {
 
     // Track active learning for streak
     const { updateStreak } = require('../utils/streak');
-    await updateStreak(req.user.id).catch(() => { });
+    await updateStreak(req.user.id).catch(err => {
+        console.error('[Streak] Update failed for user', req.user.id, ':', err.message);
+    });
 
     await query(
         `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
         [req.user.id, 'LESSON_COMPLETED', 'lessons', lessonId]
-    ).catch(() => { });
+    ).catch(err => {
+        console.error('[Audit] Failed to log lesson completion:', err.message);
+    });
 
     res.json(mapEnrollment(result.rows[0]));
 };
@@ -129,13 +167,31 @@ const updateProgress = async (req, res) => {
 const getStats = async (req, res) => {
     const { limit = 20, offset = 0 } = req.query;
     const { getPagination } = require('../utils/pagination');
+    const instructorId = req.params.instructorId;
+
+    // Authorization: instructors can only see their own stats
+    if (req.user.role === 'INSTRUCTOR' && req.user.id !== instructorId) {
+        throw createError('Forbidden', 403);
+    }
+
+    // Department-scoped admins must verify the instructor is in their department
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (scoped) {
+        const deptCheck = await query(
+            'SELECT 1 FROM users WHERE id = $1 AND department_id = $2',
+            [instructorId, departmentId]
+        );
+        if (!deptCheck.rows.length) {
+            throw createError('Instructor not in your department', 403);
+        }
+    }
 
     const countRes = await query(`
         SELECT COUNT(*)::int as total
         FROM enrollments e
         JOIN courses c ON e.course_id = c.id
         WHERE c.instructor_id = $1
-    `, [req.params.instructorId]);
+    `, [instructorId]);
     const total = countRes.rows[0].total;
 
     const result = await query(`
@@ -149,7 +205,7 @@ const getStats = async (req, res) => {
         WHERE c.instructor_id = $1
         ORDER BY e.last_accessed DESC
         LIMIT $2 OFFSET $3
-    `, [req.params.instructorId, parseInt(limit), parseInt(offset)]);
+    `, [instructorId, parseInt(limit), parseInt(offset)]);
 
     const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
 
@@ -167,4 +223,95 @@ const getStats = async (req, res) => {
     });
 };
 
-module.exports = { getByStudent, enroll, updateProgress, getStats };
+// POST /api/enrollments/bulk — Admin bulk-enrolls students in a course
+const bulkEnroll = async (req, res) => {
+    const { courseId, studentIds = [], rollNos = [] } = req.body;
+    if (!courseId) throw createError('courseId is required', 400);
+    if (!studentIds.length && !rollNos.length) throw createError('Provide studentIds or rollNos to enroll', 400);
+
+    // Resolve roll_no to user IDs if provided
+    let allStudentIds = [...studentIds];
+    if (rollNos.length) {
+        const { scoped, departmentId } = getDepartmentScope(req);
+        const resolved = await query(
+            `SELECT id FROM users
+             WHERE roll_no = ANY($1)
+               AND role = 'STUDENT'
+               AND active = true
+               ${scoped ? 'AND department_id = $2' : ''}`,
+            scoped ? [rollNos, departmentId] : [rollNos]
+        );
+        const resolvedIds = resolved.rows.map(r => r.id);
+        allStudentIds = [...new Set([...allStudentIds, ...resolvedIds])];
+    }
+
+    if (!allStudentIds.length) throw createError('No valid students found to enroll', 400);
+
+    // Get latest version to assign
+    const latestVersion = await query(
+        'SELECT id FROM course_versions WHERE course_id = $1 ORDER BY version_number DESC LIMIT 1',
+        [courseId]
+    );
+    const versionId = latestVersion.rows.length ? latestVersion.rows[0].id : null;
+
+    // Verify course exists
+    const course = await query('SELECT id, title, enrollment_count FROM courses WHERE id = $1', [courseId]);
+    if (!course.rows.length) throw createError('Course not found', 404);
+
+    const client = await query.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const results = [];
+        let enrolledCount = 0;
+
+        for (const studentId of allStudentIds) {
+            // Check duplicate
+            const existing = await client.query(
+                'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
+                [studentId, courseId]
+            );
+            if (existing.rows.length) {
+                results.push({ studentId, status: 'skipped', reason: 'Already enrolled' });
+                continue;
+            }
+
+            await client.query(
+                'INSERT INTO enrollments (student_id, course_id, version_id) VALUES ($1, $2, $3)',
+                [studentId, courseId, versionId]
+            );
+            enrolledCount++;
+            results.push({ studentId, status: 'enrolled' });
+        }
+
+        // Update enrollment count atomically
+        if (enrolledCount > 0) {
+            await client.query(
+                'UPDATE courses SET enrollment_count = enrollment_count + $1 WHERE id = $2',
+                [enrolledCount, courseId]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        await query(
+            `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+            [req.user.id, 'BULK_ENROLLMENT', 'courses', courseId, JSON.stringify({ enrolled: enrolledCount, total: allStudentIds.length })]
+        ).catch(() => {});
+
+        res.json({
+            success: true,
+            total: allStudentIds.length,
+            enrolled: enrolledCount,
+            skipped: results.filter(r => r.status === 'skipped').length,
+            results,
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+module.exports = { getByStudent, enroll, updateProgress, getStats, bulkEnroll };

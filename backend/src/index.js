@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -6,6 +6,18 @@ const helmet = require('helmet');
 const compression = require('compression');
 
 const { errorHandler } = require('./middleware/errorHandler');
+
+// Request timeout: abort requests that take > 30s to prevent long-running
+// queries from exhausting the connection pool.
+const REQUEST_TIMEOUT_MS = 30000;
+
+const requestTimeout = (req, res, next) => {
+    res.setTimeout(REQUEST_TIMEOUT_MS, () => {
+        console.error(`[Timeout] Request ${req.method} ${req.path} exceeded ${REQUEST_TIMEOUT_MS}ms`);
+        res.status(503).json({ error: 'Request timed out. Please try again.' });
+    });
+    next();
+};
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -19,7 +31,13 @@ const wishlistRoutes = require('./routes/wishlist');
 const notificationsRoutes = require('./routes/notifications');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const uploadRoutes = require('./routes/upload');
+const announcementsRoutes = require('./routes/announcements');
+const assignmentsRoutes = require('./routes/assignments');
 const departmentsRoutes = require('./routes/departments');
+const certificatesRoutes = require('./routes/certificates');
+const discussionsRoutes = require('./routes/discussions');
+const versionsRoutes = require('./routes/versions');
+const attendanceRoutes = require('./routes/attendance');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -41,11 +59,14 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
 }
+
+// ── Request Timeout ──────────────────────────────────────────────────────────
+app.use(requestTimeout);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -70,7 +91,13 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/announcements', announcementsRoutes);
+app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/departments', departmentsRoutes);
+app.use('/api/certificates', certificatesRoutes);
+app.use('/api/discussions', discussionsRoutes);
+app.use('/api/courses', versionsRoutes);  // course versioning & drip
+app.use('/api/attendance', attendanceRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Loader2, Edit, CreditCard, ChevronRight, User, Calendar, ExternalLink, RefreshCw } from 'lucide-react';
+import { Search, CreditCard, User, Calendar } from 'lucide-react';
 import { usersAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,7 @@ export default function AdminSubscriptions() {
     const [search, setSearch] = useState('');
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
         fetchUsers();
     }, []);
 
@@ -17,7 +18,7 @@ export default function AdminSubscriptions() {
             const data = await usersAPI.getAll();
             // Filter to show users who have or had a plan, or just all users for management
             setUsers(data);
-        } catch (err) {
+        } catch {
             toast.error("Failed to load users");
         } finally {
             setLoading(false);
@@ -29,7 +30,7 @@ export default function AdminSubscriptions() {
             await usersAPI.assignPlan(userId, plan);
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, subscriptionPlan: plan } : u));
             toast.success(`Plan updated to ${plan}`);
-        } catch (err) {
+        } catch {
             toast.error("Update failed");
         }
     };

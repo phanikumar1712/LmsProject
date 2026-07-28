@@ -10,6 +10,7 @@ router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ct
 // Only SUPER_ADMIN manages the department taxonomy.
 router.post('/', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.create));
 router.put('/:id', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.update));
+router.put('/:id/limits', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.updateLimits));
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.remove));
 
 module.exports = router;

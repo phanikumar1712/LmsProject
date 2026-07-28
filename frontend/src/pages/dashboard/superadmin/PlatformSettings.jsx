@@ -20,7 +20,7 @@ export default function PlatformSettings() {
     useEffect(() => {
         statsAPI.getSettings()
             .then(setSettings)
-            .catch(err => toast.error('Failed to load settings'))
+            .catch(() => toast.error('Failed to load settings'))
             .finally(() => setLoading(false));
     }, []);
 
@@ -49,10 +49,9 @@ export default function PlatformSettings() {
     const inputCls = 'w-full bg-card border border-border text-foreground rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm';
 
     return (
-        <div className="space-y-6 max-w-5xl">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 max-w-5xl">                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3">
                         <Settings size={28} className="text-indigo-600" /> Platform Settings
                     </h1>
                     <p className="text-muted-foreground font-medium mt-1">Configure global platform behavior and integrations</p>
@@ -67,10 +66,10 @@ export default function PlatformSettings() {
                 </button>
             </div>
 
-            <div className="flex gap-6">
+            <div className="flex flex-col sm:flex-row gap-6">
                 {/* Sidebar nav */}
-                <div className="w-44 flex-shrink-0">
-                    <div className="bg-card border border-border rounded-2xl p-2 shadow-sm space-y-1">
+                <div className="w-full sm:w-44 flex-shrink-0 overflow-x-auto">
+                    <div className="bg-card border border-border rounded-2xl p-2 shadow-sm flex sm:flex-col sm:space-y-1 gap-1">
                         {SECTIONS.map(({ id, label, icon: Icon }) => (
                             <button
                                 key={id}
@@ -121,6 +120,16 @@ export default function PlatformSettings() {
                                     <div>
                                         <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Support Email</label>
                                         <input type="email" className={inputCls} value={settings.supportEmail} onChange={e => update('supportEmail', e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Default Max Students / Department</label>
+                                        <input type="number" min={0} className={inputCls} value={settings.defaultMaxStudentsPerAdmin ?? ''} onChange={e => update('defaultMaxStudentsPerAdmin', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Default Max Courses / Department</label>
+                                        <input type="number" min={0} className={inputCls} value={settings.defaultMaxCoursesPerAdmin ?? ''} onChange={e => update('defaultMaxCoursesPerAdmin', e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-4 pt-2">

@@ -26,14 +26,15 @@ export function StatCard({
 }) {
     return (
         <div
-            className={`bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden ${className}`}
+            className={`bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group ${className}`}
         >
-            <div className="absolute top-0 right-0 p-8 opacity-[0.03] dark:opacity-[0.07] pointer-events-none">
+            <div className="absolute top-0 right-0 p-6 sm:p-8 opacity-[0.03] dark:opacity-[0.07] pointer-events-none group-hover:scale-110 transition-transform duration-500">
                 <Icon size={80} />
             </div>
-            <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bg}`}>
-                    <Icon size={24} style={{ color }} />
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${bg} group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={20} style={{ color }} className="sm:hidden" />
+                    <Icon size={24} style={{ color }} className="hidden sm:block" />
                 </div>
                 {showTrend && (
                     <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md text-xs font-bold">
@@ -41,13 +42,13 @@ export function StatCard({
                     </div>
                 )}
             </div>
-            <p className="text-2xl lg:text-3xl font-bold text-foreground mb-1 tracking-tight">
+            <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-1 tracking-tight break-words">
                 {value}
             </p>
-            <p className="text-muted-foreground text-sm font-medium">{label}</p>
+            <p className="text-muted-foreground text-xs sm:text-sm font-medium truncate">{label}</p>
             {change && (
                 <p
-                    className="text-[13px] font-medium mt-2"
+                    className="text-[11px] sm:text-[13px] font-medium mt-1.5 sm:mt-2 truncate"
                     style={{ color: changeColor ?? color }}
                 >
                     {change}

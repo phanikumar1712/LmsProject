@@ -73,11 +73,11 @@ export default function InstructorAnalytics() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <div>
-                <h1 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">Analytics & Earnings</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2 tracking-tight">Analytics & Earnings</h1>
                 <p className="text-muted-foreground font-medium">Deep dive into your revenue and course performance</p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
                 {statItems.map(({ icon: Icon, iconBg, iconColor, glow, label, value, badge, badgeClass, fillIcon }) => (
                     <div key={label} className="bg-card border border-border shadow-sm rounded-2xl p-6 relative overflow-hidden group">
                         <div className={`absolute top-0 right-0 w-32 h-32 ${glow} rounded-full blur-3xl -mr-10 -mt-10 transition-transform group-hover:scale-110`} />
@@ -95,7 +95,7 @@ export default function InstructorAnalytics() {
                 ))}
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
                 <div className="bg-card border border-border shadow-sm rounded-2xl p-6">
                     <h2 className="text-foreground font-bold text-lg mb-6 flex items-center gap-2"><BarChart2 size={20} className="text-indigo-600" /> Revenue by Course</h2>
                     <div className="h-72">
@@ -105,6 +105,7 @@ export default function InstructorAnalytics() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                                     <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
                                     <YAxis dataKey="name" type="category" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
+                                    {/* eslint-disable-next-line react-hooks/static-components */}
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
                                     <Bar dataKey="revenue" name="Revenue" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={24} />
                                 </BarChart>
@@ -133,6 +134,7 @@ export default function InstructorAnalytics() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                                     <XAxis dataKey="month" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                                    {/* eslint-disable-next-line react-hooks/static-components */}
                                     <Tooltip content={<CustomTooltip />} />
                                     <Area type="monotone" dataKey="revenue" name="Students (x10 Proxy)" stroke="#0891b2" strokeWidth={3} fillOpacity={1} fill="url(#colorStudents)" />
                                 </AreaChart>

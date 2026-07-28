@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const multer = require('multer');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { importLimiter } = require('../middleware/rateLimiter');
 const { asyncHandler } = require('../middleware/errorHandler');
 const ctrl = require('../controllers/usersController');
 
@@ -13,12 +14,17 @@ router.post('/instructor/:id/follow', authenticate, asyncHandler(ctrl.followInst
 router.post('/instructor/:id/unfollow', authenticate, asyncHandler(ctrl.unfollowInstructor));
 
 router.post('/invite-admin', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.inviteAdmin));
+router.put('/:id/departments', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.setAdminDepartments));
+router.get('/:id/departments', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getUserDepartments));
 router.post('/instructors', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.createInstructor));
-router.post('/instructors/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), uploadSheet.single('file'), asyncHandler(ctrl.importInstructors));
+router.post('/instructors/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importInstructors));
+router.post('/students/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importStudents));
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
+router.get('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getById));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));
+router.put('/:id/reset-password', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.resetUserPassword));
 router.put('/:id/toggle-status', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.toggleStatus));
-router.put('/:id/subscription', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.assignPlan));
+router.put('/:id/subscription', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.assignPlan));
 router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.deleteUser));
 
 router.post('/instructor-request', authenticate, asyncHandler(ctrl.submitInstructorRequest));

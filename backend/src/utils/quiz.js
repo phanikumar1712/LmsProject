@@ -1,6 +1,9 @@
 const { createError } = require('../middleware/errorHandler');
 
 const QUESTION_TYPES = new Set(['MCQ', 'MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 'FILL_BLANK']);
+const DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
+const SELECTION_MODES = new Set(['ALL', 'RANDOM', 'BY_DIFFICULTY', 'BY_CATEGORY']);
+const MAX_QUESTIONS = 500;
 const PLAN_RANK = { FREE: 0, BASIC: 1, PRO: 2, ENTERPRISE: 3 };
 
 const cleanText = (value, field, maxLength) => {
@@ -17,8 +20,8 @@ const normalizeOptionAnswer = (answer, options, field) => {
 };
 
 const validateQuestions = (questions) => {
-    if (!Array.isArray(questions) || questions.length < 1 || questions.length > 200) {
-        throw createError('questions must contain between 1 and 200 items', 400);
+    if (!Array.isArray(questions) || questions.length < 1 || questions.length > MAX_QUESTIONS) {
+        throw createError(`questions must contain between 1 and ${MAX_QUESTIONS} items`, 400);
     }
 
     const ids = new Set();
@@ -36,7 +39,14 @@ const validateQuestions = (questions) => {
         const type = String(question.type || '').toUpperCase();
         if (!QUESTION_TYPES.has(type)) throw createError(`Question ${index + 1} has an unsupported type`, 400);
         const text = cleanText(question.text, `Question ${index + 1} text`, 2000);
-        const normalized = { id, type, text, options: [] };
+        const difficulty = String(question.difficulty || 'MEDIUM').toUpperCase();
+        if (!DIFFICULTIES.has(difficulty)) {
+            throw createError(`Question ${index + 1} difficulty must be EASY, MEDIUM or HARD`, 400);
+        }
+        const category = question.category && typeof question.category === 'string'
+            ? question.category.trim().slice(0, 100)
+            : '';
+        const normalized = { id, type, text, difficulty, category, options: [] };
 
         if (['MCQ', 'MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE'].includes(type)) {
             if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 20) {
@@ -65,6 +75,111 @@ const validateQuestions = (questions) => {
     });
 };
 
+// selection_config shapes:
+//   { mode: 'ALL' }                                — every question, shuffled client-side
+//   { mode: 'RANDOM', count: 20 }                  — N random questions from the whole bank
+//   { mode: 'BY_DIFFICULTY', easy: 5, medium: 10, hard: 5 } — N random per difficulty
+const validateSelectionConfig = (config, questions) => {
+    if (config === undefined || config === null) return null;
+    if (typeof config !== 'object' || Array.isArray(config)) {
+        throw createError('selectionConfig must be an object', 400);
+    }
+    const mode = String(config.mode || 'ALL').toUpperCase();
+    if (!SELECTION_MODES.has(mode)) throw createError('selectionConfig.mode must be ALL, RANDOM or BY_DIFFICULTY', 400);
+    if (mode === 'ALL') return { mode };
+
+    const toCount = (value, field, max) => {
+        const n = Number(value ?? 0);
+        if (!Number.isInteger(n) || n < 0 || n > max) {
+            throw createError(`selectionConfig.${field} must be an integer from 0 to ${max}`, 400);
+        }
+        return n;
+    };
+
+    if (mode === 'RANDOM') {
+        const count = toCount(config.count, 'count', questions.length);
+        if (count < 1) throw createError('selectionConfig.count must be at least 1', 400);
+        return { mode, count };
+    }
+
+    // BY_CATEGORY — choose N random questions from each category
+    if (mode === 'BY_CATEGORY') {
+        const cats = config.categories;
+        if (!cats || typeof cats !== 'object' || Array.isArray(cats) || !Object.keys(cats).length) {
+            throw createError('selectionConfig.categories must be an object with category names and counts', 400);
+        }
+        const available = {};
+        questions.forEach(q => {
+            const cat = q.category || 'Uncategorized';
+            available[cat] = (available[cat] || 0) + 1;
+        });
+        const validated = {};
+        let total = 0;
+        for (const [catName, count] of Object.entries(cats)) {
+            const n = toCount(count, `categories.${catName}`, MAX_QUESTIONS);
+            if (n > 0) {
+                const avail = available[catName] || 0;
+                if (n > avail) throw createError(`Only ${avail} questions available in category "${catName}" (requested ${n})`, 400);
+                validated[catName] = n;
+                total += n;
+            }
+        }
+        if (total < 1) throw createError('selectionConfig must request at least 1 question', 400);
+        return { mode, categories: validated };
+    }
+
+    // BY_DIFFICULTY — each requested count must be available in the bank
+    const available = { EASY: 0, MEDIUM: 0, HARD: 0 };
+    questions.forEach(q => { available[q.difficulty] = (available[q.difficulty] || 0) + 1; });
+    const easy = toCount(config.easy, 'easy', MAX_QUESTIONS);
+    const medium = toCount(config.medium, 'medium', MAX_QUESTIONS);
+    const hard = toCount(config.hard, 'hard', MAX_QUESTIONS);
+    if (easy + medium + hard < 1) throw createError('selectionConfig must request at least 1 question', 400);
+    if (easy > available.EASY) throw createError(`Only ${available.EASY} easy questions available (requested ${easy})`, 400);
+    if (medium > available.MEDIUM) throw createError(`Only ${available.MEDIUM} medium questions available (requested ${medium})`, 400);
+    if (hard > available.HARD) throw createError(`Only ${available.HARD} hard questions available (requested ${hard})`, 400);
+    return { mode, easy, medium, hard };
+};
+
+// Fisher–Yates on a copy
+const shuffle = (items) => {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+};
+
+// Draw the set of questions for one attempt according to selection_config.
+const drawQuestions = (questions, config) => {
+    const all = Array.isArray(questions) ? questions : [];
+    if (!config || config.mode === 'ALL') return shuffle(all);
+    if (config.mode === 'RANDOM') return shuffle(all).slice(0, Math.min(config.count, all.length));
+    if (config.mode === 'BY_CATEGORY') {
+        const byCat = {};
+        all.forEach(q => {
+            const cat = q.category || 'Uncategorized';
+            if (!byCat[cat]) byCat[cat] = [];
+            byCat[cat].push(q);
+        });
+        const drawn = [];
+        for (const [cat, count] of Object.entries(config.categories || {})) {
+            const pool = byCat[cat] || [];
+            drawn.push(...shuffle(pool).slice(0, count));
+        }
+        return shuffle(drawn);
+    }
+    // BY_DIFFICULTY — clamp to what actually exists in case the bank shrank
+    const byLevel = { EASY: [], MEDIUM: [], HARD: [] };
+    all.forEach(q => (byLevel[q.difficulty || 'MEDIUM'] || byLevel.MEDIUM).push(q));
+    return shuffle([
+        ...shuffle(byLevel.EASY).slice(0, config.easy || 0),
+        ...shuffle(byLevel.MEDIUM).slice(0, config.medium || 0),
+        ...shuffle(byLevel.HARD).slice(0, config.hard || 0),
+    ]);
+};
+
 const validateQuizPayload = (body) => {
     const passingScore = Number(body.passingScore ?? 70);
     const timeLimit = Number(body.timeLimit ?? 30);
@@ -74,6 +189,7 @@ const validateQuizPayload = (body) => {
     if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 180) {
         throw createError('timeLimit must be an integer from 1 to 180 minutes', 400);
     }
+    const questions = validateQuestions(body.questions);
     return {
         title: cleanText(body.title, 'title', 255),
         description: typeof (body.instructions || body.description) === 'string'
@@ -81,26 +197,39 @@ const validateQuizPayload = (body) => {
             : '',
         passingScore,
         timeLimit,
-        questions: validateQuestions(body.questions),
+        questions,
+        selectionConfig: validateSelectionConfig(body.selectionConfig ?? body.selection_config, questions),
     };
 };
 
 const stripAnswers = (questions = []) => questions.map(({ correctAnswer, ...question }) => question);
 
-const serializeQuiz = (quiz, { includeQuestions = true, includeAnswers = false } = {}) => ({
-    id: quiz.id,
-    courseId: quiz.course_id,
-    lessonId: quiz.lesson_id,
-    title: quiz.title,
-    description: quiz.description,
-    instructions: quiz.description,
-    passingScore: quiz.passing_score,
-    timeLimit: quiz.time_limit,
-    questionCount: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
-    ...(includeQuestions && {
-        questions: includeAnswers ? (quiz.questions || []) : stripAnswers(quiz.questions || []),
-    }),
-});
+const serializeQuiz = (quiz, { includeQuestions = true, includeAnswers = false, questionOverride = null } = {}) => {
+    const sourceQuestions = questionOverride ?? quiz.questions ?? [];
+    const config = quiz.selection_config || null;
+    // Advertise the per-attempt question count, not the bank size
+    let effectiveCount = Array.isArray(sourceQuestions) ? sourceQuestions.length : 0;
+    if (!questionOverride && config) {
+        if (config.mode === 'RANDOM') effectiveCount = Math.min(config.count, effectiveCount);
+        else if (config.mode === 'BY_DIFFICULTY') effectiveCount = Math.min((config.easy || 0) + (config.medium || 0) + (config.hard || 0), effectiveCount);
+    }
+    return {
+        id: quiz.id,
+        courseId: quiz.course_id,
+        lessonId: quiz.lesson_id,
+        title: quiz.title,
+        description: quiz.description,
+        instructions: quiz.description,
+        passingScore: quiz.passing_score,
+        timeLimit: quiz.time_limit,
+        selectionConfig: config,
+        bankSize: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+        questionCount: effectiveCount,
+        ...(includeQuestions && {
+            questions: includeAnswers ? sourceQuestions : stripAnswers(sourceQuestions),
+        }),
+    };
+};
 
 const hasRequiredPlan = (user, requiredPlan) => {
     let currentPlan = String(user.subscription_plan || 'FREE').toUpperCase();
@@ -126,4 +255,4 @@ const answersMatch = (question, answer) => {
     return String(answer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase();
 };
 
-module.exports = { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch };
+module.exports = { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch, drawQuestions };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { subscriptionsAPI } from '../../../services/api';
-import { Check, CreditCard, ShieldAlert } from 'lucide-react';
+import { Check, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function StudentSubscription() {
@@ -11,6 +11,7 @@ export default function StudentSubscription() {
     const [processingId, setProcessingId] = useState(null);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         subscriptionsAPI.getPlans()
             .then(setPlans)
@@ -28,6 +29,7 @@ export default function StudentSubscription() {
                 });
             } else {
                 const expiryDate = plan.duration > 0
+                    // eslint-disable-next-line react-hooks/purity
                     ? new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
                     : null;
                 updateUser({ subscriptionPlan: plan.name.toUpperCase(), subscriptionExpiry: expiryDate });

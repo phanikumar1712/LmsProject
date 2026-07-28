@@ -18,4 +18,11 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Vite/Node config files run in Node, not the browser.
+    files: ['vite.config.js', '*.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

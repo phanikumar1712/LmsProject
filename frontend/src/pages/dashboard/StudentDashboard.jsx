@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Clock, Award, TrendingUp, Play, ClipboardList, CreditCard, Flame, ChevronRight } from 'lucide-react';
+import { BookOpen, Award, Play, ClipboardList, CreditCard, Flame, ChevronRight, Target } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { enrollmentsAPI, quizzesAPI, statsAPI } from '../../services/api';
 import { ProgressBar } from '../../components/ui/ProgressBar';
@@ -8,12 +8,13 @@ import { PageHeader, SectionHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/Feedback';
 import { useMultipleAsync } from '../../hooks/useAsyncData';
 import { PLAN_COLORS } from '../../lib/constants';
+import PullToRefresh from '../../components/ui/PullToRefresh';
 
 export default function StudentDashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const { results, loading } = useMultipleAsync([
+    const { results, loading, reload } = useMultipleAsync([
         () => enrollmentsAPI.getByStudent(user.id),
         () => quizzesAPI.getAttempts(user.id),
         () => statsAPI.getStudentStreak(),
@@ -36,10 +37,11 @@ export default function StudentDashboard() {
         { label: 'Enrolled Courses', value: safeEnrollments.length, icon: BookOpen, color: '#4f46e5', bg: 'bg-indigo-50' },
         { label: 'Completed', value: completedCourses.length, icon: Award, color: '#16a34a', bg: 'bg-emerald-50' },
         { label: 'Quiz Attempts', value: safeAttempts.length, icon: ClipboardList, color: '#0891b2', bg: 'bg-cyan-50' },
-        { label: 'Avg Progress', value: `${avgProgress}%`, icon: TrendingUp, color: '#d97706', bg: 'bg-amber-50' },
+        { label: 'Avg Progress', value: `${avgProgress}%`, icon: Target, color: '#d97706', bg: 'bg-amber-50' },
     ];
 
     return (
+        <PullToRefresh onRefresh={reload}>
         <div className="space-y-8 max-w-6xl w-full">
             {/* Welcome Header */}
             <PageHeader
@@ -68,7 +70,7 @@ export default function StudentDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
                 {/* Continue Learning */}
                 <div className="lg:col-span-2">
                     <SectionHeader
@@ -130,9 +132,9 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* Side Panel */}
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     {/* Subscription */}
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <div className="bg-card border border-border rounded-xl p-4 sm:p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-foreground font-bold">Subscription</h3>
                             <span className="badge" style={{ backgroundColor: `${planColor}15`, color: planColor }}>
@@ -158,18 +160,18 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Learning Streak */}
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-foreground font-bold">Learning Streak</h3>
+                    <div className="bg-card border border-border rounded-xl p-4 sm:p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-4 sm:mb-6">
+                            <h3 className="text-foreground font-bold text-sm sm:text-base">Learning Streak</h3>
                             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/20 rounded-full text-amber-600 dark:text-amber-400">
-                                <Flame size={16} fill="currentColor" />
-                                <span className="text-sm font-bold">{safeStreak.currentStreak} days</span>
+                                <Flame size={14} fill="currentColor" />
+                                <span className="text-xs sm:text-sm font-bold">{safeStreak.currentStreak} days</span>
                             </div>
                         </div>
-                        <div className="flex justify-between items-center gap-1">
+                        <div className="flex justify-between items-center gap-0.5 sm:gap-1">
                             {safeStreak.streakDays.map((day, i) => (
                                 <div key={i} className="flex flex-col items-center">
-                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-2 text-xs transition-colors ${safeStreak.activeStreak[i] ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 ring-2 ring-amber-200 ring-offset-1 dark:ring-offset-card' : 'bg-muted text-muted-foreground border border-border'}`}>
+                                    <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1 sm:mb-2 text-xs transition-colors ${safeStreak.activeStreak[i] ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 ring-2 ring-amber-200 ring-offset-1 dark:ring-offset-card' : 'bg-muted text-muted-foreground border border-border'}`}>
                                         {safeStreak.activeStreak[i] ? <Flame size={16} fill="currentColor" /> : <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />}
                                     </div>
                                     <span className="text-muted-foreground text-[11px] font-medium">{day}</span>
@@ -217,9 +219,9 @@ export default function StudentDashboard() {
                             </Link>
                         }
                     />
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {completedCourses.map(e => (
-                            <div key={e.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow cursor-pointer">
+                            <div key={e.id} className="bg-card border border-border rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-sm transition-shadow cursor-pointer">
                                 {e.course?.thumbnail ? (
                                     <img src={e.course.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 bg-muted" />
                                 ) : (
@@ -239,5 +241,6 @@ export default function StudentDashboard() {
                 </div>
             )}
         </div>
+        </PullToRefresh>
     );
 }

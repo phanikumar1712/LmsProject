@@ -113,6 +113,19 @@ const create = async (req, res) => {
 const replyToReview = async (req, res) => {
     const { reply } = req.body;
     if (!reply) throw createError('Reply text is required', 400);
+
+    // Verify the instructor owns the course being reviewed
+    const rating = await query(
+        `SELECT c.instructor_id FROM ratings r
+         JOIN courses c ON r.course_id = c.id
+         WHERE r.id = $1`,
+        [req.params.id]
+    );
+    if (!rating.rows.length) throw createError('Rating not found', 404);
+    if (req.user.role === 'INSTRUCTOR' && rating.rows[0].instructor_id !== req.user.id) {
+        throw createError('Not authorized to reply to this review', 403);
+    }
+
     const result = await query(
         `UPDATE ratings SET instructor_reply = $1 WHERE id = $2 RETURNING id`,
         [reply, req.params.id]
@@ -128,27 +141,67 @@ const replyToReview = async (req, res) => {
 
 // PUT /api/ratings/:id/like
 const likeReview = async (req, res) => {
-    const result = await query(
-        `UPDATE ratings SET likes = likes + 1 WHERE id = $1 RETURNING id`,
-        [req.params.id]
-    );
-    if (!result.rows.length) throw createError('Rating not found', 404);
+    const ratingId = req.params.id;
+    const userId = req.user.id;
 
-    const full = await query(`
-        SELECT ${ratingFields} FROM ratings r JOIN users u ON r.student_id = u.id
-        WHERE r.id = $1
-    `, [req.params.id]);
-    res.json(mapRating(full.rows[0]));
+    // Check if rating exists
+    const ratingCheck = await query('SELECT id FROM ratings WHERE id = $1', [ratingId]);
+    if (!ratingCheck.rows.length) throw createError('Rating not found', 404);
+
+    // Check if user already liked this review
+    const existing = await query(
+        'SELECT 1 FROM rating_likes WHERE rating_id = $1 AND user_id = $2',
+        [ratingId, userId]
+    );
+    if (existing.rows.length) throw createError('You have already liked this review', 409);
+
+    // Use transaction to ensure atomicity
+    const client = await query.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Record the like
+        await client.query(
+            'INSERT INTO rating_likes (rating_id, user_id) VALUES ($1, $2)',
+            [ratingId, userId]
+        );
+
+        // Increment the counter
+        await client.query(
+            'UPDATE ratings SET likes = likes + 1 WHERE id = $1',
+            [ratingId]
+        );
+
+        await client.query('COMMIT');
+
+        const full = await query(`
+            SELECT ${ratingFields} FROM ratings r JOIN users u ON r.student_id = u.id
+            WHERE r.id = $1
+        `, [ratingId]);
+        res.json(mapRating(full.rows[0]));
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
 };
 
 // DELETE /api/ratings/:id
 const deleteRating = async (req, res) => {
     const result = await query(
-        `DELETE FROM ratings WHERE id = $1 RETURNING course_id`,
+        `DELETE FROM ratings WHERE id = $1 RETURNING course_id, stars`,
         [req.params.id]
     );
     if (!result.rows.length) throw createError('Rating not found', 404);
     await recalcCourseRating(result.rows[0].course_id);
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'RATING_DELETED', 'ratings', req.params.id,
+         JSON.stringify({ courseId: result.rows[0].course_id, stars: result.rows[0].stars })]
+    ).catch(() => {});
+
     res.json({ success: true });
 };
 

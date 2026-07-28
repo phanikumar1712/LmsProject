@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     AlertTriangle, X, Clock, Shield, ChevronLeft, ChevronRight,
-    CheckCircle, XCircle, Maximize2, Eye, EyeOff
+    CheckCircle, XCircle, Maximize2
 } from 'lucide-react';
 import { quizzesAPI, enrollmentsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,7 +29,7 @@ export default function QuizPage() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [violations, setViolations] = useState(0);
     const [warning, setWarning] = useState(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [, setIsFullscreen] = useState(false);
 
     const timerRef = useRef(null);
     const startTimeRef = useRef(null);
@@ -46,6 +46,7 @@ export default function QuizPage() {
         }).finally(() => setLoading(false));
     }, [quizId, courseId, navigate]);
 
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const submitQuiz = useCallback(async (finalAnswers, finalViolations, auto = false) => {
         if (submittingRef.current) return;
         submittingRef.current = true;
@@ -220,7 +221,7 @@ export default function QuizPage() {
             await document.documentElement.requestFullscreen?.();
             // Optional lock if available (Screen Wake Lock / Pointer Lock usually not needed for normal quiz)
             setIsFullscreen(true);
-        } catch { }
+        } catch { /* noop */ }
     };
 
     const handleReattempt = () => {
@@ -384,7 +385,6 @@ export default function QuizPage() {
 
     // Active quiz
     const q = questions[currentQ];
-    const answered = answers[currentQ] !== undefined && answers[currentQ] !== null;
     const timerDanger = timeLeft < 60;
     const timerWarning = timeLeft < 180;
 
