@@ -1,18 +1,30 @@
 import { useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Trash2, Edit2, FileText, X, Save, Search } from 'lucide-react';
-import { coursesAPI, statsAPI } from '../../../services/api';
+import { coursesAPI, statsAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export default function AdminCourses() {
+    const { isSuperAdmin } = useAuth();
     const [filter, setFilter] = useState('ALL');
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
+    const [departmentFilter, setDepartmentFilter] = useState('ALL');
     const [sort, setSort] = useState('newest');
-    const { data, loading, reload } = useAsyncData(() => coursesAPI.getAll({ admin: true }), []);
+
+    // Only SUPER_ADMIN sees the department filter; a scoped ADMIN is locked to their own dept
+    const { data: departments } = useAsyncData(
+        () => isSuperAdmin() ? departmentsAPI.list() : Promise.resolve([]),
+        [isSuperAdmin]
+    );
+
+    const apiFilters = { admin: true };
+    if (departmentFilter !== 'ALL') apiFilters.departmentId = departmentFilter;
+    const { data, loading, reload } = useAsyncData(() => coursesAPI.getAll(apiFilters), [departmentFilter]);
     const { data: categories } = useAsyncData(() => statsAPI.getCategories(), []);
     const courses = data ?? [];
 
@@ -160,7 +172,7 @@ export default function AdminCourses() {
                 }
             />
 
-            <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
+            <div className="bg-card border border-border shadow-sm rounded-2xl p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col gap-4 mb-8">
                     <div className="flex flex-wrap gap-3">
                         {['ALL', 'PUBLISHED', 'PENDING', 'DRAFT', 'REJECTED'].map(f => (
@@ -202,6 +214,20 @@ export default function AdminCourses() {
                                 <option key={cat.id} value={cat.name}>{cat.name}</option>
                             ))}
                         </select>
+
+                        {isSuperAdmin() && (
+                            <select
+                                value={departmentFilter}
+                                onChange={e => setDepartmentFilter(e.target.value)}
+                                className="px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-bold shadow-sm cursor-pointer"
+                            >
+                                <option value="ALL">🏛️ All Departments</option>
+                                {(departments ?? []).map(d => (
+                                    <option key={d.id} value={d.id}>{d.icon || '🏛️'} {d.name}</option>
+                                ))}
+                            </select>
+                        )}
+
                         <select
                             value={sort}
                             onChange={e => setSort(e.target.value)}
@@ -225,8 +251,8 @@ export default function AdminCourses() {
                                 No courses found in this category.
                             </div>
                         ) : displayCourses.map(course => (
-                            <div key={course.id} className="bg-muted/40 border border-border p-5 rounded-2xl flex flex-col md:flex-row gap-6 items-center hover:bg-muted transition-colors relative group shadow-sm">
-                                <div className="w-56 h-32 rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-border">
+                            <div key={course.id} className="bg-muted/40 border border-border p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center hover:bg-muted transition-colors relative group shadow-sm">
+                                <div className="w-full md:w-56 h-32 rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-border">
                                     <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
                                     <div className="absolute top-3 right-3 flex gap-1">
                                         <span className="bg-card/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] text-foreground font-bold tracking-wider shadow-sm border border-border">₹{course.discountPrice || course.price}</span>
@@ -245,7 +271,7 @@ export default function AdminCourses() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col items-end gap-3 flex-shrink-0 w-44 border-l border-border pl-6">
+                                <div className="flex flex-col items-start md:items-end gap-3 flex-shrink-0 w-full md:w-44 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-6">
                                     <div className="w-full">
                                         {statusBadge(course.status)}
                                     </div>

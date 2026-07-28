@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-    BookOpen, Users, Star, DollarSign, TrendingUp, PlusCircle,
+    BookOpen, Users, Star, DollarSign, PlusCircle,
     ChevronRight, BarChart2, Eye
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,11 +14,12 @@ import { ChartTooltip, ChartCard } from '../../components/ui/ChartComponents';
 import { EmptyState, StatusBadge } from '../../components/ui/Feedback';
 import { useMultipleAsync } from '../../hooks/useAsyncData';
 import { CHART_MARGIN, CHART_AXIS_STYLE } from '../../lib/constants';
+import PullToRefresh from '../../components/ui/PullToRefresh';
 
 export default function InstructorDashboard() {
     const { user } = useAuth();
 
-    const { results, loading } = useMultipleAsync([
+    const { results, loading, reload } = useMultipleAsync([
         () => statsAPI.getInstructor(user.id),
         () => coursesAPI.getByInstructor(user.id),
     ], [user.id]);
@@ -34,6 +35,7 @@ export default function InstructorDashboard() {
     ] : [];
 
     return (
+        <PullToRefresh onRefresh={reload}>
         <div className="space-y-8 max-w-6xl">
             <PageHeader
                 title="Instructor Dashboard"
@@ -54,11 +56,11 @@ export default function InstructorDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                 {/* Earnings Chart */}
                 <ChartCard
                     title="Monthly Earnings"
-                    badge={stats?.thisMonth?.earnings > 0 && <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-md text-sm font-bold">+₹{stats.thisMonth.earnings.toLocaleString()} this month</span>}
+                    badge={stats?.thisMonth?.earnings > 0 && <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-md text-xs sm:text-sm font-bold">+₹{stats.thisMonth.earnings.toLocaleString()} this month</span>}
                     className="lg:col-span-2"
                 >
                     {stats?.monthlyEarnings && stats.monthlyEarnings.length > 0 ? (
@@ -86,7 +88,7 @@ export default function InstructorDashboard() {
                 </ChartCard>
 
                 {/* Side Panel */}
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     <Card>
                         <CardHeader title="Course Status" icon={<BarChart2 size={20} className="text-indigo-600" />} />
                         <div className="space-y-4">
@@ -106,8 +108,8 @@ export default function InstructorDashboard() {
                         </div>
                     </Card>
 
-                    <div className="bg-card border border-border rounded-2xl p-6">
-                        <h3 className="text-lg font-bold text-foreground mb-4">Quick Actions</h3>
+                    <div className="bg-card border border-border rounded-2xl p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-bold text-foreground mb-3 sm:mb-4">Quick Actions</h3>
                         <div className="space-y-2">
                             {[
                                 { to: '/instructor/create-course', icon: PlusCircle, label: 'Create New Course', color: 'text-indigo-600' },
@@ -137,12 +139,12 @@ export default function InstructorDashboard() {
                         </Link>
                     }
                 />
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                     {loading ? (
                         [1, 2, 3, 4].map(i => <div key={i} className="bg-card border border-border rounded-2xl h-[100px] animate-pulse" />)
                     ) : courses?.slice(0, 4).map(course => (
-                        <div key={course.id} className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-shadow group">
-                            <img src={course.thumbnail} alt="" className="w-20 h-16 rounded-lg object-cover border border-border flex-shrink-0" />
+                        <div key={course.id} className="bg-card border border-border rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow group">
+                            <img src={course.thumbnail} alt="" className="w-16 h-12 sm:w-20 sm:h-16 rounded-lg object-cover border border-border flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground font-bold text-[15px] truncate group-hover:text-indigo-600 transition-colors">{course.title}</p>
                                 <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">
@@ -175,5 +177,6 @@ export default function InstructorDashboard() {
                 </div>
             </div>
         </div>
+        </PullToRefresh>
     );
 }

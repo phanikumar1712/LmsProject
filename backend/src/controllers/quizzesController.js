@@ -1,7 +1,7 @@
 const { query, getClient } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapQuizAttempt } = require('../utils/formatters');
-const { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch } = require('../utils/quiz');
+const { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch, drawQuestions } = require('../utils/quiz');
 
 const MAX_ATTEMPTS_PER_DAY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -104,23 +104,25 @@ const createQuiz = async (req, res) => {
     }
 
     const values = [courseId, lessonId, payload.title, payload.description, payload.passingScore,
-        payload.timeLimit, JSON.stringify(payload.questions)];
+        payload.timeLimit, JSON.stringify(payload.questions),
+        payload.selectionConfig ? JSON.stringify(payload.selectionConfig) : null];
     const result = lessonId
         ? await query(`
-            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, questions)
-            VALUES ($1,$2,$3,$4,$5,$6,$7)
+            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, questions, selection_config)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
             ON CONFLICT (lesson_id) DO UPDATE SET
                 title = EXCLUDED.title,
                 description = EXCLUDED.description,
                 passing_score = EXCLUDED.passing_score,
                 time_limit = EXCLUDED.time_limit,
-                questions = EXCLUDED.questions
+                questions = EXCLUDED.questions,
+                selection_config = EXCLUDED.selection_config
             WHERE quizzes.course_id = EXCLUDED.course_id
             RETURNING *
         `, values)
         : await query(`
-            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, questions)
-            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
+            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, questions, selection_config)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
         `, values);
 
     if (!result.rows.length) throw createError('Quiz course mismatch', 409);
@@ -132,16 +134,23 @@ const startAttempt = async (req, res) => {
     const quiz = await loadQuiz(req.params.id);
     await assertCourseAccess({ ...quiz, id: quiz.course_id }, req.user);
 
+    // Reconstruct the exact question set pinned to a session (order preserved)
+    const questionsForIds = (ids) => {
+        const byId = new Map((quiz.questions || []).map(q => [q.id, q]));
+        return (ids || []).map(qid => byId.get(qid)).filter(Boolean);
+    };
+
     const active = await query(`
-        SELECT id, expires_at FROM quiz_attempt_sessions
+        SELECT id, expires_at, question_ids FROM quiz_attempt_sessions
         WHERE quiz_id = $1 AND student_id = $2 AND submitted_at IS NULL AND expires_at > NOW()
         ORDER BY started_at DESC LIMIT 1
     `, [quiz.id, req.user.id]);
     if (active.rows.length) {
+        const pinned = active.rows[0].question_ids;
         return res.json({
             attemptId: active.rows[0].id,
             expiresAt: active.rows[0].expires_at,
-            quiz: serializeQuiz(quiz),
+            quiz: serializeQuiz(quiz, pinned ? { questionOverride: questionsForIds(pinned) } : {}),
         });
     }
 
@@ -153,15 +162,20 @@ const startAttempt = async (req, res) => {
         throw createError(`Maximum ${MAX_ATTEMPTS_PER_DAY} attempts allowed per 24 hours`, 429);
     }
 
+    // Draw this attempt's questions per the quiz's selection config and pin
+    // them to the session so grading uses exactly what was served.
+    const drawn = drawQuestions(quiz.questions || [], quiz.selection_config);
+    if (!drawn.length) throw createError('This quiz has no questions available', 409);
+
     const session = await query(`
-        INSERT INTO quiz_attempt_sessions (quiz_id, student_id, expires_at)
-        VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))
+        INSERT INTO quiz_attempt_sessions (quiz_id, student_id, expires_at, question_ids)
+        VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'), $4)
         RETURNING id, expires_at
-    `, [quiz.id, req.user.id, quiz.time_limit]);
+    `, [quiz.id, req.user.id, quiz.time_limit, drawn.map(q => q.id)]);
     res.status(201).json({
         attemptId: session.rows[0].id,
         expiresAt: session.rows[0].expires_at,
-        quiz: serializeQuiz(quiz),
+        quiz: serializeQuiz(quiz, { questionOverride: drawn }),
     });
 };
 
@@ -192,6 +206,17 @@ const submitAttempt = async (req, res) => {
         if (session.rows[0].submitted_at) throw createError('Quiz attempt already submitted', 409);
         if (new Date(session.rows[0].expires_at).getTime() < Date.now()) throw createError('Quiz time limit expired', 409);
 
+        // Grade against the exact question set pinned to this session (question
+        // banks serve a subset per attempt); legacy sessions fall back to all.
+        const pinnedIds = session.rows[0].question_ids;
+        const attemptQuestions = pinnedIds
+            ? (() => {
+                const byId = new Map(quiz.questions.map(q => [q.id, q]));
+                return pinnedIds.map(qid => byId.get(qid)).filter(Boolean);
+            })()
+            : quiz.questions;
+        if (Object.keys(answers).length > attemptQuestions.length) throw createError('Too many answers supplied', 400);
+
         const recent = await client.query(`
             SELECT COUNT(*)::int AS count FROM quiz_attempts
             WHERE quiz_id = $1 AND student_id = $2 AND completed_at >= NOW() - INTERVAL '24 hours'
@@ -201,7 +226,7 @@ const submitAttempt = async (req, res) => {
         }
 
         let correctCount = 0;
-        const results = quiz.questions.map(question => {
+        const results = attemptQuestions.map(question => {
             const answer = Object.prototype.hasOwnProperty.call(answers, question.id)
                 ? answers[question.id]
                 : undefined;
@@ -209,7 +234,7 @@ const submitAttempt = async (req, res) => {
             if (correct) correctCount++;
             return { questionId: question.id, correct };
         });
-        const score = quiz.questions.length ? Math.round((correctCount / quiz.questions.length) * 100) : 0;
+        const score = attemptQuestions.length ? Math.round((correctCount / attemptQuestions.length) * 100) : 0;
         const passed = score >= quiz.passing_score;
         const elapsedSeconds = Math.max(0, Math.round(
             (Date.now() - new Date(session.rows[0].started_at).getTime()) / 1000

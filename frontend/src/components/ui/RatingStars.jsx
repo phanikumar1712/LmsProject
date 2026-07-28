@@ -1,4 +1,4 @@
-import { Star, StarHalf } from 'lucide-react';
+import { Star } from 'lucide-react';
 
 export function RatingStars({ rating, size = 14, interactive = false, onRate, max = 5 }) {
     const numericRating = Number(rating) || 0;

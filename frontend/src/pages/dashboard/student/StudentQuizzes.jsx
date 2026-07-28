@@ -35,7 +35,8 @@ export default function StudentQuizzes() {
             <PageHeader title="My Quizzes" subtitle="Review your assessment history and scores" />
 
             <div className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden">
-                <table className="w-full text-left">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left">
                     <thead className="bg-muted/40 border-b border-border">
                         <tr>
                             <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Quiz Name</th>
@@ -84,6 +85,7 @@ export default function StudentQuizzes() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );

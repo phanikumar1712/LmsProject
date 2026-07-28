@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageSquare, Check, X, Star, ExternalLink, Filter, Trash2 } from 'lucide-react';
+import { MessageSquare, Star, Trash2 } from 'lucide-react';
 import { ratingsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,7 @@ export default function ModerateReviews() {
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
         fetchReviews();
     }, []);
 
@@ -16,7 +17,7 @@ export default function ModerateReviews() {
         try {
             const data = await ratingsAPI.getAll();
             setReviews(data);
-        } catch (err) {
+        } catch {
             toast.error("Cloud not load reviews");
         } finally {
             setLoading(false);
@@ -70,14 +71,14 @@ export default function ModerateReviews() {
 
             <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full min-w-[640px] text-left">
                         <thead className="bg-muted/40 border-b border-border">
                             <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Student</th>
-                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Course Info</th>
-                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Rating</th>
-                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Review</th>
-                                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Student</th>
+                                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Course Info</th>
+                                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Rating</th>
+                                <th className="hidden sm:table-cell px-3 sm:px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Review</th>
+                                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -112,7 +113,7 @@ export default function ModerateReviews() {
                                             <Star size={14} fill="currentColor" />
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="hidden sm:table-cell px-6 py-4">
                                         <p className="text-sm text-muted-foreground line-clamp-2 max-w-sm italic">"{r.comment || 'No comment provided.'}"</p>
                                     </td>
                                     <td className="px-6 py-4 text-right">

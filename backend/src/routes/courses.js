@@ -9,7 +9,9 @@ router.get('/instructor/:instructorId', authenticate, asyncHandler(ctrl.getByIns
 router.get('/:id', asyncHandler(ctrl.getById));
 router.get('/:id/lessons', asyncHandler(ctrl.getLessons));
 
-// Instructor routes
+// Instructor + Admin routes — Admins can edit/delete courses within their own
+// department (enforced by assertCourseInScope in the controller).
+// Super Admin has platform-wide override.
 router.post('/', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.create));
 router.put('/:id', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.update));
 router.delete('/:id', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.deleteCourse));

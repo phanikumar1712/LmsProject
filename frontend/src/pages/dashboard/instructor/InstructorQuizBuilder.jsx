@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, GripVertical, CheckCircle, ChevronDown, ChevronUp, CheckSquare, Circle, Type } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Save, GripVertical, CheckCircle, ChevronDown, CheckSquare, Circle, Type, Layers, Upload, Shuffle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coursesAPI, quizzesAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { parseQuestionFile, downloadQuestionTemplate } from '../../../utils/quizImport';
 
 const QUESTION_TYPES = [
     { value: 'MCQ_SINGLE', label: 'Single Choice (Radio)', icon: Circle },
@@ -11,19 +12,43 @@ const QUESTION_TYPES = [
     { value: 'FILL_BLANK', label: 'Fill in the Blank', icon: Type }
 ];
 
+const SELECTION_MODES = [
+    { value: 'ALL', label: 'All Questions' },
+    { value: 'RANDOM', label: 'Random (pick N)' },
+    { value: 'BY_DIFFICULTY', label: 'By Difficulty' },
+    { value: 'BY_CATEGORY', label: 'By Category' },
+];
+
 export default function InstructorQuizBuilder() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
     const [saving, setSaving] = useState(false);
+    const [importing, setImporting] = useState(false);
 
     const [quizInfo, setQuizInfo] = useState({
         courseId: '', title: '', instructions: '', timeLimit: 30, passingScore: 80
     });
 
+    // Selection config for random question drawing
+    const [selectionMode, setSelectionMode] = useState('ALL');
+    const [selectionConfig, setSelectionConfig] = useState({
+        count: 10,
+        easy: 3, medium: 4, hard: 3,
+        categories: {},
+    });
+
     const [questions, setQuestions] = useState([
-        { id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type: 'MCQ_SINGLE', text: '', options: ['', ''], correctAnswers: [0], isExpanded: true }
+        // eslint-disable-next-line react-hooks/purity
+        { id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type: 'MCQ_SINGLE', text: '', category: '', options: ['', ''], correctAnswers: [0], difficulty: 'MEDIUM', isExpanded: true }
     ]);
+
+    // Extract unique categories from all questions
+    const categories = useMemo(() => {
+        const cats = new Set();
+        questions.forEach(q => { if (q.category?.trim()) cats.add(q.category.trim()); });
+        return [...cats].sort();
+    }, [questions]);
 
     useEffect(() => {
         coursesAPI.getByInstructor(user.id).then(setCourses);
@@ -33,11 +58,14 @@ export default function InstructorQuizBuilder() {
         setQuizInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
-    const addQuestion = (type) => {
+    const addQuestion = (type, presetCategory = '') => {
         setQuestions([...questions, {
+            // eslint-disable-next-line react-hooks/purity
             id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type, text: '',
+            category: presetCategory,
             options: type.includes('MCQ') ? ['', ''] : [],
             correctAnswers: type === 'MCQ_SINGLE' ? [0] : [],
+            difficulty: 'MEDIUM',
             isExpanded: true
         }]);
     };
@@ -68,7 +96,6 @@ export default function InstructorQuizBuilder() {
     const removeOption = (qIdx, optIdx) => {
         const newQs = [...questions];
         newQs[qIdx].options.splice(optIdx, 1);
-        // clean up correctAnswers array if needed
         newQs[qIdx].correctAnswers = newQs[qIdx].correctAnswers.filter(i => i !== optIdx).map(i => i > optIdx ? i - 1 : i);
         setQuestions(newQs);
     };
@@ -87,6 +114,64 @@ export default function InstructorQuizBuilder() {
             }
         }
         setQuestions(newQs);
+    };
+
+    // Category management
+    const bulkSetCategory = (category) => {
+        setQuestions(prev => prev.map(q => ({ ...q, category })));
+    };
+
+    const addQuestionsByCategory = (type, category) => {
+        addQuestion(type, category);
+    };
+
+    // Import quiz questions from CSV/Excel
+    const handleFileImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const result = await parseQuestionFile(file);
+            if (result.errors.length > 0) {
+                toast.error(`${result.errors.length} row(s) had issues — imported ${result.questions.length} questions`);
+                console.warn('Import errors:', result.errors);
+            }
+            if (result.questions.length === 0) {
+                toast.error('No valid questions found in file');
+                setImporting(false);
+                return;
+            }
+            setQuestions(prev => [...prev, ...result.questions.map(q => ({
+                ...q,
+                category: q.category || '',
+                difficulty: q.difficulty || 'MEDIUM',
+                isExpanded: false,
+            }))]);
+            toast.success(`Imported ${result.questions.length} questions from ${file.name}`);
+        } catch (err) {
+            toast.error('Failed to parse file: ' + err.message);
+        } finally {
+            setImporting(false);
+            e.target.value = '';
+        }
+    };
+
+    const buildSelectionConfig = () => {
+        if (selectionMode === 'ALL') return null;
+        if (selectionMode === 'RANDOM') return { mode: 'RANDOM', count: selectionConfig.count };
+        if (selectionMode === 'BY_DIFFICULTY') {
+            return { mode: 'BY_DIFFICULTY', easy: selectionConfig.easy, medium: selectionConfig.medium, hard: selectionConfig.hard };
+        }
+        if (selectionMode === 'BY_CATEGORY') {
+            // Build categories object from config, only include categories with count > 0
+            const cats = {};
+            Object.entries(selectionConfig.categories).forEach(([cat, count]) => {
+                if (count > 0) cats[cat] = count;
+            });
+            if (Object.keys(cats).length === 0) return null;
+            return { mode: 'BY_CATEGORY', categories: cats };
+        }
+        return null;
     };
 
     const handleSave = async () => {
@@ -111,10 +196,13 @@ export default function InstructorQuizBuilder() {
                 instructions: quizInfo.instructions,
                 timeLimit: parseInt(quizInfo.timeLimit),
                 passingScore: parseInt(quizInfo.passingScore),
+                selectionConfig: buildSelectionConfig(),
                 questions: questions.map(q => ({
                     id: q.id,
                     type: q.type,
                     text: q.text,
+                    category: q.category?.trim() || '',
+                    difficulty: q.difficulty || 'MEDIUM',
                     options: q.options,
                     correctAnswer: q.type === 'MCQ_SINGLE' ? String(q.options[q.correctAnswers[0]])
                         : q.type === 'MCQ_MULTI' ? q.correctAnswers.map(idx => String(q.options[idx]))
@@ -131,13 +219,38 @@ export default function InstructorQuizBuilder() {
         }
     };
 
+    const handleTemplateDownload = () => {
+        downloadQuestionTemplate();
+        toast.success('Template downloaded!');
+    };
+
     const InputClass = "w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-3 px-4 focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow text-[15px]";
+
+    // Count questions per category for display
+    const catCounts = useMemo(() => {
+        const counts = {};
+        questions.forEach(q => {
+            const cat = q.category?.trim() || 'Uncategorized';
+            counts[cat] = (counts[cat] || 0) + 1;
+        });
+        return counts;
+    }, [questions]);
+
+    // For BY_DIFFICULTY mode, count questions per difficulty
+    const diffCounts = useMemo(() => {
+        const counts = { EASY: 0, MEDIUM: 0, HARD: 0 };
+        questions.forEach(q => {
+            const d = q.difficulty || 'MEDIUM';
+            counts[d] = (counts[d] || 0) + 1;
+        });
+        return counts;
+    }, [questions]);
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">
             <div>
                 <h1 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">Quiz Builder</h1>
-                <p className="text-muted-foreground font-medium">Create powerful assessments with varying answer types and anti-cheat enforcements.</p>
+                <p className="text-muted-foreground font-medium">Create powerful assessments with categories, random selection, and anti-cheat enforcements.</p>
             </div>
 
             <div className="bg-card border border-border shadow-sm rounded-2xl p-8 space-y-5">
@@ -169,75 +282,307 @@ export default function InstructorQuizBuilder() {
                 </div>
             </div>
 
-            <div className="space-y-5">
-                {questions.map((q, qIdx) => {
-                    const QIcon = QUESTION_TYPES.find(t => t.value === q.type)?.icon || Type;
-                    return (
-                        <div key={q.id} className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden transition-all">
-                            <div className="bg-muted/40 border-b border-border p-4 flex items-center gap-3">
-                                <GripVertical size={18} className="text-muted-foreground/60 cursor-move" />
-                                <span className="bg-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider">Q{qIdx + 1}</span>
-                                <QIcon size={18} className="text-muted-foreground" />
-                                <span className="text-foreground/80 font-bold text-[14px] flex-1">{QUESTION_TYPES.find(t => t.value === q.type)?.label}</span>
-                                <button onClick={() => updateQuestion(qIdx, 'isExpanded', !q.isExpanded)} className="p-2 text-muted-foreground/60 hover:bg-muted hover:text-foreground/80 rounded-lg transition-colors"><ChevronDown size={18} className={q.isExpanded ? "rotate-180 transition-transform" : "transition-transform"} /></button>
-                                <button onClick={() => removeQuestion(qIdx)} className="p-2 text-rose-500/70 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"><Trash2 size={18} /></button>
-                            </div>
+            {/* Question Selection Mode */}
+            <div className="bg-card border border-border shadow-sm rounded-2xl p-8 space-y-5">
+                <h2 className="text-xl font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
+                    <Shuffle size={18} className="text-indigo-500" />
+                    Question Selection Mode
+                </h2>
+                <p className="text-sm text-muted-foreground font-medium">
+                    Choose how questions are picked when a student starts the quiz.
+                        You have <strong className="text-foreground">{questions.length}</strong> questions in the bank.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {SELECTION_MODES.map(mode => {
+                            const isActive = selectionMode === mode.value;
+                            return (
+                                <button
+                                    key={mode.value}
+                                    onClick={() => setSelectionMode(mode.value)}
+                                    className={`px-4 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                                        isActive
+                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                                            : 'border-border bg-card text-muted-foreground hover:border-indigo-300 hover:text-indigo-600'
+                                    }`}
+                                >
+                                    {mode.label}
+                                </button>
+                            );
+                        })}
+                    </div>
 
-                            {q.isExpanded && (
-                                <div className="p-6 space-y-5">
-                                    <div>
-                                        <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Question Prompt *</label>
-                                        <textarea value={q.text} onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)} className={`${InputClass} min-h-[80px]`} placeholder="What is the output of..." />
+                    {selectionMode === 'RANDOM' && (
+                        <div className="bg-muted/30 border border-border rounded-xl p-5">
+                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">
+                                Number of random questions per attempt
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                max={questions.length}
+                                value={selectionConfig.count}
+                                onChange={e => setSelectionConfig(prev => ({ ...prev, count: Math.min(Number(e.target.value), questions.length) }))}
+                                className={InputClass}
+                            />
+                            <p className="text-xs text-muted-foreground mt-2 font-medium">Each student will get {Math.min(selectionConfig.count, questions.length)} random questions from your bank of {questions.length}.</p>
+                        </div>
+                    )}
+
+                    {selectionMode === 'BY_DIFFICULTY' && (
+                        <div className="bg-muted/30 border border-border rounded-xl p-5 space-y-4">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Available: {Object.entries(diffCounts).map(([d, c]) => `${d}: ${c}`).join(' | ')}</p>
+                            <div className="grid grid-cols-3 gap-4">
+                                {['easy', 'medium', 'hard'].map(level => (
+                                    <div key={level}>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase block mb-1.5 capitalize">{level}</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max={diffCounts[level.toUpperCase()]}
+                                            value={selectionConfig[level]}
+                                            onChange={e => setSelectionConfig(prev => ({ ...prev, [level]: Math.min(Number(e.target.value), diffCounts[level.toUpperCase()]) }))}
+                                            className={InputClass}
+                                        />
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-                                    {(q.type === 'MCQ_SINGLE' || q.type === 'MCQ_MULTI') && (
-                                        <div className="bg-muted/40 border border-border rounded-xl p-5 space-y-4">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Options & Correct Answer</label>
-                                            {q.options.map((opt, oIdx) => (
-                                                <div key={oIdx} className="flex items-center gap-3">
-                                                    <button onClick={() => toggleCorrectOption(qIdx, oIdx)} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors flex-shrink-0 shadow-sm ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-card border border-border text-transparent hover:border-indigo-400'}`}>
-                                                        {q.correctAnswers.includes(oIdx) && <CheckCircle size={16} />}
-                                                    </button>
-                                                    <input type="text" value={opt} onChange={e => updateOption(qIdx, oIdx, e.target.value)} className="flex-1 bg-card border border-border rounded-lg py-2.5 px-3 text-[14px] font-bold text-foreground outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 shadow-sm" placeholder={`Option ${oIdx + 1}`} />
-                                                    <button onClick={() => removeOption(qIdx, oIdx)} className="p-2 text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                                                </div>
-                                            ))}
-                                            <button onClick={() => addOption(qIdx)} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 mt-2 transition-colors"><Plus size={14} /> Add Option</button>
-                                        </div>
-                                    )}
-
-                                    {q.type === 'FILL_BLANK' && (
-                                        <div className="bg-muted/40 border border-border rounded-xl p-5">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">Acceptable Answer(s) (Case-insensitive)</label>
-                                            <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
-                                                const newQs = [...questions]; newQs[qIdx].correctAnswers = [e.target.value]; setQuestions(newQs);
-                                            }} className={InputClass} placeholder="Exact valid text..." />
-                                        </div>
-                                    )}
-
-                                </div>
+                    {selectionMode === 'BY_CATEGORY' && (
+                        <div className="bg-muted/30 border border-border rounded-xl p-5 space-y-4">
+                            {categories.length === 0 ? (
+                                <p className="text-sm text-muted-foreground font-medium text-center py-4">
+                                    No categories yet. Assign categories to your questions below, then configure how many to pick from each.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pick N questions from each category:</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {categories.map(cat => (
+                                            <div key={cat} className="flex items-center gap-3">
+                                                <label className="text-sm font-bold text-foreground flex-1 capitalize">{cat} <span className="text-xs text-muted-foreground font-medium">({catCounts[cat] || 0} available)</span></label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max={catCounts[cat] || 0}
+                                                    value={selectionConfig.categories[cat] || 0}
+                                                    onChange={e => {
+                                                        const val = Math.min(Number(e.target.value), catCounts[cat] || 0);
+                                                        setSelectionConfig(prev => ({
+                                                            ...prev,
+                                                            categories: { ...prev.categories, [cat]: val }
+                                                        }));
+                                                    }}
+                                                    className="w-20 px-3 py-2 bg-card border border-border rounded-xl text-sm font-bold text-center outline-none focus:ring-2 focus:ring-indigo-100"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </div>
-                    );
-                })}
-            </div>
+                    )}
 
-            <div className="flex flex-wrap gap-3 pt-5">
-                {QUESTION_TYPES.map(qt => (
-                    <button key={qt.value} onClick={() => addQuestion(qt.value)} className="px-4 py-2.5 bg-card border border-border hover:bg-muted/40 hover:border-border rounded-xl text-[13px] font-bold text-foreground/80 flex items-center gap-2 shadow-sm transition-all focus:ring-2 focus:ring-indigo-100">
-                        <Plus size={16} className="text-indigo-600" /> Add {qt.label}
-                    </button>
-                ))}
-            </div>
+                    {selectionMode !== 'ALL' && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                            <p className="text-xs text-amber-800 font-medium flex items-center gap-2">
+                                <Shuffle size={14} />
+                                Each student will receive a different randomized subset of questions from your question bank.
+                            </p>
+                        </div>
+                    )}
+                </div>
 
-            <div className="fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-md p-4 border-t border-border z-20 flex justify-end px-8 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
-                <div className="w-full max-w-4xl mx-auto flex justify-end gap-3">
-                    <button onClick={() => navigate(-1)} className="px-6 py-2.5 rounded-xl text-[14px] font-bold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted transition-colors">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-xl text-[14px] font-bold text-white flex items-center gap-2 shadow-sm transition-colors">
-                        <Save size={18} /> {saving ? 'Saving...' : 'Save Active Quiz'}
-                    </button>
+                {/* Import Section */}
+                <div className="bg-card border border-border shadow-sm rounded-2xl p-8 space-y-4">
+                    <h2 className="text-xl font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
+                        <Upload size={18} className="text-indigo-500" />
+                        Import Questions
+                    </h2>
+                    <div className="flex flex-wrap gap-3">
+                        <label className={`px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-[13px] font-bold text-indigo-700 flex items-center gap-2 cursor-pointer transition-colors ${importing ? 'opacity-60' : ''}`}>
+                            <Upload size={16} />
+                            {importing ? 'Importing...' : 'Upload CSV / Excel'}
+                            <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileImport} className="hidden" disabled={importing} />
+                        </label>
+                        <button onClick={handleTemplateDownload} className="px-4 py-2.5 bg-card border border-border hover:bg-muted/40 rounded-xl text-[13px] font-bold text-foreground/80 flex items-center gap-2 transition-colors">
+                            <Plus size={16} /> Download Template
+                        </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                        Supports CSV or Excel files. Include a <strong>category</strong> column to organize questions by topic.
+                    </p>
+                </div>
+
+                {/* Question Categories Summary */}
+                {categories.length > 0 && (
+                    <div className="bg-card border border-border shadow-sm rounded-2xl p-6">
+                        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                            <Layers size={16} className="text-indigo-500" />
+                            Question Categories
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.map(cat => (
+                                <span key={cat} className="bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-indigo-100">
+                                    <Layers size={12} />
+                                    {cat}
+                                    <span className="bg-indigo-200 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded-full">{catCounts[cat]}</span>
+                                </span>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => bulkSetCategory('')}
+                            className="text-xs text-muted-foreground hover:text-rose-500 font-medium mt-3 transition-colors"
+                        >
+                            Clear all categories
+                        </button>
+                    </div>
+                )}
+
+                {/* Questions */}
+                <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold text-foreground">
+                            Questions <span className="text-muted-foreground text-base font-medium ml-2">({questions.length})</span>
+                        </h2>
+                    </div>
+                    {questions.map((q, qIdx) => {
+                        const QIcon = QUESTION_TYPES.find(t => t.value === q.type)?.icon || Type;
+                        return (
+                            <div key={q.id} className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden transition-all">
+                                <div className="bg-muted/40 border-b border-border p-4 flex items-center gap-3">
+                                    <GripVertical size={18} className="text-muted-foreground/60 cursor-move" />
+                                    <span className="bg-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider">Q{qIdx + 1}</span>
+                                    <QIcon size={18} className="text-muted-foreground" />
+                                    <span className="text-foreground/80 font-bold text-[14px] flex-1">{QUESTION_TYPES.find(t => t.value === q.type)?.label}</span>
+                                    {q.category && (
+                                        <span className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-indigo-100">{q.category}</span>
+                                    )}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                                        q.difficulty === 'EASY' ? 'bg-emerald-50 text-emerald-600' :
+                                        q.difficulty === 'HARD' ? 'bg-rose-50 text-rose-600' :
+                                        'bg-amber-50 text-amber-600'
+                                    }`}>{q.difficulty}</span>
+                                    <button onClick={() => updateQuestion(qIdx, 'isExpanded', !q.isExpanded)} className="p-2 text-muted-foreground/60 hover:bg-muted hover:text-foreground/80 rounded-lg transition-colors"><ChevronDown size={18} className={q.isExpanded ? "rotate-180 transition-transform" : "transition-transform"} /></button>
+                                    <button onClick={() => removeQuestion(qIdx)} className="p-2 text-rose-500/70 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                                </div>
+
+                                {q.isExpanded && (
+                                    <div className="p-6 space-y-5">
+                                        <div>
+                                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Question Prompt *</label>
+                                            <textarea value={q.text} onChange={(e) => updateQuestion(qIdx, 'text', e.target.value)} className={`${InputClass} min-h-[80px]`} placeholder="What is the output of..." />
+                                        </div>
+
+                                        {/* Category and Difficulty Row */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                                                    <Layers size={12} className="inline mr-1" /> Category
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={q.category || ''}
+                                                        onChange={e => updateQuestion(qIdx, 'category', e.target.value)}
+                                                        className="flex-1 bg-card border border-border rounded-lg py-2.5 px-3 text-[13px] font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 shadow-sm"
+                                                        placeholder="e.g. React Basics, Variables"
+                                                        list={`categories-list-${qIdx}`}
+                                                    />
+                                                    <datalist id={`categories-list-${qIdx}`}>
+                                                        {categories.map(cat => <option key={cat} value={cat} />)}
+                                                    </datalist>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Difficulty</label>
+                                                <select
+                                                    value={q.difficulty || 'MEDIUM'}
+                                                    onChange={e => updateQuestion(qIdx, 'difficulty', e.target.value)}
+                                                    className="w-full bg-card border border-border rounded-lg py-2.5 px-3 text-[13px] font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 shadow-sm"
+                                                >
+                                                    <option value="EASY">Easy</option>
+                                                    <option value="MEDIUM">Medium</option>
+                                                    <option value="HARD">Hard</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {(q.type === 'MCQ_SINGLE' || q.type === 'MCQ_MULTI') && (
+                                            <div className="bg-muted/40 border border-border rounded-xl p-5 space-y-4">
+                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Options & Correct Answer</label>
+                                                {q.options.map((opt, oIdx) => (
+                                                    <div key={oIdx} className="flex items-center gap-3">
+                                                        <button onClick={() => toggleCorrectOption(qIdx, oIdx)} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors flex-shrink-0 shadow-sm ${q.correctAnswers.includes(oIdx) ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-card border border-border text-transparent hover:border-indigo-400'}`}>
+                                                            {q.correctAnswers.includes(oIdx) && <CheckCircle size={16} />}
+                                                        </button>
+                                                        <input type="text" value={opt} onChange={e => updateOption(qIdx, oIdx, e.target.value)} className="flex-1 bg-card border border-border rounded-lg py-2.5 px-3 text-[14px] font-bold text-foreground outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 shadow-sm" placeholder={`Option ${oIdx + 1}`} />
+                                                        <button onClick={() => removeOption(qIdx, oIdx)} className="p-2 text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                                <button onClick={() => addOption(qIdx)} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 mt-2 transition-colors"><Plus size={14} /> Add Option</button>
+                                            </div>
+                                        )}
+
+                                        {q.type === 'FILL_BLANK' && (
+                                            <div className="bg-muted/40 border border-border rounded-xl p-5">
+                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">Acceptable Answer(s) (Case-insensitive)</label>
+                                                <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
+                                                    const newQs = [...questions]; newQs[qIdx].correctAnswers = [e.target.value]; setQuestions(newQs);
+                                                }} className={InputClass} placeholder="Exact valid text..." />
+                                            </div>
+                                        )}
+
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="flex flex-wrap gap-3 pt-5">
+                    {QUESTION_TYPES.map(qt => (
+                        <button key={qt.value} onClick={() => addQuestion(qt.value)} className="px-4 py-2.5 bg-card border border-border hover:bg-muted/40 hover:border-border rounded-xl text-[13px] font-bold text-foreground/80 flex items-center gap-2 shadow-sm transition-all focus:ring-2 focus:ring-indigo-100">
+                            <Plus size={16} className="text-indigo-600" /> Add {qt.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Quick-add by category */}
+                {categories.length > 0 && (
+                    <div className="bg-muted/20 border border-border rounded-2xl p-6">
+                        <h3 className="text-sm font-bold text-foreground mb-3">Quick Add to Category</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {categories.map(cat => (
+                                <div key={cat} className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2">
+                                    <span className="text-xs font-bold text-foreground capitalize">{cat}</span>
+                                    <button
+                                        onClick={() => addQuestionsByCategory('MCQ_SINGLE', cat)}
+                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg transition-colors"
+                                    >
+                                        + MCQ
+                                    </button>
+                                    <button
+                                        onClick={() => addQuestionsByCategory('FILL_BLANK', cat)}
+                                        className="text-[10px] font-bold text-purple-600 hover:text-purple-700 bg-purple-50 px-2 py-1 rounded-lg transition-colors"
+                                    >
+                                        + Fill
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-md p-4 border-t border-border z-20 flex justify-end px-8 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+                    <div className="w-full max-w-4xl mx-auto flex justify-end gap-3">
+                        <button onClick={() => navigate(-1)} className="px-6 py-2.5 rounded-xl text-[14px] font-bold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted transition-colors">Cancel</button>
+                        <button onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-xl text-[14px] font-bold text-white flex items-center gap-2 shadow-sm transition-colors">
+                            <Save size={18} /> {saving ? 'Saving...' : 'Save Active Quiz'}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
     );
 }

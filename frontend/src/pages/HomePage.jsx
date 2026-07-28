@@ -1,17 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
-import CountUp from 'react-countup';
-import Marquee from 'react-fast-marquee';
-import Tilt from 'react-parallax-tilt';
-import { Typewriter } from 'react-simple-typewriter';
+import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+// react-countup ships as CommonJS; under Vite's dep optimizer the default
+// import can resolve to the module namespace ({ default, useCountUp }) instead
+// of the component. Unwrap the interop so <CountUp> is always the component.
+import CountUpImport from 'react-countup';
+const CountUp = CountUpImport?.default ?? CountUpImport;
+// react-fast-marquee is CommonJS with `exports.default`; unwrap the interop
+// so <Marquee> is the component and not the module namespace object.
+import MarqueeImport from 'react-fast-marquee';
+const Marquee = MarqueeImport?.default ?? MarqueeImport;
+// react-simple-typewriter is CommonJS with named exports only; under Vite's
+// optimizer the named `{ Typewriter }` import can resolve to undefined, so pull
+// it off the namespace/default defensively.
+import * as TypewriterNS from 'react-simple-typewriter';
+const Typewriter = TypewriterNS.Typewriter ?? TypewriterNS.default?.Typewriter ?? TypewriterNS.default;
 import {
     ArrowRight, GraduationCap, Zap, Shield, TrendingUp,
-    Play, Users, BookOpen, Award, Clock, ChevronRight, Menu, X,
-    Sparkles, Compass, RefreshCw, Quote, Star
+    Play, Users, BookOpen, Clock, ChevronRight,
+    Sparkles, Compass, RefreshCw
 } from 'lucide-react';
 import { coursesAPI, statsAPI } from '../services/api';
-import { testimonials, partnerBrands } from '../data/testimonials';
 import studentImg from '../assets/student.jpg';
 
 // ─── Animated stat: counts up on scroll, preserves prefix/suffix ──────────────
@@ -74,7 +83,6 @@ export default function HomePage() {
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
     const [categories, setCategories] = useState([]);
-    const [activeTestimonial, setActiveTestimonial] = useState(0);
 
     // Respect the user's reduced-motion preference: disables count-ups, tilt,
     // the typewriter loop, and marquee autoplay for a calm, static experience.
@@ -108,20 +116,6 @@ export default function HomePage() {
             .then(data => setCategories(Array.isArray(data) ? data : []))
             .catch(() => { });
     }, []);
-
-    // Auto-rotate testimonials (paused when reduced motion is requested).
-    useEffect(() => {
-        if (reduced || testimonials.length <= 1) return;
-        const id = setInterval(() => {
-            setActiveTestimonial(t => (t + 1) % testimonials.length);
-        }, 5500);
-        return () => clearInterval(id);
-    }, [reduced]);
-
-    const fadeUp = {
-        hidden: { opacity: 0, y: 32 },
-        visible: (delay = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } })
-    };
 
     return (
         <>
@@ -821,19 +815,19 @@ export default function HomePage() {
                             <div className="hp-hero__stats">
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        <CountStat value={stats?.totalStudents || 10000} suffix="+" reduced={reduced} />
+                                        <CountStat value={stats?.totalStudents || 0} suffix="+" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Students Enrolled</div>
                                 </div>
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        <CountStat value={stats?.totalCourses || 50} suffix="+" reduced={reduced} />
+                                        <CountStat value={stats?.totalCourses || 0} suffix="+" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Courses Available</div>
                                 </div>
                                 <div className="hp-hero__stat-item">
                                     <div className="hp-hero__stat-num">
-                                        <CountStat value={parseFloat(stats?.avgRating) || 4.9} decimals={1} suffix="★" reduced={reduced} />
+                                        <CountStat value={parseFloat(stats?.avgRating) || 0} decimals={1} suffix="★" reduced={reduced} />
                                     </div>
                                     <div className="hp-hero__stat-label">Avg. Rating</div>
                                 </div>
@@ -864,10 +858,10 @@ export default function HomePage() {
                 <div className="hp-statsbar">
                     <div className="hp-statsbar__inner">
                         {[
-                            { value: stats?.totalStudents || 18, suffix: '+', label: 'Happy Learners' },
-                            { value: stats?.totalCourses || 1, suffix: '+', label: 'Courses Published' },
-                            { value: stats?.totalInstructors || 3, suffix: '+', label: 'Expert Instructors' },
-                            { value: stats?.satisfactionRate || 60, suffix: '%', label: 'Satisfaction Rate' },
+                            { value: stats?.totalStudents || 0, suffix: '+', label: 'Happy Learners' },
+                            { value: stats?.totalCourses || 0, suffix: '+', label: 'Courses Published' },
+                            { value: stats?.totalInstructors || 0, suffix: '+', label: 'Expert Instructors' },
+                            { value: stats?.satisfactionRate || 0, suffix: '%', label: 'Satisfaction Rate' },
                         ].map((s, i) => (
                             <motion.div
                                 key={i}
@@ -885,18 +879,25 @@ export default function HomePage() {
                     </div>
                 </div>
 
-                {/* ── Partner / trusted-by logo strip ────────────── */}
-                <section className="hp-partners">
-                    <div className="hp-partners__label">Trusted by teams and learners at</div>
-                    <Marquee gradient={false} speed={40} pauseOnHover play={!reduced} autoFill>
-                        {partnerBrands.map((brand, i) => (
-                            <span className="hp-partner" key={i}>
-                                <span className="hp-partner__dot" />
-                                {brand}
-                            </span>
-                        ))}
-                    </Marquee>
-                </section>
+                {/* ── Category marquee strip (live data) ─────────── */}
+                {categories.length > 0 && (
+                    <section className="hp-partners">
+                        <div className="hp-partners__label">Explore learning across every domain</div>
+                        <Marquee gradient={false} speed={40} pauseOnHover play={!reduced} autoFill>
+                            {categories.map((cat) => (
+                                <span
+                                    className="hp-partner"
+                                    key={cat.id}
+                                    onClick={() => navigate(`/courses?category=${cat.id}`)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <span className="hp-partner__dot" />
+                                    {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                                </span>
+                            ))}
+                        </Marquee>
+                    </section>
+                )}
 
                 {/* ── Features ───────────────────────────────────── */}
                 <section id="features" className="hp-section hp-features">

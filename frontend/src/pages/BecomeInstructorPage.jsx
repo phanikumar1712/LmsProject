@@ -32,7 +32,7 @@ const FAQS = [
 ];
 
 export default function BecomeInstructorPage() {
-    const { user, updateUser } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);

@@ -161,39 +161,9 @@ const upgrade = async (req, res) => {
     res.json({ success: true, plan: p, user: mapUser(userRes.rows[0]) });
 };
 
-// GET /api/categories
-const getCategories = async (req, res) => {
-    const result = await query(`
-        SELECT cat.*, COUNT(c.id) as course_count
-        FROM categories cat
-        LEFT JOIN courses c ON c.category_id = cat.id AND c.status = 'PUBLISHED'
-        GROUP BY cat.id
-        ORDER BY cat.name ASC
-    `);
-    res.json(result.rows);
-};
-
-// POST /api/categories (Admin)
-const createCategory = async (req, res) => {
-    const { name, icon = '📚' } = req.body;
-    if (!name) throw createError('Category name is required', 400);
-    const result = await query(
-        'INSERT INTO categories (name, icon) VALUES ($1,$2) RETURNING *',
-        [name, icon]
-    );
-    res.status(201).json(result.rows[0]);
-};
-
-// DELETE /api/categories/:id (Admin)
-const deleteCategory = async (req, res) => {
-    const result = await query('DELETE FROM categories WHERE id = $1 RETURNING id', [req.params.id]);
-    if (!result.rows.length) throw createError('Category not found', 404);
-    res.json({ success: true });
-};
-
 // PUT /api/subscriptions/plans/:id (Super Admin)
 const updatePlan = async (req, res) => {
-    const { price, duration, features } = req.body;
+    const { name, price, duration, features, popular } = req.body;
     const { id } = req.params;
     const assignments = normalizeCourseAssignments(req.body);
     const client = await getClient();
@@ -202,11 +172,40 @@ const updatePlan = async (req, res) => {
         await client.query('BEGIN');
         await ensureSubscriptionCourseSchema(client);
 
+        // Build a dynamic SET clause so only provided fields are updated.
+        // This avoids accidentally NULL-ing out columns that carry NOT NULL
+        // constraints (e.g. price) when the caller only wants to change name.
+        const updates = [];
+        const values = [];
+        let i = 1;
+
+        const fields = { name, price, duration, features, popular };
+        for (const [key, val] of Object.entries(fields)) {
+            if (val === undefined) continue;
+            if (key === 'price') {
+                const num = Number(val);
+                if (!Number.isFinite(num)) throw createError('price must be a valid number', 400);
+                updates.push(`${key} = $${i++}`);
+                values.push(num);
+            } else if (key === 'popular') {
+                updates.push(`${key} = $${i++}`);
+                values.push(Boolean(val));
+            } else if (key === 'duration') {
+                updates.push(`${key} = $${i++}`);
+                values.push(Number(val) || 30);
+            } else {
+                updates.push(`${key} = $${i++}`);
+                values.push(val);
+            }
+        }
+
+        if (!updates.length) throw createError('No fields to update', 400);
+        updates.push(`updated_at = NOW()`);
+        values.push(id);
+
         const result = await client.query(
-            `UPDATE subscription_plans 
-             SET price = $1, duration = $2, features = $3, updated_at = NOW() 
-             WHERE id = $4 RETURNING id`,
-            [price, duration, features, id]
+            `UPDATE subscription_plans SET ${updates.join(', ')} WHERE id = $${i} RETURNING id`,
+            values
         );
 
         if (!result.rows.length) throw createError('Plan not found', 404);
@@ -285,4 +284,4 @@ const deletePlan = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { getPlans, upgrade, updatePlan, createPlan, deletePlan, getCategories, createCategory, deleteCategory };
+module.exports = { getPlans, upgrade, updatePlan, createPlan, deletePlan };

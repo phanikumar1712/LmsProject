@@ -1,0 +1,199 @@
+# EduNexus LMS — Admin & Super Admin Feature Comparison
+
+> **Route reuse note**: Super Admin reuses the `/admin/users`, `/admin/courses`, and  
+> `/admin/attendance` frontend routes. The **same page component** renders for both roles,  
+> but the **backend enforces elevated permissions** via the `getDepartmentScope` middleware  
+> — a scoped Admin sees only their department's data, while Super Admin sees everything  
+> platform-wide. This is by design, not a copy-paste error.
+
+---
+
+## 🛡️ Admin (Department-Scoped)
+
+Admins are **scoped to their department**. They only see courses, users, and data within their assigned department.
+
+### Dashboard
+| Feature | Access |
+|---------|--------|
+| `/admin` | Dashboard overview with key metrics for their department |
+
+### 👥 User Management
+| Feature | Details |
+|---------|---------|
+| `/admin/users` | View STUDENT + INSTRUCTOR users in their department only |
+| Create Instructor accounts | ✅ |
+| Change user roles (Student↔Instructor) | ✅ **Within department only** (cannot promote to Admin/Super Admin) |
+| Suspend/Activate users | ✅ Department non-admin users |
+| Reset user passwords | ✅ Generates temp password, notifies user |
+| Delete users (non-admin) | ✅ With confirm dialog + audit log entry |
+| Bulk import Instructors (CSV/Excel) | ✅ Into own department |
+| Bulk import Students (CSV/Excel) | ✅ Into own department |
+| Bulk export users (CSV) | ✅ Department-scoped |
+
+### 📚 Course Management
+| Feature | Details |
+|---------|---------|
+| `/admin/courses` | View courses in their department |
+| Create/Edit/Delete courses | ✅ Department courses only |
+| Approve/Reject course submissions | ✅ |
+| Send back to Draft with review notes | ✅ |
+| Edit sections, lessons, quizzes | ✅ Within dept courses |
+| `/admin/categories` | Create/Edit/Delete/Import categories | ✅ Department categories |
+
+### 🎓 Student Progress & Enrollment
+| Feature | Details |
+|---------|---------|
+| `/admin/student-progress` | Track student progress across dept courses |
+| `/admin/bulk-enroll` | Bulk enroll students into courses |
+
+### 📝 Assignments & Reviews
+| Feature | Details |
+|---------|---------|
+| `/admin/assignments` | Manage submissions and grading |
+| `/admin/reviews` | Moderate course reviews |
+
+### 📢 Announcements & Calendar
+| Feature | Details |
+|---------|---------|
+| `/admin/announcements` | Create/delete department-scoped announcements |
+| `/admin/timetable` | Academic Calendar — manage sessions (name, start/end dates, enrollment windows) |
+
+### 📊 Reports & Analytics
+| Feature | Details |
+|---------|---------|
+| `/admin/reports` | Department-level reports (enrollments, revenue, ratings) |
+| Export reports as CSV | ✅ |
+
+### 🎥 Attendance
+| Feature | Details |
+|---------|---------|
+| `/admin/attendance` | Create/manage live sessions across dept courses |
+| Mark attendance (Present/Absent/Late/Excused) | ✅ |
+| Bulk mark all present/absent | ✅ (with `window.confirm` safeguard) |
+| View per-student attendance stats | ✅ |
+
+---
+
+## 👑 Super Admin (Platform-Wide)
+
+Super Admins have **unrestricted access** across the entire platform. They see everything.
+
+### Dashboard & Analytics
+| Feature | Details |
+|---------|---------|
+| `/super-admin` | Platform-wide dashboard |
+| `/super-admin/analytics` | Revenue trends, user growth, course engagement |
+| `/super-admin/ai-analytics` | AI-powered analytics reports |
+
+### 🏛️ Department Management
+| Feature | Details |
+|---------|---------|
+| `/super-admin/departments` | Create/Edit/Delete departments |
+| `/super-admin/departments/:id` | Department detail view with analytics |
+
+### 👤 Admin Management
+| Feature | Details |
+|---------|---------|
+| `/super-admin/admins` | Create Admin accounts |
+| Assign departments to admins | ✅ Multi-department assignment |
+| Set per-admin quotas (max students, max courses) | ✅ |
+| Demote/Remove admin access | ✅ |
+
+### 👥 User Management (Global — reuses `/admin/users` route with elevated perms)
+| Feature | Details |
+|---------|---------|
+| `/admin/users` | **Full access** to ALL users across ALL roles |
+| Promote to Admin/Super Admin | ✅ |
+| Change any user's role | ✅ |
+| Bulk import into any department | ✅ |
+| Force password reset | ✅ |
+| Suspend/Activate/Delete any user | ✅ |
+
+### 📚 Course Oversight (Global — reuses `/admin/courses` route with elevated perms)
+| Feature | Details |
+|---------|---------|
+| `/admin/courses` | View ALL courses across ALL departments |
+| Force-edit/delete any course | ✅ |
+| Override course status | ✅ |
+| Override instructor/admin decisions | ✅ |
+
+### 💳 Subscription & Billing
+| Feature | Details |
+|---------|---------|
+| `/admin/subscriptions` | Create/Edit/Delete pricing plans |
+| View invoices | ✅ |
+| Handle refunds | ✅ |
+
+### ⚙️ Platform Settings
+| Feature | Details |
+|---------|---------|
+| `/super-admin/settings` | Configure: Site name, tagline, branding |
+| Email/SMTP configuration | ✅ |
+| Payment gateway (Razorpay/Stripe) | ✅ |
+| SSO/Login configuration | ✅ |
+| Terms & Policies | ✅ |
+| 2FA enforcement platform-wide | ✅ |
+| JWT expiry, rate limits | ✅ |
+
+### 🔍 Audit Logs
+| Feature | Details |
+|---------|---------|
+| `/super-admin/audit-logs` | View every action by every user |
+| Filter by user/action/date | ✅ |
+| Export as CSV | ✅ |
+
+### 🩺 System Health
+| Feature | Details |
+|---------|---------|
+| `/super-admin/system` | Server uptime monitoring |
+| Database status/latency | ✅ |
+| Memory usage | ✅ |
+| Service health dashboard | ✅ |
+
+### 📢 Announcements (Global)
+| Feature | Details |
+|---------|---------|
+| Platform-wide announcements | ✅ |
+| Target specific roles | ✅ |
+
+### 🎥 Attendance (Global — reuses `/admin/attendance` route with elevated perms)
+| Feature | Details |
+|---------|---------|
+| `/admin/attendance` | View ALL live sessions across all courses |
+| Mark attendance for any course | ✅ |
+
+---
+
+## 🔒 Safeguards on Destructive Actions
+
+| Action | Confirm Dialog | Audit Log | Self-Delete Protection | Scope Check |
+|--------|:--------------:|:---------:|:----------------------:|:-----------:|
+| Delete user | ✅ Frontend `window.confirm` | ✅ `audit_logs` entry | ✅ Cannot delete self | ✅ `assertUserInScope` |
+| Suspend user | ✅ Frontend confirm | ✅ `USER_SUSPENDED` / `USER_ACTIVATED` | ❌ (not applicable) | ✅ Dept-scoped |
+| Change role | ❌ No confirm | ✅ `USER_ROLE_CHANGED` with old/new roles | ❌ | ✅ Dept-scoped |
+| Reset password | ❌ No confirm | ✅ `USER_PASSWORD_RESET` | ❌ | ✅ Dept-scoped |
+| Bulk mark attendance | ✅ `window.confirm` | ❌ Not individually logged | ❌ | ✅ Session ownership |
+
+---
+
+## Quick Comparison Table
+
+| Capability | 🛡️ Admin (Dept) | 👑 Super Admin |
+|-----------|:----------------:|:--------------:|
+| **Dashboard** | ✅ Dept-scoped | ✅ Platform-wide |
+| **Manage Users** | ✅ Dept students + instructors | ✅ All roles globally |
+| **Change user role** | ✅ Student↔Instructor only | ✅ Any role |
+| **Create Admin** | ❌ | ✅ |
+| **Bulk Import** | ✅ Own dept | ✅ Any dept |
+| **Course CRUD** | ✅ Dept courses | ✅ All courses globally |
+| **Approve/Reject courses** | ✅ | ✅ Override |
+| **Categories** | ✅ Dept | ✅ Any |
+| **Departments** | ❌ | ✅ Create/Edit/Delete |
+| **Subscriptions** | ❌ | ✅ Plans + billing |
+| **Platform Settings** | ❌ | ✅ Full config |
+| **Audit Logs** | ❌ | ✅ View + export |
+| **System Health** | ❌ | ✅ Monitor |
+| **AI Reports** | ❌ | ✅ |
+| **Academic Calendar** | ✅ Own dept | ✅ All depts |
+| **Live Sessions** | ✅ Own dept | ✅ All courses |
+| **Announcements** | ✅ Dept-scoped | ✅ Platform-wide |

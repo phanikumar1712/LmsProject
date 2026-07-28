@@ -17,44 +17,54 @@ export function DataTable({
     emptyText = 'No data found.',
 }) {
     const colSpan = columns.length;
+    const isActionsLast = columns.length > 0 && (columns[columns.length - 1] === 'Actions' || columns[columns.length - 1] === 'Action');
 
     return (
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-foreground">
-                    <thead className="bg-muted/60 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        <tr>
-                            {columns.map((col, i) => (
-                                <th
-                                    key={col}
-                                    className={`px-6 py-4 ${i === columns.length - 1 && (col === 'Actions' || col === 'Action') ? 'text-right' : ''}`}
-                                >
-                                    {col}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                        {loading ? (
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden relative">
+            {/* Mobile scroll hint */}
+            <div className="md:hidden flex items-center justify-center py-1.5 bg-muted/40 border-b border-border text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
+                <svg className="w-3 h-3 mr-1 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+                Swipe to scroll
+            </div>
+            <div className="overflow-x-auto -mx-1 sm:mx-0">
+                <div className="inline-block min-w-full align-middle">
+                    <table className="w-full text-left text-sm text-foreground min-w-[600px] md:min-w-0">
+                        <thead className="bg-muted/60 border-b border-border text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider">
                             <tr>
-                                <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground font-medium">
-                                    <div className="flex items-center justify-center gap-3">
-                                        <div className="w-5 h-5 border-[3px] border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                                        {loadingText}
-                                    </div>
-                                </td>
+                                {columns.map((col, i) => (
+                                    <th
+                                        key={col}
+                                        className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 whitespace-nowrap ${i === columns.length - 1 && isActionsLast ? 'text-right' : ''}`}
+                                    >
+                                        {col}
+                                    </th>
+                                ))}
                             </tr>
-                        ) : empty ? (
-                            <tr>
-                                <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground font-medium">
-                                    {emptyText}
-                                </td>
-                            </tr>
-                        ) : (
-                            children
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={colSpan} className="px-3 sm:px-6 py-8 sm:py-12 text-center text-muted-foreground font-medium">
+                                        <div className="flex items-center justify-center gap-3">
+                                            <div className="w-5 h-5 border-[3px] border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                            {loadingText}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : empty ? (
+                                <tr>
+                                    <td colSpan={colSpan} className="px-3 sm:px-6 py-8 sm:py-12 text-center text-muted-foreground font-medium">
+                                        {emptyText}
+                                    </td>
+                                </tr>
+                            ) : (
+                                children
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

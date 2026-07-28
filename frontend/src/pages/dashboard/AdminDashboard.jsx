@@ -1,10 +1,10 @@
 import {
-    Users, BookOpen, DollarSign, TrendingUp, UserPlus,
-    ShieldCheck, AlertTriangle, ChevronRight, Activity
+    Users, BookOpen, DollarSign, TrendingUp,
+    ShieldCheck, AlertTriangle, ChevronRight, Activity, Award
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { statsAPI } from '../../services/api';
+import { statsAPI, usersAPI } from '../../services/api';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -15,28 +15,32 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { ChartTooltip, ChartCard } from '../../components/ui/ChartComponents';
 import { useMultipleAsync } from '../../hooks/useAsyncData';
 import { CHART_COLORS, CHART_MARGIN, CHART_AXIS_STYLE } from '../../lib/constants';
+import PullToRefresh from '../../components/ui/PullToRefresh';
 
 export default function AdminDashboard() {
     const { user } = useAuth();
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
-    const { results, loading } = useMultipleAsync([
+    const { results, loading, reload } = useMultipleAsync([
         () => statsAPI.getPlatform(),
         () => (isSuperAdmin ? statsAPI.getAuditLogs() : Promise.resolve([])),
+        () => usersAPI.getInstructorRequests().catch(() => []),
     ], [isSuperAdmin]);
 
     const stats = results[0] || null;
     const auditLogs = results[1] || [];
+    const instructorRequests = results[2] || [];
     const navigate = useNavigate();
 
     const statCards = stats ? [
         { label: 'Total Users', value: stats.totalUsers?.toLocaleString(), icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
         { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published` },
-        { label: 'Premium Subscribers', value: stats.premiumSubscribers?.toLocaleString(), icon: DollarSign, color: '#d97706', bg: 'bg-amber-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% revenue trend` },
+        { label: 'Premium Subscribers', value: stats.premiumSubscribers?.toLocaleString(), icon: Award, color: '#d97706', bg: 'bg-amber-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% revenue trend` },
         { label: 'Pending Approvals', value: stats.pendingCourses, icon: AlertTriangle, color: '#e11d48', bg: 'bg-rose-50', change: 'Needs action', changeColor: '#e11d48' },
     ] : [];
 
     return (
+        <PullToRefresh onRefresh={reload}>
         <div className="space-y-8 max-w-7xl w-full">
             <PageHeader
                 border
@@ -65,10 +69,10 @@ export default function AdminDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+                <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
                     {/* Revenue Chart */}
-                    <ChartCard title="Revenue Overview" height="h-[280px]">
+                    <ChartCard title="Revenue Overview" height="h-[220px] sm:h-[280px]">
                         {stats?.monthlyRevenue && stats.monthlyRevenue.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={stats.monthlyRevenue} margin={CHART_MARGIN}>
@@ -93,7 +97,7 @@ export default function AdminDashboard() {
                         )}
                     </ChartCard>
 
-                    <div className="grid sm:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                         {/* Roles Pie */}
                         <Card>
                             <CardHeader title="Users by Role" />
@@ -142,14 +146,14 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-8">
+                <div className="space-y-4 sm:space-y-6 lg:space-y-8">
                     {/* Action Required */}
                     <Card accentColor="#f59e0b">
                         <CardHeader title="Action Required" icon={<AlertTriangle size={18} className="text-amber-500" />} className="pl-3" />
                         <div className="space-y-4">
                             {[
                                 { title: 'Pending Courses', sub: `${stats?.pendingCourses || 0} awaiting approval`, btnClass: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200', btnText: 'Review', to: '/admin/courses' },
-                                { title: 'User Reports', sub: '3 new flagged items', btnClass: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200', btnText: 'Check', to: '/admin/reports' },
+                                { title: 'Instructor Requests', sub: `${instructorRequests.length} pending application${instructorRequests.length === 1 ? '' : 's'}`, btnClass: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200', btnText: 'Check', to: '/admin/users' },
                             ].map(item => (
                                 <div key={item.title} className="flex items-center justify-between bg-muted/30 border border-border p-4 rounded-xl hover:bg-muted hover:border-border transition-all shadow-sm">
                                     <div>
@@ -167,9 +171,11 @@ export default function AdminDashboard() {
                         <CardHeader title="Quick Links" />
                         <div className="space-y-2">
                             {[
-                                { label: 'Manage Users', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', to: isSuperAdmin ? '/super-admin/users' : '/admin/users' },
-                                { label: 'Course Catalog', icon: BookOpen, color: 'text-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-900/20', to: isSuperAdmin ? '/super-admin/courses' : '/admin/courses' },
-                                { label: 'Platform Stats', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', to: isSuperAdmin ? '/super-admin/analytics' : '/admin' },
+                                { label: 'Bulk Enrollment', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', to: '/admin/bulk-enroll' },
+                                { label: 'Announcements', icon: BookOpen, color: 'text-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-900/20', to: '/admin/announcements' },
+                                { label: 'Student Progress', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', to: '/admin/student-progress' },
+                                { label: 'Assignments', icon: BookOpen, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', to: '/admin/assignments' },
+                                { label: 'Academic Calendar', icon: TrendingUp, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', to: '/admin/timetable' },
                             ].map(link => (
                                 <button key={link.label} onClick={() => navigate(link.to)} className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted border border-transparent hover:border-border transition-all group">
                                     <div className="flex items-center gap-3">
@@ -231,5 +237,6 @@ export default function AdminDashboard() {
                 </div>
             </div>
         </div>
+        </PullToRefresh>
     );
 }

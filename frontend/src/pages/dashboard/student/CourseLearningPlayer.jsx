@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Play, CheckCircle, FileText, ChevronLeft, ChevronRight, Menu, X,
-    HelpCircle, Video, Lock, BookOpen, Trophy, Clock, Loader2
+    HelpCircle, BookOpen, Trophy, Clock, Loader2, Lock, GitBranch, Sparkles
 } from 'lucide-react';
 import { coursesAPI, enrollmentsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -29,7 +29,7 @@ function getYouTubeEmbedUrl(url) {
         } else if (/^[a-zA-Z0-9_-]{11}$/.test(url.split('?')[0])) {
             videoId = url.split('?')[0];
         }
-    } catch { }
+    } catch { /* noop */ }
     return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=0` : null;
 }
 
@@ -70,9 +70,33 @@ export default function CourseLearningPlayer() {
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
     const [submittingRating, setSubmittingRating] = useState(false);
+    const [dripStatus, setDripStatus] = useState([]);
+    const [dripMode, setDripMode] = useState('none');
+    const [versions, setVersions] = useState([]);
+    const [showChangelog, setShowChangelog] = useState(false);
+
+    // Build a map of lessonId -> drip info
+    const dripMap = {};
+    dripStatus.forEach(d => { dripMap[d.lessonId] = d; });
+
+    const isLessonUnlocked = useCallback((lessonId) => {
+        const drip = dripMap[lessonId];
+        return !drip || drip.unlocked !== false;
+    }, [dripMap]);
+
+    const getDripReason = useCallback((lessonId) => {
+        const drip = dripMap[lessonId];
+        return drip?.reason || null;
+    }, [dripMap]);
+
+    // Compute whether a newer version exists
+    const latestVersion = versions.length > 0 ? versions[0] : null;
+    const enrolledVersionId = enrollment?.versionId || null;
+    const hasNewerVersion = latestVersion && enrolledVersionId && latestVersion.id !== enrolledVersionId;
 
     useEffect(() => {
         if (!user) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         Promise.all([
             coursesAPI.getById(courseId),
@@ -85,8 +109,20 @@ export default function CourseLearningPlayer() {
             const e = enrolls.find(en => en.courseId === courseId);
             setEnrollment(e || null);
 
+            // Fetch version history if enrolled
+            if (e) {
+                Promise.all([
+                    coursesAPI.getVersions(courseId),
+                    coursesAPI.getDripStatus(courseId),
+                ]).then(([versionData, dripData]) => {
+                    setVersions(versionData || []);
+                    setDripStatus(dripData.dripStatus || []);
+                    setDripMode(dripData.dripMode || 'none');
+                }).catch(() => {});
+            }
+
             if (l.length > 0) {
-                // Resume: find first lesson not yet completed
+                // Resume: find first lesson not yet completed AND unlocked
                 const completedSet = new Set(e?.completedLessons || []);
                 const next = l.find(lsn => !completedSet.has(lsn.id));
                 setActiveLesson(next || l[0]);
@@ -123,10 +159,21 @@ export default function CourseLearningPlayer() {
         return enrollment?.completedLessons?.includes(lessonId) ?? false;
     }, [enrollment]);
 
+    const handleLessonSelect = (lesson) => {
+        if (!isLessonUnlocked(lesson.id)) {
+            toast.error(dripMap[lesson.id]?.reason || 'This lesson is not yet available');
+            return;
+        }
+        setActiveLesson(lesson);
+    };
+
     const handleMarkComplete = async () => {
         if (!activeLesson || !enrollment || marking) return;
+        if (!isLessonUnlocked(activeLesson.id)) {
+            toast.error('This lesson is locked by the release schedule');
+            return;
+        }
         if (isCompleted(activeLesson.id)) {
-            // Already done — just go to next
             goToNext();
             return;
         }
@@ -148,7 +195,7 @@ export default function CourseLearningPlayer() {
         }
     };
 
-    const goToNext = (updatedEnroll = enrollment) => {
+    const goToNext = () => {
         const currentIndex = lessons.findIndex(l => l.id === activeLesson.id);
         if (currentIndex < lessons.length - 1) {
             setActiveLesson(lessons[currentIndex + 1]);
@@ -174,6 +221,9 @@ export default function CourseLearningPlayer() {
             </div>
         </div>
     );
+
+    // Check if active lesson is locked
+    const activeLocked = activeLesson && !isLessonUnlocked(activeLesson.id);
     if (!course) return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
             <p className="text-muted-foreground">Course not found</p>
@@ -217,6 +267,18 @@ export default function CourseLearningPlayer() {
                         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
 
+                    {/* "What's New" badge */}
+                    {hasNewerVersion && latestVersion && (
+                        <button
+                            onClick={() => setShowChangelog(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-400 transition-colors border border-emerald-500/20 animate-pulse"
+                            title="A new version of this course is available"
+                        >
+                            <Sparkles size={14} />
+                            <span className="hidden xs:inline">What's New?</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => setShowReviewModal(true)}
                         className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-amber-400 transition-colors border border-amber-400/20"
@@ -238,6 +300,24 @@ export default function CourseLearningPlayer() {
                         {!activeLesson ? (
                             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                                 <BookOpen size={48} />
+                            </div>
+                        ) : activeLocked ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 p-8 text-center">
+                                <div className="bg-slate-800/60 backdrop-blur-xl p-10 rounded-3xl border border-amber-500/20 shadow-2xl max-w-md w-full">
+                                    <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                                        <Lock size={40} className="text-amber-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">Lesson Locked 🔒</h3>
+                                    <p className="text-muted-foreground/60 text-sm mb-4">
+                                        {getDripReason(activeLesson.id)}
+                                    </p>
+                                    {dripMode === 'relative' && (
+                                        <p className="text-xs text-amber-400/80">Content is released on a schedule. Check back later!</p>
+                                    )}
+                                    {dripMode === 'absolute' && (
+                                        <p className="text-xs text-amber-400/80">Lessons unlock on their scheduled release dates.</p>
+                                    )}
+                                </div>
                             </div>
                         ) : activeLesson.type === 'video' ? (
                             <div className="absolute inset-0">
@@ -403,20 +483,27 @@ export default function CourseLearningPlayer() {
                                     {sectionLessons.map((lesson) => {
                                         const done = isCompleted(lesson.id);
                                         const active = lesson.id === activeLesson?.id;
+                                        const unlocked = isLessonUnlocked(lesson.id);
+                                        const dripReason = getDripReason(lesson.id);
                                         return (
                                             <button
                                                 key={lesson.id}
-                                                onClick={() => setActiveLesson(lesson)}
+                                                onClick={() => unlocked ? handleLessonSelect(lesson) : toast.error(dripReason || 'This lesson is not yet available')}
+                                                disabled={!unlocked}
                                                 className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all border-l-2
-                                                    ${active
+                                                    ${active && unlocked
                                                         ? 'bg-indigo-600/10 border-indigo-500 text-white'
-                                                        : 'border-transparent hover:bg-slate-800/50 text-muted-foreground/60 hover:text-slate-200'
+                                                        : unlocked
+                                                            ? 'border-transparent hover:bg-slate-800/50 text-muted-foreground/60 hover:text-slate-200'
+                                                            : 'border-transparent text-muted-foreground/30 opacity-60 cursor-not-allowed'
                                                     }
                                                 `}
                                             >
                                                 {/* Status icon */}
                                                 <span className="flex-shrink-0 mt-0.5">
-                                                    {done ? (
+                                                    {!unlocked ? (
+                                                        <Lock size={16} className="text-amber-500/60" />
+                                                    ) : done ? (
                                                         <CheckCircle size={16} className="text-green-500" />
                                                     ) : lesson.type === 'quiz' ? (
                                                         <HelpCircle size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
@@ -427,20 +514,26 @@ export default function CourseLearningPlayer() {
                                                     )}
                                                 </span>
                                                 <div className="min-w-0">
-                                                    <p className={`text-xs font-semibold leading-tight truncate ${active ? 'text-white' : ''}`}>
+                                                    <p className={`text-xs font-semibold leading-tight truncate ${active && unlocked ? 'text-white' : ''}`}>
                                                         {lesson.title}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[10px] text-muted-foreground capitalize">{lesson.type}</span>
-                                                        {lesson.duration && (
+                                                        {!unlocked && dripReason ? (
+                                                            <span className="text-[10px] text-amber-500/70 font-medium">{dripReason}</span>
+                                                        ) : (
                                                             <>
-                                                                <span className="text-foreground/80">·</span>
-                                                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                                                    <Clock size={9} /> {lesson.duration}
-                                                                </span>
+                                                                <span className="text-[10px] text-muted-foreground capitalize">{lesson.type}</span>
+                                                                {lesson.duration && (
+                                                                    <>
+                                                                        <span className="text-foreground/80">·</span>
+                                                                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                                                            <Clock size={9} /> {lesson.duration}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {done && <span className="text-[10px] text-green-500 font-bold">Done</span>}
                                                             </>
                                                         )}
-                                                        {done && <span className="text-[10px] text-green-500 font-bold">Done</span>}
                                                     </div>
                                                 </div>
                                             </button>
@@ -460,6 +553,77 @@ export default function CourseLearningPlayer() {
                     )}
                 </div>
             </div>
+            {/* ── What's New / Changelog Modal ──────────────────── */}
+            <AnimatePresence>
+                {showChangelog && latestVersion && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowChangelog(false)}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-8 max-w-lg w-full relative z-10 max-h-[80vh] overflow-y-auto"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                                        <Sparkles size={20} className="text-emerald-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white">What's New</h3>
+                                        <p className="text-xs text-muted-foreground/60">
+                                            {latestVersion.version_label || `Version ${latestVersion.version_number}`} — {new Date(latestVersion.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowChangelog(false)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+                                    <X size={18} className="text-muted-foreground/60" />
+                                </button>
+                            </div>
+
+                            {/* Version history list */}
+                            <div className="space-y-4">
+                                {versions.map((v, idx) => (
+                                    <div key={v.id} className={`p-4 rounded-2xl border ${idx === 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-slate-800/30 border-slate-700/50'}`}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <GitBranch size={14} className={idx === 0 ? 'text-emerald-400' : 'text-muted-foreground/60'} />
+                                            <span className={`text-xs font-bold ${idx === 0 ? 'text-emerald-400' : 'text-muted-foreground/60'}`}>
+                                                {v.version_label || `v${v.version_number}`}
+                                            </span>
+                                            {idx === 0 && (
+                                                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Latest</span>
+                                            )}
+                                            <span className="text-[10px] text-muted-foreground/40 ml-auto">
+                                                {new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                            </span>
+                                        </div>
+                                        {v.changelog ? (
+                                            <div className="text-sm text-muted-foreground/80 whitespace-pre-wrap leading-relaxed pl-6">
+                                                {v.changelog}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground/40 italic pl-6">No release notes</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-6 pt-4 border-t border-slate-800">
+                                <p className="text-xs text-muted-foreground/60">
+                                    You are viewing content from your enrolled version. The latest version has updates you haven't seen yet.
+                                </p>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* ── Review Modal ─────────────────────────────────────── */}
             <AnimatePresence>
                 {showReviewModal && (

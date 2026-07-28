@@ -12,6 +12,7 @@ import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 import QuizPage from './pages/QuizPage';
 import InstructorProfilePage from './pages/InstructorProfilePage';
+import CertificateVerifyPage from './pages/CertificateVerifyPage';
 
 
 
@@ -30,6 +31,7 @@ import AdminUsers from './pages/dashboard/admin/AdminUsers';
 import AdminCourses from './pages/dashboard/admin/AdminCourses';
 import BecomeInstructorPage from './pages/BecomeInstructorPage';
 import ProfilePage from './pages/ProfilePage';
+import UserDetail from './pages/dashboard/admin/UserDetail';
 import StudentCourses from './pages/dashboard/student/StudentCourses';
 import StudentWishlist from './pages/dashboard/student/StudentWishlist';
 import StudentQuizzes from './pages/dashboard/student/StudentQuizzes';
@@ -41,10 +43,21 @@ import AuditLogs from './pages/dashboard/superadmin/AuditLogs';
 import SystemHealth from './pages/dashboard/superadmin/SystemHealth';
 import PlatformSettings from './pages/dashboard/superadmin/PlatformSettings';
 import ManageAdmins from './pages/dashboard/superadmin/ManageAdmins';
+import DepartmentOverview from './pages/dashboard/superadmin/DepartmentOverview';
+import DepartmentDetail from './pages/dashboard/superadmin/DepartmentDetail';
+import AIAnalytics from './pages/dashboard/superadmin/AIAnalytics';
 import SubscriptionPlans from './pages/dashboard/superadmin/SubscriptionPlans';
 import AdminCategories from './pages/dashboard/admin/AdminCategories';
 import ModerateReviews from './pages/dashboard/admin/ModerateReviews';
 import AdminReports from './pages/dashboard/admin/AdminReports';
+import AdminAnnouncements from './pages/dashboard/admin/AdminAnnouncements';
+import AdminBulkEnrollment from './pages/dashboard/admin/AdminBulkEnrollment';
+import AdminStudentProgress from './pages/dashboard/admin/AdminStudentProgress';
+import AdminAssignments from './pages/dashboard/admin/AdminAssignments';
+import AdminTimetable from './pages/dashboard/admin/AdminTimetable';
+import InstructorChangelog from './pages/dashboard/instructor/InstructorChangelog';
+import InstructorLiveSessions from './pages/dashboard/instructor/InstructorLiveSessions';
+import AdminLiveSessions from './pages/dashboard/admin/AdminLiveSessions';
 
 // Placeholder empty page for other routes
 const Placeholder = ({ title }) => (
@@ -74,6 +87,7 @@ export default function App() {
             {/* Nav and Footer Placeholders */}
             <Route path="/paths" element={<Placeholder title="Learning Paths" />} />
             <Route path="/contact" element={<Placeholder title="Contact Us" />} />
+            <Route path="/verify/:certId" element={<CertificateVerifyPage />} />
             <Route path="/about" element={<Placeholder title="About Us" />} />
             <Route path="/careers" element={<Placeholder title="Careers" />} />
             <Route path="/blog" element={<Placeholder title="Blog" />} />
@@ -110,26 +124,35 @@ export default function App() {
             <Route path="/instructor/reviews" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorReviews /></ProtectedRoute>} />
             <Route path="/instructor/analytics" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorAnalytics /></ProtectedRoute>} />
             <Route path="/instructor/quiz-builder" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorQuizBuilder /></ProtectedRoute>} />
+            <Route path="/instructor/versions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorChangelog /></ProtectedRoute>} />
+            <Route path="/instructor/live-sessions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorLiveSessions /></ProtectedRoute>} />
 
             {/* Admin */}
             <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminUsers /></ProtectedRoute>} />
+            <Route path="/admin/users/:id" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><UserDetail /></ProtectedRoute>} />
             <Route path="/admin/courses" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminCourses /></ProtectedRoute>} />
             <Route path="/admin/categories" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminCategories /></ProtectedRoute>} />
             <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><ModerateReviews /></ProtectedRoute>} />
             <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminReports /></ProtectedRoute>} />
-            <Route path="/admin/subscriptions" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><SubscriptionPlans /></ProtectedRoute>} />
+            <Route path="/admin/subscriptions" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SubscriptionPlans /></ProtectedRoute>} />
+            <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminAnnouncements /></ProtectedRoute>} />
+            <Route path="/admin/bulk-enroll" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminBulkEnrollment /></ProtectedRoute>} />
+            <Route path="/admin/student-progress" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminStudentProgress /></ProtectedRoute>} />
+            <Route path="/admin/assignments" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminAssignments /></ProtectedRoute>} />
+            <Route path="/admin/timetable" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminTimetable /></ProtectedRoute>} />
+            <Route path="/admin/attendance" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminLiveSessions /></ProtectedRoute>} />
 
             {/* Super Admin */}
             <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/super-admin/admins" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><ManageAdmins /></ProtectedRoute>} />
+            <Route path="/super-admin/departments" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><DepartmentOverview /></ProtectedRoute>} />
+            <Route path="/super-admin/departments/:id" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><DepartmentDetail /></ProtectedRoute>} />
             <Route path="/super-admin/analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SuperAdminAnalytics /></ProtectedRoute>} />
             <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><PlatformSettings /></ProtectedRoute>} />
-            <Route path="/super-admin/subscriptions" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SubscriptionPlans /></ProtectedRoute>} />
             <Route path="/super-admin/audit-logs" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AuditLogs /></ProtectedRoute>} />
             <Route path="/super-admin/system" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SystemHealth /></ProtectedRoute>} />
-            <Route path="/super-admin/users" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AdminUsers /></ProtectedRoute>} />
-            <Route path="/super-admin/courses" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AdminCourses /></ProtectedRoute>} />
+            <Route path="/super-admin/ai-analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AIAnalytics /></ProtectedRoute>} />
 
             {/* General Protected */}
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

@@ -8,7 +8,7 @@ import { departmentsAPI } from '../services/api';
 export default function RegisterPage() {
     const { register } = useAuth();
     const navigate = useNavigate();
-    const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'STUDENT', departmentId: '' });
+    const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'STUDENT', departmentId: '', rollNo: '' });
     const [departments, setDepartments] = useState([]);
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -48,7 +48,7 @@ export default function RegisterPage() {
         if (err) { setError(err); return; }
         setLoading(true); setError('');
         try {
-            const user = await register(form.name, form.email, form.password, form.role, form.departmentId || null);
+            const user = await register(form.name, form.email, form.password, form.role, form.departmentId || null, form.rollNo.trim() || null);
             navigate(ROLE_HOMES[user.role] || '/', { replace: true });
         } catch (err) {
             setError(err.message);
@@ -107,13 +107,23 @@ export default function RegisterPage() {
                                 <select id="reg-department" value={form.departmentId}
                                     onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))}
                                     className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors text-foreground appearance-none">
-                                    <option value="">Select your department (optional)</option>
+                                    <option value="">Select your department (required for students)</option>
                                     {departments.map(d => (
                                         <option key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
+                        {form.role === 'STUDENT' && (
+                            <div>
+                                <label className="text-sm text-foreground font-medium block mb-1.5">Roll Number</label>
+                                <input type="text" placeholder="e.g. CS22001"
+                                    value={form.rollNo} onChange={e => setForm(f => ({ ...f, rollNo: e.target.value }))}
+                                    className="w-full bg-background border border-border rounded-lg pl-4 pr-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors placeholder:text-muted-foreground text-foreground"
+                                    autoComplete="off" />
+                                <p className="text-[11px] text-muted-foreground mt-1">Your unique roll number within your department.</p>
+                            </div>
+                        )}
                         <div>
                             <label className="text-sm text-foreground font-medium block mb-1.5">Password</label>
                             <div className="relative">

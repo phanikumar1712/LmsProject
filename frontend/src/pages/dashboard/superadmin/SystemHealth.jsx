@@ -32,7 +32,7 @@ export default function SystemHealth() {
         try {
             const data = await statsAPI.getSystemHealth();
             setHealth(data);
-        } catch (err) {
+        } catch {
             toast.error('Failed to fetch system health');
         } finally {
             setLoading(false);
@@ -41,6 +41,7 @@ export default function SystemHealth() {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData();
     }, []);
 
@@ -81,7 +82,7 @@ export default function SystemHealth() {
             />
 
             {/* Metrics Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between">
                         <div>

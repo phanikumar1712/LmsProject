@@ -65,8 +65,8 @@ export function AuthProvider({ children }) {
         return safeUser;
     };
 
-    const register = async (name, email, password, role, departmentId = null) => {
-        const { user, token } = await authAPI.register(name, email, password, role, departmentId);
+    const register = async (name, email, password, role, departmentId = null, rollNo = null) => {
+        const { user, token } = await authAPI.register(name, email, password, role, departmentId, rollNo);
         const safeUser = mapUser(user);
         localStorage.setItem('lms_token', token);
         dispatch({ type: 'SET_USER', payload: { user: safeUser, token } });
@@ -101,6 +101,7 @@ export function AuthProvider({ children }) {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     const ctx = useContext(AuthContext);
     if (!ctx) throw new Error('useAuth must be used within AuthProvider');

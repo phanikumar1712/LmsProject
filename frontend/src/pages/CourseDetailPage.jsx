@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import ReactPlayer from 'react-player';
 import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI } from '../services/api';
+import DiscussionSection from '../components/ui/DiscussionSection';
 import { useAuth } from '../contexts/AuthContext';
 import { RatingDisplay, RatingStars } from '../components/ui/RatingStars';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -208,7 +209,7 @@ export default function CourseDetailPage() {
 
                     {/* Tabs */}
                     <div id="tabs-section" className="flex gap-2 mb-8 border-b border-border overflow-x-auto no-scrollbar">
-                        {['overview', 'curriculum', 'preview', 'reviews'].map(tab => (
+                        {['overview', 'curriculum', 'preview', 'reviews', 'discuss'].map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)}
                                 className={`px-5 py-3 text-sm font-semibold capitalize whitespace-nowrap transition-all border-b-2 -mb-[1px] ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                                 {tab}
@@ -359,6 +360,12 @@ export default function CourseDetailPage() {
                                         <p className="text-muted-foreground/60 text-sm">Check the curriculum for other preview lessons.</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'discuss' && (
+                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                <DiscussionSection courseId={id} />
                             </div>
                         )}
 
@@ -514,7 +521,7 @@ export default function CourseDetailPage() {
                         {/* CTA */}
                         {isAdminPreview ? (
                             <button
-                                onClick={() => navigate(user.role === 'SUPER_ADMIN' ? '/super-admin/courses' : '/admin/courses')}
+                                onClick={() => navigate('/admin/courses')}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl text-[15px] font-bold mb-4 shadow-sm transition-colors flex items-center justify-center gap-2"
                             >
                                 <Unlock size={18} /> Admin Preview Mode
@@ -575,7 +582,7 @@ export default function CourseDetailPage() {
                     {course.price === 0 ? <p className="font-bold text-lg text-emerald-600">Free</p> : <p className="font-bold text-lg text-foreground">₹{effectivePrice.toLocaleString()}</p>}
                 </div>
                 {isAdminPreview ? (
-                    <button onClick={() => navigate(user.role === 'SUPER_ADMIN' ? '/super-admin/courses' : '/admin/courses')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Admin Preview</button>
+                    <button onClick={() => navigate('/admin/courses')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Admin Preview</button>
                 ) : isEnrolled ? (
                     <button onClick={() => navigate(`/courses/${id}/learn`)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Continue</button>
                 ) : (

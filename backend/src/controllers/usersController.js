@@ -1,9 +1,11 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
-const { mapUser, mapInstructorRequest } = require('../utils/formatters');
+const { mapUser, mapEnrollment, mapInstructorRequest } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
 
-const safeUserFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, department_id, created_at`;
+const safeUserFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, department_id, roll_no, created_at`;
+
+const MAX_IMPORT_ROWS = 500;
 
 // A scoped ADMIN may only view/act on non-admin (STUDENT/INSTRUCTOR) users in
 // their own department. Returns the target row or throws 403/404. SUPER_ADMIN and
@@ -89,7 +91,7 @@ const getAll = async (req, res) => {
 
 // PUT /api/users/:id/role
 const updateRole = async (req, res) => {
-    const { role } = req.body;
+    const { role, reason } = req.body;
     const validRoles = ['STUDENT', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'];
     if (!validRoles.includes(role)) throw createError('Invalid role', 400);
 
@@ -100,18 +102,83 @@ const updateRole = async (req, res) => {
     // A department-scoped admin may only change roles of their own dept's non-admins.
     await assertUserInScope(req, req.params.id);
 
+    // Fetch the target user's current role before updating
+    const targetRes = await query('SELECT name, role FROM users WHERE id = $1', [req.params.id]);
+    if (!targetRes.rows.length) throw createError('User not found', 404);
+    const oldRole = targetRes.rows[0].role;
+    const targetName = targetRes.rows[0].name;
+
+    // Prevent no-op changes
+    if (oldRole === role) {
+        throw createError('User already has this role', 400);
+    }
+
     const result = await query(
         `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING ${safeUserFields}`,
         [role, req.params.id]
     );
     if (!result.rows.length) throw createError('User not found', 404);
 
+    // Rich audit log with actor name, target name, old/new roles, reason, and timestamp
+    const auditDetails = {
+        targetName,
+        targetId: req.params.id,
+        oldRole,
+        newRole: role,
+        changedBy: req.user.name,
+        changedById: req.user.id,
+        reason: reason || '',
+        timestamp: new Date().toISOString(),
+    };
     await query(
         `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
-        [req.user.id, 'USER_ROLE_CHANGED', 'users', req.params.id, JSON.stringify({ newRole: role })]
-    ).catch(() => { });
+        [req.user.id, 'USER_ROLE_CHANGED', 'users', req.params.id, JSON.stringify(auditDetails)]
+    ).catch(err => console.error('[Audit] Failed to log role change:', err.message));
 
     res.json(mapUser(result.rows[0]));
+};
+
+// Limits have moved to departments. See departmentsController.updateLimits.
+
+// PUT /api/users/:id/reset-password — privileged reset by an admin/super-admin.
+// Scoping via assertUserInScope: a SUPER_ADMIN (unscoped) may reset anyone incl.
+// admins; a department-scoped ADMIN may only reset non-admin users in their own
+// department (instructors/students). Generates a temp password unless one is
+// provided, and returns it so the operator can hand it to the user.
+const resetUserPassword = async (req, res) => {
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+
+    // Authorization + department isolation. Throws 403/404 as appropriate.
+    await assertUserInScope(req, req.params.id);
+
+    const target = await query('SELECT id, email, name FROM users WHERE id = $1', [req.params.id]);
+    if (!target.rows.length) throw createError('User not found', 404);
+
+    const provided = req.body?.password;
+    if (provided !== undefined && provided !== null && provided !== '' && provided.length < 8) {
+        throw createError('Password must be at least 8 characters', 400);
+    }
+    const newPassword = provided && provided.length >= 8 ? provided : crypto.randomBytes(6).toString('hex');
+    const hashed = await bcrypt.hash(newPassword, 12);
+
+    await query(
+        `UPDATE users SET password = $1, reset_otp = NULL, reset_otp_expiry = NULL, updated_at = NOW() WHERE id = $2`,
+        [hashed, req.params.id]
+    );
+
+    await query(
+        `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)`,
+        [req.params.id, 'Your password was reset by an administrator. Please log in and change it.', 'system']
+    ).catch(() => { });
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
+        [req.user.id, 'USER_PASSWORD_RESET', 'users', req.params.id]
+    ).catch(() => { });
+
+    // Only echo the password when we generated it (the operator needs to relay it).
+    res.json({ success: true, tempPassword: provided ? undefined : newPassword });
 };
 
 // PUT /api/users/:id/toggle-status
@@ -151,8 +218,15 @@ const assignPlan = async (req, res) => {
 const deleteUser = async (req, res) => {
     if (req.params.id === req.user.id) throw createError('Cannot delete your own account', 400);
     await assertUserInScope(req, req.params.id);
-    const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);
+    const result = await query('DELETE FROM users WHERE id = $1 RETURNING id, name, email', [req.params.id]);
     if (!result.rows.length) throw createError('User not found', 404);
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'USER_DELETED', 'users', req.params.id,
+         JSON.stringify({ deletedName: result.rows[0].name, deletedEmail: result.rows[0].email })]
+    ).catch(err => console.error('[Audit] Failed to log user deletion:', err.message));
+
     res.json({ success: true });
 };
 
@@ -297,7 +371,7 @@ const unfollowInstructor = async (req, res) => {
 
 // POST /api/users/invite-admin
 const inviteAdmin = async (req, res) => {
-    const { name, role, password: providedPassword, phone, departmentId } = req.body;
+    const { name, role, password: providedPassword, phone, departmentId, departmentIds: providedDeptIds } = req.body;
     if (!name || !req.body.email) throw createError('Name and email are required', 400);
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) throw createError('Invalid admin role', 400);
 
@@ -312,13 +386,38 @@ const inviteAdmin = async (req, res) => {
         throw createError('Password must be at least 8 characters', 400);
     }
 
-    // Validate the department assignment (SUPER_ADMINs are typically global, but
-    // a department may still be assigned to either role if provided).
-    let deptId = null;
-    if (departmentId) {
-        const dept = await query('SELECT id FROM departments WHERE id = $1', [departmentId]);
-        if (!dept.rows.length) throw createError('Invalid department', 400);
-        deptId = departmentId;
+    // Determine final set of department IDs (merge departmentId + departmentIds array)
+    const finalDeptIds = [];
+    const seenIds = new Set();
+    const addDeptId = (id) => {
+        if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            finalDeptIds.push(id);
+        }
+    };
+    if (departmentId) addDeptId(departmentId);
+    if (Array.isArray(providedDeptIds)) {
+        providedDeptIds.forEach(id => addDeptId(id));
+    }
+
+    // Validate all department IDs exist
+    if (finalDeptIds.length > 0) {
+        const valid = await query('SELECT id FROM departments WHERE id = ANY($1::uuid[])', [finalDeptIds]);
+        if (valid.rows.length !== finalDeptIds.length) {
+            throw createError('One or more department IDs are invalid', 400);
+        }
+    }
+
+    // Primary department (first in the list, or null)
+    const primaryDeptId = finalDeptIds.length > 0 ? finalDeptIds[0] : null;
+
+    // One admin per department check (only for the primary department)
+    if (role === 'ADMIN' && primaryDeptId) {
+        const existingAdmin = await query(
+            `SELECT id FROM users WHERE role = 'ADMIN' AND department_id = $1`,
+            [primaryDeptId]
+        );
+        if (existingAdmin.rows.length) throw createError('This department already has an admin', 409);
     }
 
     // Check if user exists
@@ -334,8 +433,20 @@ const inviteAdmin = async (req, res) => {
 
     const result = await query(
         `INSERT INTO users (name, email, password, role, department_id, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${safeUserFields}`,
-        [name, email, hashedPassword, role, deptId, String(phone || '').trim()]
+        [name, email, hashedPassword, role, primaryDeptId, String(phone || '').trim()]
     );
+
+    // Insert multi-department assignments
+    if (finalDeptIds.length > 1) {
+        const extraDepts = finalDeptIds.slice(1); // Skip the first — it's the primary
+        if (extraDepts.length > 0) {
+            const vals = extraDepts.map((_, i) => `($1, $${i + 2})`).join(', ');
+            await query(
+                `INSERT INTO admin_departments (user_id, department_id) VALUES ${vals}`,
+                [result.rows[0].id, ...extraDepts]
+            );
+        }
+    }
 
     await query(
         `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)`,
@@ -350,9 +461,9 @@ const inviteAdmin = async (req, res) => {
     res.status(201).json(mapUser(result.rows[0]));
 };
 
-// Shared: create one INSTRUCTOR with a generated (or provided) temp password.
+// Shared: create one user (INSTRUCTOR or STUDENT) with a generated (or provided) temp password.
 // Returns { user, tempPassword }. Throws on duplicate email / missing fields.
-const createInstructorRecord = async ({ name, email, phone, departmentId, password }) => {
+const createUserRecord = async ({ name, email, phone, departmentId, rollNo, password, role = 'INSTRUCTOR' }) => {
     const bcrypt = require('bcryptjs');
     const crypto = require('crypto');
     if (!name || !email) throw createError('Name and email are required', 400);
@@ -362,14 +473,114 @@ const createInstructorRecord = async ({ name, email, phone, departmentId, passwo
     const exists = await query('SELECT id FROM users WHERE email = $1', [normEmail]);
     if (exists.rows.length) throw createError('User already exists', 409);
 
+    // Roll number: required for STUDENT, must be unique per department.
+    const normRollNo = String(rollNo || '').trim() || null;
+    if (role === 'STUDENT' && !normRollNo) {
+        throw createError('Roll number is required for student accounts', 400);
+    }
+    if (normRollNo) {
+        // Friendly check before DB unique index throws a terse constraint violation.
+        const dupRoll = await query(
+            `SELECT 1 FROM users WHERE roll_no = $1 AND COALESCE(department_id, '00000000-0000-0000-0000-000000000000') = COALESCE($2, '00000000-0000-0000-0000-000000000000') AND role = 'STUDENT'`,
+            [normRollNo, departmentId || null]
+        );
+        if (dupRoll.rows.length) throw createError('Roll number is already taken in this department', 409);
+    }
+
     const tempPassword = password && password.length >= 8 ? password : crypto.randomBytes(6).toString('hex');
     const hashed = await bcrypt.hash(tempPassword, 12);
     const result = await query(
-        `INSERT INTO users (name, email, password, role, department_id, phone) VALUES ($1,$2,$3,'INSTRUCTOR',$4,$5) RETURNING ${safeUserFields}`,
-        [String(name).trim(), normEmail, hashed, departmentId || null, String(phone || '').trim()]
+        `INSERT INTO users (name, email, password, role, department_id, phone, roll_no) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING ${safeUserFields}`,
+        [String(name).trim(), normEmail, hashed, role, departmentId || null, String(phone || '').trim(), normRollNo]
     );
     return { user: result.rows[0], tempPassword };
 };
+
+// PUT /api/users/:id/departments — SUPER_ADMIN batch-assigns departments to an
+// admin user. Replaces all assignments atomically. Expects { departmentIds: [...] }.
+// The primary department (users.department_id) is updated to match the first ID
+// in the array (or NULL if the array is empty).
+const setAdminDepartments = async (req, res) => {
+    const { departmentIds } = req.body;
+    if (!Array.isArray(departmentIds)) {
+        throw createError('departmentIds must be an array', 400);
+    }
+
+    // Verify the target user is an admin
+    const target = await query('SELECT id, role, department_id FROM users WHERE id = $1', [req.params.id]);
+    if (!target.rows.length) throw createError('User not found', 404);
+    if (target.rows[0].role === 'SUPER_ADMIN') {
+        throw createError('Super Admins cannot be department-bound', 400);
+    }
+    if (target.rows[0].role !== 'ADMIN') {
+        throw createError('Only admin users can be assigned to departments', 400);
+    }
+
+    // Validate all department IDs exist
+    if (departmentIds.length > 0) {
+        const valid = await query('SELECT id FROM departments WHERE id = ANY($1::uuid[])', [departmentIds]);
+        if (valid.rows.length !== departmentIds.length) {
+            throw createError('One or more department IDs are invalid', 400);
+        }
+    }
+
+    const client = await query.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Remove all existing extra assignments
+        await client.query('DELETE FROM admin_departments WHERE user_id = $1', [req.params.id]);
+
+        // Insert new assignments
+        if (departmentIds.length > 0) {
+            const values = departmentIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+            await client.query(
+                `INSERT INTO admin_departments (user_id, department_id) VALUES ${values}`,
+                [req.params.id, ...departmentIds]
+            );
+        }
+
+        // Update the primary department (first in the list, or NULL if none)
+        const primaryDept = departmentIds.length > 0 ? departmentIds[0] : null;
+        await client.query(
+            'UPDATE users SET department_id = $1, updated_at = NOW() WHERE id = $2',
+            [primaryDept, req.params.id]
+        );
+
+        await client.query('COMMIT');
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'ADMIN_DEPARTMENTS_UPDATED', 'users', req.params.id, JSON.stringify({ departmentIds })]
+    ).catch(() => { });
+
+    res.json({ success: true, departmentIds });
+};
+
+// GET /api/users/:id/departments — get all departments assigned to a user
+// (from the admin_departments junction table).
+const getUserDepartments = async (req, res) => {
+    const target = await query('SELECT id, role FROM users WHERE id = $1', [req.params.id]);
+    if (!target.rows.length) throw createError('User not found', 404);
+
+    const extra = await query(`
+        SELECT d.id, d.name, d.icon FROM admin_departments ad
+        JOIN departments d ON ad.department_id = d.id
+        WHERE ad.user_id = $1
+        ORDER BY d.name ASC
+    `, [req.params.id]);
+
+    res.json(extra.rows);
+};
+
+// Alias for backward compatibility
+const createInstructorRecord = (opts) => createUserRecord({ ...opts, role: 'INSTRUCTOR' });
 
 // Target department for admin-created instructors: a scoped admin's own dept;
 // super-admin may pass a departmentId (else global/null).
@@ -410,6 +621,7 @@ const importInstructors = async (req, res) => {
         throw createError('Could not parse file. Upload a valid CSV or Excel file.', 400);
     }
     if (!rows.length) throw createError('The file has no rows', 400);
+    if (rows.length > MAX_IMPORT_ROWS) throw createError(`File exceeds maximum of ${MAX_IMPORT_ROWS} rows`, 400);
 
     const departmentId = resolveTargetDepartment(req);
     // Normalize header keys to lowercase for lookup.
@@ -424,7 +636,11 @@ const importInstructors = async (req, res) => {
         const email = pick(row, 'email');
         const phone = pick(row, 'phone');
         try {
-            const { user, tempPassword } = await createInstructorRecord({ name, email, phone, departmentId });
+            const { user, tempPassword } = await createUserRecord({ name, email, phone, departmentId, role: 'INSTRUCTOR' });
+            await query(
+                `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)`,
+                [user.id, 'Your instructor account has been created. Welcome to the platform!', 'system']
+            ).catch(() => { });
             await query(
                 `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
                 [req.user.id, 'INSTRUCTOR_IMPORTED', 'users', user.id]
@@ -439,9 +655,147 @@ const importInstructors = async (req, res) => {
     res.status(201).json({ total: results.length, created, failed: results.length - created, results });
 };
 
+// POST /api/users/students/import — bulk create students from CSV/XLSX.
+// Columns (case-insensitive): name, email, roll_no (required), phone (optional).
+// Returns per-row results.
+const importStudents = async (req, res) => {
+    if (!req.file || !req.file.buffer) throw createError('No file uploaded', 400);
+    const xlsx = require('xlsx');
+    let rows;
+    try {
+        const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+    } catch {
+        throw createError('Could not parse file. Upload a valid CSV or Excel file.', 400);
+    }
+    if (!rows.length) throw createError('The file has no rows', 400);
+    if (rows.length > MAX_IMPORT_ROWS) throw createError(`File exceeds maximum of ${MAX_IMPORT_ROWS} rows`, 400);
+
+    const departmentId = resolveTargetDepartment(req);
+    // Normalize header keys to lowercase for lookup.
+    const pick = (row, key) => {
+        const found = Object.keys(row).find(k => k.trim().toLowerCase() === key);
+        return found ? row[found] : '';
+    };
+
+    const results = [];
+    for (const row of rows) {
+        const name = pick(row, 'name');
+        const email = pick(row, 'email');
+        const phone = pick(row, 'phone');
+        const rollNo = pick(row, 'roll_no') || pick(row, 'roll no') || pick(row, 'rollnumber') || '';
+        try {
+            const { user, tempPassword } = await createUserRecord({ name, email, phone, rollNo, departmentId, role: 'STUDENT' });
+            await query(
+                `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)`,
+                [user.id, 'Your student account has been created. Welcome to the platform!', 'system']
+            ).catch(() => { });
+            await query(
+                `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
+                [req.user.id, 'STUDENT_IMPORTED', 'users', user.id]
+            ).catch(() => { });
+            results.push({ email: user.email, name: user.name, rollNo: user.roll_no, status: 'created', tempPassword });
+        } catch (err) {
+            results.push({ email: String(email || '').trim().toLowerCase(), name, rollNo, status: 'error', error: err.message });
+        }
+    }
+
+    const created = results.filter(r => r.status === 'created').length;
+    res.status(201).json({ total: results.length, created, failed: results.length - created, results });
+};
+
+// GET /api/users/:id — full user detail for Admin/Super Admin
+const getById = async (req, res) => {
+    const { id } = req.params;
+
+    // Department isolation check
+    await assertUserInScope(req, id);
+
+    // Get user record
+    const userRes = await query(`SELECT ${safeUserFields} FROM users WHERE id = $1`, [id]);
+    if (!userRes.rows.length) throw createError('User not found', 404);
+    const user = mapUser(userRes.rows[0]);
+
+    // Get department name
+    if (user.departmentId) {
+        const deptRes = await query('SELECT name FROM departments WHERE id = $1', [user.departmentId]);
+        user.departmentName = deptRes.rows.length ? deptRes.rows[0].name : null;
+    }
+
+    // Get enrollments with progress
+    const enrollmentsRes = await query(`
+        SELECT e.*, c.title, c.thumbnail, c.level, c.duration,
+               u.name as "instructorName", u.avatar as "instructorAvatar"
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.id
+        JOIN users u ON c.instructor_id = u.id
+        WHERE e.student_id = $1
+        ORDER BY e.last_accessed DESC NULLS LAST
+    `, [id]);
+    user.enrollments = enrollmentsRes.rows.map(mapEnrollment);
+
+    // Get quiz attempts stats
+    const quizStatsRes = await query(`
+        SELECT COUNT(*)::int as "totalAttempts",
+               COUNT(*) FILTER (WHERE passed = true)::int as "passedAttempts",
+               COALESCE(AVG(score), 0)::numeric(5,1) as "avgScore"
+        FROM quiz_attempts WHERE student_id = $1
+    `, [id]);
+    user.quizStats = quizStatsRes.rows[0] || { totalAttempts: 0, passedAttempts: 0, avgScore: 0 };
+
+    // Get certificates
+    const certRes = await query(`
+        SELECT id, cert_id, course_title, issue_date
+        FROM certificates WHERE student_id = $1
+        ORDER BY issue_date DESC
+    `, [id]);
+    user.certificates = certRes.rows;
+
+    // Get reviews given
+    const reviewRes = await query(`
+        SELECT r.id, r.stars, r.comment, r.created_at,
+               c.id as "course_id", c.title as "course_title"
+        FROM ratings r
+        JOIN courses c ON r.course_id = c.id
+        WHERE r.student_id = $1
+        ORDER BY r.created_at DESC
+    `, [id]);
+    user.reviews = reviewRes.rows.map(r => ({
+        id: r.id,
+        stars: r.stars,
+        comment: r.comment,
+        createdAt: r.created_at,
+        course: { id: r.course_id, title: r.course_title }
+    }));
+
+    // Get streak data
+    const streakRes = await query(`
+        SELECT current_streak, longest_streak
+        FROM users WHERE id = $1
+    `, [id]);
+    user.currentStreak = streakRes.rows[0]?.current_streak || 0;
+    user.longestStreak = streakRes.rows[0]?.longest_streak || 0;
+
+    // Get follower count (if instructor)
+    if (user.role === 'INSTRUCTOR') {
+        const followersRes = await query('SELECT COUNT(*)::int as total FROM follows WHERE following_id = $1', [id]);
+        user.followerCount = followersRes.rows[0].total;
+    }
+
+    // Get total courses created (if instructor)
+    if (['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+        const coursesRes = await query('SELECT COUNT(*)::int as total FROM courses WHERE instructor_id = $1', [id]);
+        user.coursesCreated = coursesRes.rows[0].total;
+    }
+
+    res.json({ success: true, data: user });
+};
+
 module.exports = {
-    getAll, updateRole, toggleStatus, assignPlan, deleteUser,
+    getAll, getById, updateRole, resetUserPassword, toggleStatus, assignPlan, deleteUser,
     submitInstructorRequest, getInstructorRequests, approveInstructorRequest,
     getInstructorProfile, followInstructor, unfollowInstructor, inviteAdmin,
-    createInstructor, importInstructors
+    createInstructor, importInstructors, importStudents,
+    setAdminDepartments, getUserDepartments
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { coursesAPI, statsAPI } from '../services/api';
 import { CourseCard, SkeletonCard } from '../components/ui/CourseCard';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +36,7 @@ export default function CoursesPage() {
     }, [user]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         const f = {
             status: 'PUBLISHED',
