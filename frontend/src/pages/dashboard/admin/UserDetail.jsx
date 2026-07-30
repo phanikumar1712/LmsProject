@@ -89,6 +89,8 @@ export default function UserDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user: currentUser, isSuperAdmin } = useAuth();
+    const isInstructor = currentUser?.role === 'INSTRUCTOR';
+    const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -294,11 +296,11 @@ export default function UserDetail() {
         <div className="space-y-8 max-w-7xl mx-auto pb-12">
             {/* ── Back button ── */}
             <button
-                onClick={() => navigate('/admin/users')}
+                onClick={() => navigate(isInstructor ? '/instructor/students' : '/admin/users')}
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground font-medium text-sm transition-colors group"
             >
                 <ChevronLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
-                Back to Users
+                {isInstructor ? 'Back to My Students' : 'Back to Users'}
             </button>
 
             {/* ── Profile Header Card ── */}
@@ -339,7 +341,7 @@ export default function UserDetail() {
                             </p>
                         </div>
                         <div className="flex gap-2 sm:pb-1">
-                            <button onClick={() => navigate('/admin/users')} className="px-4 py-2.5 rounded-xl border border-border text-sm font-bold hover:bg-muted transition-colors">
+                            <button onClick={() => navigate(isInstructor ? '/instructor/students' : '/admin/users')} className="px-4 py-2.5 rounded-xl border border-border text-sm font-bold hover:bg-muted transition-colors">
                                 Back
                             </button>
                             <button onClick={() => setShowNotify(true)} className="px-4 py-2.5 rounded-xl border border-border text-sm font-bold hover:bg-muted transition-colors flex items-center gap-1.5">
@@ -348,35 +350,41 @@ export default function UserDetail() {
                         </div>
                     </div>
 
-                    {/* Quick action buttons */}
+                    {/* Quick action buttons — instructors see minimal actions */}
                     <div className="flex flex-wrap gap-2 pb-6 border-b border-border">
-                        <select
-                            value={user.role}
-                            onChange={e => handleRoleChange(e.target.value)}
-                            className="px-3 py-2 bg-muted/40 border border-border rounded-xl text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer"
-                        >
-                            <option value="STUDENT">Student</option>
-                            <option value="INSTRUCTOR">Instructor</option>
-                            {isSuperAdmin() && <option value="ADMIN">Admin</option>}
-                            {isSuperAdmin() && <option value="SUPER_ADMIN">Super Admin</option>}
-                        </select>
-                        <button
-                            onClick={handleToggleStatus}
-                            disabled={user.id === currentUser?.id}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 ${user.active !== false
-                                ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-700'
-                                : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-700'}`}
-                        >
-                            {user.active !== false ? <Ban size={14} /> : <CheckCircle size={14} />}
-                            {user.active !== false ? 'Suspend' : 'Activate'}
-                        </button>
-                        <button
-                            onClick={handleResetPassword}
-                            disabled={user.id === currentUser?.id}
-                            className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 transition-colors disabled:opacity-50"
-                        >
-                            <RotateCcw size={14} /> Reset Password
-                        </button>
+                        {canManage && (
+                            <select
+                                value={user.role}
+                                onChange={e => handleRoleChange(e.target.value)}
+                                className="px-3 py-2 bg-muted/40 border border-border rounded-xl text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                                <option value="STUDENT">Student</option>
+                                <option value="INSTRUCTOR">Instructor</option>
+                                {isSuperAdmin() && <option value="ADMIN">Admin</option>}
+                                {isSuperAdmin() && <option value="SUPER_ADMIN">Super Admin</option>}
+                            </select>
+                        )}
+                        {canManage && (
+                            <button
+                                onClick={handleToggleStatus}
+                                disabled={user.id === currentUser?.id}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 ${user.active !== false
+                                    ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-700'
+                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-700'}`}
+                            >
+                                {user.active !== false ? <Ban size={14} /> : <CheckCircle size={14} />}
+                                {user.active !== false ? 'Suspend' : 'Activate'}
+                            </button>
+                        )}
+                        {canManage && (
+                            <button
+                                onClick={handleResetPassword}
+                                disabled={user.id === currentUser?.id}
+                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 transition-colors disabled:opacity-50"
+                            >
+                                <RotateCcw size={14} /> Reset Password
+                            </button>
+                        )}
                         {isSuperAdmin() && (
                             <button
                                 onClick={() => { setSubscriptionPlan(user.subscriptionPlan || 'FREE'); setShowSubscription(true); }}
@@ -385,19 +393,23 @@ export default function UserDetail() {
                                 <CreditCard size={14} /> Subscription
                             </button>
                         )}
-                        <button
-                            onClick={() => setShowAssignCourse(true)}
-                            className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-sky-50 text-sky-600 hover:bg-sky-100 dark:bg-sky-900/20 dark:border-sky-700 transition-colors"
-                        >
-                            <Plus size={14} /> Enroll in Course
-                        </button>
-                        <button
-                            onClick={() => setDeleteConfirm(true)}
-                            disabled={user.id === currentUser?.id}
-                            className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-700 transition-colors disabled:opacity-50"
-                        >
-                            <Trash2 size={14} /> Delete
-                        </button>
+                        {canManage && (
+                            <button
+                                onClick={() => setShowAssignCourse(true)}
+                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-sky-50 text-sky-600 hover:bg-sky-100 dark:bg-sky-900/20 dark:border-sky-700 transition-colors"
+                            >
+                                <Plus size={14} /> Enroll in Course
+                            </button>
+                        )}
+                        {canManage && (
+                            <button
+                                onClick={() => setDeleteConfirm(true)}
+                                disabled={user.id === currentUser?.id}
+                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-700 transition-colors disabled:opacity-50"
+                            >
+                                <Trash2 size={14} /> Delete
+                            </button>
+                        )}
                     </div>
 
                     {/* Detail grid */}
@@ -582,24 +594,26 @@ export default function UserDetail() {
             {/* ── Courses Tab (students only) ── */}
             {activeTab === 'courses' && (
                 <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-                        <h3 className="font-bold text-foreground flex items-center gap-2">
-                            <BookOpen size={18} className="text-indigo-600" /> Enrolled Courses ({user.enrollments?.length || 0})
-                        </h3>
-                        <button onClick={() => setShowAssignCourse(true)}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors">
-                            <Plus size={14} /> Assign Course
-                        </button>
+                    <div className="px-6 py-4 border-b border-border flex items-center justify-between">                                <h3 className="font-bold text-foreground flex items-center gap-2">
+                                    <BookOpen size={18} className="text-indigo-600" /> Enrolled Courses ({user.enrollments?.length || 0})
+                                </h3>
+                                {canManage && (
+                                    <button onClick={() => setShowAssignCourse(true)}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors">
+                                        <Plus size={14} /> Assign Course
+                                    </button>
+                                )}
                     </div>
                     <div className="divide-y divide-border">
                         {(user.enrollments || []).length === 0 ? (
                             <div className="px-6 py-12 text-center text-muted-foreground text-sm font-medium">
                                 <BookOpen size={48} className="mx-auto mb-3 opacity-20" />
-                                <p>No courses enrolled yet</p>
-                                <button onClick={() => setShowAssignCourse(true)}
-                                    className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors">
-                                    <Plus size={14} /> Assign First Course
-                                </button>
+                                <p>No courses enrolled yet</p>                                                                            {canManage && (
+                                                                                <button onClick={() => setShowAssignCourse(true)}
+                                                                                    className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors">
+                                                                                    <Plus size={14} /> Assign First Course
+                                                                                </button>
+                                                                            )}
                             </div>
                         ) : (
                             (user.enrollments || []).map(enrollment => (

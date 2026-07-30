@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info } from 'lucide-react';
+import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info, EyeOff, CheckCircle, Calendar, User, Clock } from 'lucide-react';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import toast from 'react-hot-toast';
@@ -27,6 +27,11 @@ export default function AdminAnnouncements() {
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState(null);
 
+    // Read receipts modal state
+    const [readsModal, setReadsModal] = useState(null); // announcement object
+    const [readsData, setReadsData] = useState(null);
+    const [readsLoading, setReadsLoading] = useState(false);
+
     const { data: announcements, loading, reload } = useAsyncData(() => http('GET', '/announcements'), []);
 
     const handleCreate = async (e) => {
@@ -34,9 +39,15 @@ export default function AdminAnnouncements() {
         if (!form.title.trim() || !form.content.trim()) { toast.error('Title and content are required'); return; }
         setCreating(true);
         try {
-            await http('POST', '/announcements', form);
-            toast.success('Announcement published! 📢');
+            if (editing) {
+                await http('PUT', `/announcements/${editing.id}`, form);
+                toast.success('Announcement updated!');
+            } else {
+                await http('POST', '/announcements', form);
+                toast.success('Announcement published! 📢');
+            }
             setShowCreate(false);
+            setEditing(null);
             setForm({ title: '', content: '', priority: 'normal', pinned: false, targetRoles: ['STUDENT', 'INSTRUCTOR'] });
             reload();
         } catch (err) {
@@ -67,6 +78,20 @@ export default function AdminAnnouncements() {
         }
     };
 
+    const openReadsModal = async (ann) => {
+        setReadsModal(ann);
+        setReadsData(null);
+        setReadsLoading(true);
+        try {
+            const data = await http('GET', `/announcements/${ann.id}/reads`);
+            setReadsData(data);
+        } catch (err) {
+            toast.error('Failed to load readers');
+        } finally {
+            setReadsLoading(false);
+        }
+    };
+
     const priorityIcon = (p) => {
         if (p === 'high') return <AlertTriangle size={14} className="text-rose-500" />;
         if (p === 'urgent') return <Bell size={14} className="text-red-500" />;
@@ -77,6 +102,16 @@ export default function AdminAnnouncements() {
         if (p === 'high') return 'bg-rose-50 text-rose-600 border-rose-200';
         if (p === 'urgent') return 'bg-red-50 text-red-600 border-red-200';
         return 'bg-blue-50 text-blue-600 border-blue-200';
+    };
+
+    const roleBadge = (role) => {
+        const colors = {
+            STUDENT: 'bg-emerald-100 text-emerald-700',
+            INSTRUCTOR: 'bg-indigo-100 text-indigo-700',
+            ADMIN: 'bg-amber-100 text-amber-700',
+            SUPER_ADMIN: 'bg-purple-100 text-purple-700',
+        };
+        return colors[role] || 'bg-gray-100 text-gray-700';
     };
 
     return (
@@ -129,13 +164,21 @@ export default function AdminAnnouncements() {
                                         </span>
                                     </div>
                                     <h3 className="text-lg font-bold text-foreground mb-2">{ann.title}</h3>
-                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ann.content}</p>
-                                    <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-2">{ann.content}</p>
+                                    <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1"><Users size={12} /> {(ann.target_roles || []).join(', ') || 'All'}</span>
-                                        <span>by {ann.author_name || 'Unknown'}</span>
+                                        <span className="flex items-center gap-1"><User size={12} /> {ann.author_name || 'Unknown'}</span>
+                                        <span className="flex items-center gap-1"><EyeOff size={12} /> {ann.view_count || 0} views</span>
                                     </div>
                                 </div>
-                                    <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+                                <div className="flex gap-1 sm:gap-2 flex-shrink-0 items-start">
+                                    <button
+                                        onClick={() => openReadsModal(ann)}
+                                        className="p-2 rounded-lg text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                                        title="View read receipts"
+                                    >
+                                        <CheckCircle size={16} />
+                                    </button>
                                     <button
                                         onClick={() => handleTogglePin(ann)}
                                         className={`p-2 rounded-lg transition-colors ${ann.pinned ? 'bg-indigo-50 text-indigo-600' : 'text-muted-foreground hover:bg-muted'}`}
@@ -254,6 +297,75 @@ export default function AdminAnnouncements() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Read Receipts Modal */}
+            {readsModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm" onClick={() => setReadsModal(null)}>
+                    <div className="bg-card w-full max-w-lg border border-border shadow-2xl rounded-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 border-b border-border flex justify-between items-center bg-muted/30">
+                            <div>
+                                <h3 className="text-lg font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                    <CheckCircle size={18} className="text-emerald-600" />
+                                    Read Receipts
+                                </h3>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{readsModal.title}</p>
+                            </div>
+                            <button onClick={() => setReadsModal(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-5 max-h-[60vh] overflow-y-auto">
+                            {readsLoading ? (
+                                <div className="flex items-center justify-center py-10">
+                                    <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : !readsData || !readsData.readers?.length ? (
+                                <div className="text-center py-10">
+                                    <EyeOff size={36} className="mx-auto text-muted-foreground/30 mb-3" />
+                                    <p className="text-sm text-muted-foreground font-medium">No one has read this announcement yet</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium px-1">
+                                        <span>{readsData.total} reader{readsData.total !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    {readsData.readers.map(reader => (
+                                        <div key={reader.userId} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/60 hover:bg-muted/50 transition-colors">
+                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                                {reader.name?.charAt(0) || '?'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-foreground truncate">{reader.name}</span>
+                                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${roleBadge(reader.role)}`}>
+                                                        {reader.role}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                                    <Clock size={10} />
+                                                    {new Date(reader.readAt).toLocaleDateString('en-US', {
+                                                        month: 'short', day: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit'
+                                                    })}
+                                                </div>
+                                            </div>
+                                            <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-border bg-muted/20">
+                            <button
+                                onClick={() => setReadsModal(null)}
+                                className="w-full px-6 py-2.5 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

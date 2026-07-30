@@ -1,6 +1,6 @@
 import {
-    Users, BookOpen, DollarSign, TrendingUp,
-    ShieldCheck, AlertTriangle, ChevronRight, Activity, Award
+    Users, BookOpen, TrendingUp,
+    ShieldCheck, AlertTriangle, ChevronRight, Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,7 +35,6 @@ export default function AdminDashboard() {
     const statCards = stats ? [
         { label: 'Total Users', value: stats.totalUsers?.toLocaleString(), icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
         { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published` },
-        { label: 'Premium Subscribers', value: stats.premiumSubscribers?.toLocaleString(), icon: Award, color: '#d97706', bg: 'bg-amber-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% revenue trend` },
         { label: 'Pending Approvals', value: stats.pendingCourses, icon: AlertTriangle, color: '#e11d48', bg: 'bg-rose-50', change: 'Needs action', changeColor: '#e11d48' },
     ] : [];
 
@@ -55,12 +54,6 @@ export default function AdminDashboard() {
                     </span>
                 }
                 subtitle="Platform overview and management"
-                action={
-                    <div className="text-right bg-card border border-border px-6 py-3 rounded-xl shadow-sm hidden sm:block">
-                        <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mb-1">Platform Revenue</p>
-                        <p className="text-emerald-600 font-extrabold text-2xl tracking-tighter">₹{stats?.totalRevenue?.toLocaleString() || '0'}</p>
-                    </div>
-                }
             />
 
             {loading ? <StatCardSkeleton /> : (
@@ -71,32 +64,6 @@ export default function AdminDashboard() {
 
             <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                 <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
-                    {/* Revenue Chart */}
-                    <ChartCard title="Revenue Overview" height="h-[220px] sm:h-[280px]">
-                        {stats?.monthlyRevenue && stats.monthlyRevenue.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.monthlyRevenue} margin={CHART_MARGIN}>
-                                    <defs>
-                                        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#4f46e5" />
-                                            <stop offset="100%" stopColor="#818cf8" />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} dy={10} />
-                                    <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
-                                    <RechartsTooltip cursor={{ fill: '#f1f5f9' }} content={<ChartTooltip prefix="₹" />} />
-                                    <Bar dataKey="revenue" fill="url(#barGrad)" radius={[6, 6, 0, 0]} barSize={40} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/20 rounded-xl border border-dashed border-border">
-                                <DollarSign size={32} className="opacity-20" />
-                                <p className="text-sm font-medium">No revenue data available</p>
-                            </div>
-                        )}
-                    </ChartCard>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                         {/* Roles Pie */}
                         <Card>

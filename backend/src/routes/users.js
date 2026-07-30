@@ -17,10 +17,12 @@ router.post('/invite-admin', authenticate, authorize('SUPER_ADMIN'), asyncHandle
 router.put('/:id/departments', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.setAdminDepartments));
 router.get('/:id/departments', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getUserDepartments));
 router.post('/instructors', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.createInstructor));
+router.get('/instructors/template', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.downloadInstructorTemplate));
+router.get('/students/template', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.downloadStudentTemplate));
 router.post('/instructors/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importInstructors));
 router.post('/students/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importStudents));
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
-router.get('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getById));
+router.get('/:id', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getById));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));
 router.put('/:id/reset-password', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.resetUserPassword));
 router.put('/:id/toggle-status', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.toggleStatus));

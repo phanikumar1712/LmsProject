@@ -35,6 +35,14 @@ const createQuestion = async (req, res) => {
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [courseId, lessonId || null, req.user.id, title, content]
     );
+    // Notify the course instructor so questions don't go unanswered
+    const course = await query('SELECT instructor_id, title FROM courses WHERE id = $1', [courseId]);
+    if (course.rows.length && course.rows[0].instructor_id !== req.user.id) {
+        await query(
+            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
+            [course.rows[0].instructor_id, `New question on "${course.rows[0].title}": ${title}`, 'discussion', `/courses/${courseId}?tab=discuss`]
+        ).catch(() => {});
+    }
     res.status(201).json(result.rows[0]);
 };
 
@@ -94,7 +102,7 @@ const createAnswer = async (req, res) => {
     if (q.rows.length && q.rows[0].student_id !== req.user.id) {
         await query(
             `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-            [q.rows[0].student_id, `New answer on "${q.rows[0].title}"`, 'discussion', `/courses/${q.rows[0].course_id}/discuss`]
+            [q.rows[0].student_id, `New answer on "${q.rows[0].title}"`, 'discussion', `/courses/${q.rows[0].course_id}?tab=discuss`]
         ).catch(() => {});
     }
     res.status(201).json(result.rows[0]);
@@ -171,6 +179,14 @@ const markBestAnswer = async (req, res) => {
         'UPDATE discussion_answers SET is_best_answer = true WHERE id = $1',
         [req.params.id]
     );
+    // Notify the answer author of the recognition
+    const author = await query('SELECT user_id FROM discussion_answers WHERE id = $1', [req.params.id]);
+    if (author.rows.length && author.rows[0].user_id !== req.user.id) {
+        await query(
+            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
+            [author.rows[0].user_id, '🏆 Your answer was marked as the best answer!', 'discussion', `/courses/${answer.rows[0].course_id}?tab=discuss`]
+        ).catch(() => {});
+    }
     res.json({ success: true, isBestAnswer: true });
 };
 

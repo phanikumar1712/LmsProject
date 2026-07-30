@@ -1,11 +1,10 @@
-import { BookOpen, Clock, Users, Heart, Play, Lock } from 'lucide-react';
+import { BookOpen, Clock, Users, Heart, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { ProgressBar } from './ProgressBar';
 import { RatingDisplay } from './RatingStars';
 import { useAuth } from '../../contexts/AuthContext';
 import { wishlistAPI } from '../../services/api';
-import { canAccessCourse } from '../../lib/courseAccess';
 import toast from 'react-hot-toast';
 
 const LEVEL_COLORS = {
@@ -20,7 +19,6 @@ export function CourseCard({ course, enrollment }) {
     const [wishlisted, setWishlisted] = useState(user?.wishlist?.includes(course.id) || false);
     const [hearting, setHearting] = useState(false);
 
-    const canAccess = canAccessCourse(user, course);
     const isEnrolled = !!enrollment;
 
     const handleWishlist = async (e) => {
@@ -36,13 +34,12 @@ export function CourseCard({ course, enrollment }) {
     };
 
     const handleClick = () => {
-        navigate(`/courses/${course.id}`);
+        if (isEnrolled) {
+            navigate(`/courses/${course.id}/learn`);
+        } else {
+            navigate(`/courses/${course.id}?tab=preview`);
+        }
     };
-
-    const effectivePrice = course.discountPrice ?? course.price ?? 0;
-    const discountPct = course.price > 0 && course.discountPrice !== null
-        ? Math.round((1 - course.discountPrice / course.price) * 100)
-        : 0;
 
     return (
         <div
@@ -64,16 +61,7 @@ export function CourseCard({ course, enrollment }) {
                 <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider ${LEVEL_COLORS[course.level] || 'bg-indigo-100 text-indigo-800'}`}>{course.level}</span>
                     {course.status === 'PENDING' && <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider">Pending Review</span>}
-                    {discountPct > 0 && <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider">{discountPct}% OFF</span>}
                 </div>
-                {!canAccess && !isEnrolled && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100">
-                        <div className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-lg">
-                            <Lock size={14} className="text-amber-500" />
-                            <span className="text-xs font-bold text-foreground">{course.requiredPlan} Plan Required</span>
-                        </div>
-                    </div>
-                )}
                 {/* Wishlist btn */}
                 <button
                     onClick={handleWishlist}
@@ -98,8 +86,13 @@ export function CourseCard({ course, enrollment }) {
 
             {/* Body */}
             <div className="p-4 flex flex-col flex-1">
-                <div className="flex items-center gap-1.5 mb-2">
+                <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                     <span className="text-xs text-indigo-600 font-bold uppercase tracking-wide">{course.category}</span>
+                    {course.departmentName && (
+                        <span className="text-[10px] font-semibold text-muted-foreground/70 bg-muted/70 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                            {course.departmentName}
+                        </span>
+                    )}
                 </div>
                 <h3 className="font-bold text-foreground text-base leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
                     {course.title}
@@ -131,26 +124,11 @@ export function CourseCard({ course, enrollment }) {
                     <RatingDisplay rating={course.rating} count={course.reviewCount} />
                 </div>
 
-                {/* Price */}
-                {!isEnrolled && (
+                {course.certificate && (
                     <div className="mt-auto pt-3 flex items-end justify-between">
-                        <div className="flex items-center gap-2">
-                            {course.price === 0 ? (
-                                <span className="text-emerald-600 font-bold text-lg leading-none">Free</span>
-                            ) : (
-                                <div className="flex items-baseline gap-1.5">
-                                    <span className="text-foreground font-bold text-lg leading-none">₹{effectivePrice.toLocaleString()}</span>
-                                    {course.discountPrice !== null && course.discountPrice < course.price && (
-                                        <span className="text-muted-foreground text-sm line-through decoration-slate-300 dark:decoration-slate-700">₹{course.price?.toLocaleString()}</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {course.certificate && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-1 rounded">
-                                Certificate
-                            </span>
-                        )}
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-1 rounded">
+                            Certificate
+                        </span>
                     </div>
                 )}
 

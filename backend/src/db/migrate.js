@@ -493,6 +493,24 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_announcements_dept ON announcements(department_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON announcements(pinned, created_at DESC); `);
 
+        // ── ANNOUNCEMENT READ RECEIPTS ────────────────────────────────────────
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS announcement_reads (
+                announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+                user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                read_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (announcement_id, user_id)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_announcement_reads_ann ON announcement_reads(announcement_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_announcement_reads_user ON announcement_reads(user_id); `);
+
+        // Add a view_count column to announcements for quick glance stats
+        await client.query(`
+            ALTER TABLE announcements
+            ADD COLUMN IF NOT EXISTS view_count INT NOT NULL DEFAULT 0;
+        `);
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS academic_sessions (
                 id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -523,6 +541,24 @@ const createTables = async () => {
             );
         `);        await client.query(`
             CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id); `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS submissions (
+                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                assignment_id   UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+                student_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                file_url        TEXT DEFAULT '',
+                comments        TEXT DEFAULT '',
+                marks           INT,
+                feedback        TEXT,
+                graded_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+                submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                graded_at       TIMESTAMPTZ,
+                UNIQUE(assignment_id, student_id)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON submissions(assignment_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id); `);
 
         // ── RUBRIC GRADING ────────────────────────────────────────────────────
         await client.query(`
@@ -608,23 +644,6 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_certificates_student ON certificates(student_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_certificates_cert_id ON certificates(cert_id); `);
 
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS submissions (
-                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                assignment_id   UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
-                student_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                file_url        TEXT DEFAULT '',
-                comments        TEXT DEFAULT '',
-                marks           INT,
-                feedback        TEXT,
-                graded_by       UUID REFERENCES users(id) ON DELETE SET NULL,
-                submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                graded_at       TIMESTAMPTZ,
-                UNIQUE(assignment_id, student_id)
-            );
-        `);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON submissions(assignment_id); `);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id); `);
 
         // -- COURSE SCHEDULING: start/end dates and multi-step review level --
         await client.query(`
@@ -665,9 +684,15 @@ const createTables = async () => {
             ADD COLUMN IF NOT EXISTS drip_mode VARCHAR(20) DEFAULT 'none';
         `);
         await client.query(`
-            ALTER TABLE courses
-            ADD CONSTRAINT IF NOT EXISTS courses_drip_mode_check
-            CHECK (drip_mode IN ('none', 'absolute', 'relative', 'both'));
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'courses_drip_mode_check'
+                ) THEN
+                    ALTER TABLE courses
+                    ADD CONSTRAINT courses_drip_mode_check
+                    CHECK (drip_mode IN ('none', 'absolute', 'relative', 'both'));
+                END IF;
+            END $$;
         `);
         await client.query(`
             ALTER TABLE lessons
@@ -981,7 +1006,7 @@ const createTables = async () => {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('❌ Migration failed:', err.message);
+        console.error('❌ Migration failed:', err);
         throw err;
     } finally {
         client.release();

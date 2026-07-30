@@ -18,8 +18,8 @@ export default function CreateCourseForm() {
 
     const [formData, setFormData] = useState({
         title: '', description: '', categoryId: '', customCategory: '', level: 'Beginner',
-        price: 0, discountPrice: 0, duration: '',
-        requiredPlan: 'FREE', certificate: true,
+        duration: '',
+        certificate: true,
         tags: '', prerequisites: '', learningOutcomes: '', dripMode: 'none'
     });
 
@@ -55,10 +55,7 @@ export default function CreateCourseForm() {
                     categoryId: course.categoryId || '',
                     customCategory: '',
                     level: course.level || 'Beginner',
-                    price: course.price || 0,
-                    discountPrice: course.discountPrice || 0,
                     duration: course.duration || '',
-                    requiredPlan: course.requiredPlan || 'FREE',
                     certificate: course.certificate ?? true,
                     tags: course.tags?.join(', ') || '',
                     prerequisites: course.prerequisites?.join(', ') || '',
@@ -424,10 +421,7 @@ export default function CreateCourseForm() {
                 level: formData.level,
                 duration: formData.duration,
                 thumbnail: thumbnailPreview || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-                price: Number(formData.price),
-                discount_price: Number(formData.discountPrice),
                 certificate: formData.certificate,
-                required_plan: formData.requiredPlan,
                 tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
                 requirements: formData.prerequisites.split(',').map(t => t.trim()).filter(Boolean),
                 what_you_learn: formData.learningOutcomes.split('\n').filter(Boolean),
@@ -605,11 +599,10 @@ export default function CreateCourseForm() {
                     </div>
                 </div>
 
-                {/* Media & Pricing */}
+                {/* Media & Thumbnail */}
                 <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
-                    <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Pricing</h2>
+                    <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Settings</h2>
                     <div className="space-y-6">
-
                         {/* Thumbnail Upload */}
                         <div>
                             <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-3">Course Thumbnail</label>
@@ -644,30 +637,10 @@ export default function CreateCourseForm() {
                             </div>
                         </div>
 
-                        <div className="grid sm:grid-cols-3 gap-5 border-t border-border pt-6">
+                        <div className="grid sm:grid-cols-2 gap-5 border-t border-border pt-6">
                             <div>
                                 <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Est. Total Duration</label>
                                 <input type="text" name="duration" value={formData.duration} onChange={handleChange} className={InputClass} placeholder="e.g. 10 hours" />
-                            </div>
-                            <div>
-                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Regular Price (₹)</label>
-                                <input type="number" name="price" value={formData.price} onChange={handleChange} className={InputClass} min="0" />
-                            </div>
-                            <div>
-                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Discount Price (₹)</label>
-                                <input type="number" name="discountPrice" value={formData.discountPrice} onChange={handleChange} className={InputClass} min="0" />
-                            </div>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-5 pt-2">
-                            <div>
-                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Required Plan</label>
-                                <select name="requiredPlan" value={formData.requiredPlan} onChange={handleChange} className={InputClass}>
-                                    <option value="FREE">Free for all</option>
-                                    <option value="BASIC">Basic Plan & above</option>
-                                    <option value="PRO">Pro Plan & above</option>
-                                    <option value="ENTERPRISE">Enterprise only</option>
-                                </select>
                             </div>
                             <div className="flex items-center gap-3 pt-8">
                                 <input type="checkbox" id="cert" name="certificate" checked={formData.certificate} onChange={handleChange} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-border" />

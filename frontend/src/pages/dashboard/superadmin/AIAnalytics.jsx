@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import {
-    BarChart3, TrendingUp, BookOpen, Users, DollarSign, Star,
+    BarChart3, TrendingUp, BookOpen, Users, Star,
     AlertTriangle, Lightbulb, Target, Activity, Zap, RefreshCw,
-    Building2, CheckCircle2
+    Building2, CheckCircle2, GraduationCap
 } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -116,7 +116,7 @@ export default function AIAnalytics() {
                     { label: 'Total Users', value: report.platform?.total_users?.toLocaleString() || '0', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/10' },
                     { label: 'Published Courses', value: report.platform?.published_courses?.toLocaleString() || '0', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/10' },
                     { label: 'Enrollments', value: report.platform?.total_enrollments?.toLocaleString() || '0', icon: Activity, color: 'text-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-900/10' },
-                    { label: 'Revenue', value: report.platform?.total_revenue >= 100000 ? `₹${(report.platform.total_revenue / 100000).toFixed(1)}L` : `₹${Math.round(report.platform?.total_revenue || 0).toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/10' },
+                    { label: 'Instructors', value: report.platform?.total_instructors?.toLocaleString() || report.usersByRole?.find(r => r.role === 'INSTRUCTOR')?.count?.toLocaleString() || '0', icon: GraduationCap, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/10' },
                 ].map(s => (
                     <div key={s.label} className={`${s.bg} border border-border rounded-2xl p-4 shadow-sm`}>
                         <div className="flex items-center gap-2 mb-2">
@@ -131,20 +131,24 @@ export default function AIAnalytics() {
             </div>
 
             {/* Top Insight Banner */}
-            {topInsight && (
-                <div className={`rounded-2xl border p-4 flex items-start gap-3 ${
-                    topInsight.type === 'warning' ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/20' :
-                    topInsight.type === 'success' ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/20' :
-                    'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-900/20'
-                }`}>
-                    {(insightIcons[topInsight.type] || Lightbulb)({ size: 20, className: topInsight.type === 'warning' ? 'text-amber-600' : topInsight.type === 'success' ? 'text-emerald-600' : 'text-indigo-600 flex-shrink-0 mt-0.5' })}
-                    <div className="flex-1">
-                        <p className="font-extrabold text-foreground text-sm">{topInsight.title}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5">{topInsight.detail}</p>
+            {topInsight && (() => {
+                const TopIcon = insightIcons[topInsight.type] || Lightbulb;
+                const iconClass = topInsight.type === 'warning' ? 'text-amber-600' : topInsight.type === 'success' ? 'text-emerald-600' : 'text-indigo-600 flex-shrink-0 mt-0.5';
+                return (
+                    <div className={`rounded-2xl border p-4 flex items-start gap-3 ${
+                        topInsight.type === 'warning' ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/20' :
+                        topInsight.type === 'success' ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/20' :
+                        'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-900/20'
+                    }`}>
+                        <TopIcon size={20} className={iconClass} />
+                        <div className="flex-1">
+                            <p className="font-extrabold text-foreground text-sm">{topInsight.title}</p>
+                            <p className="text-sm text-muted-foreground mt-0.5">{topInsight.detail}</p>
+                        </div>
+                        <span className="text-2xl font-black text-foreground">{topInsight.value}</span>
                     </div>
-                    <span className="text-2xl font-black text-foreground">{topInsight.value}</span>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Tabs */}
             <div className="flex gap-1 bg-muted/50 p-1 rounded-2xl border border-border overflow-x-auto">
@@ -172,7 +176,7 @@ export default function AIAnalytics() {
                                 { label: 'New Users', value: report.period?.last30Days?.newUsers || 0, icon: Users },
                                 { label: 'New Courses', value: report.period?.last30Days?.newCourses || 0, icon: BookOpen },
                                 { label: 'New Enrollments', value: report.period?.last30Days?.newEnrollments || 0, icon: Activity },
-                                { label: 'Revenue Generated', value: `₹${Math.round(report.period?.last30Days?.revenue || 0).toLocaleString()}`, icon: DollarSign },
+                                { label: 'Active Users', value: report.period?.last30Days?.activeUsers?.toLocaleString() || report.period?.last30Days?.newUsers?.toLocaleString() || '0', icon: Users },
                             ].map(item => (
                                 <div key={item.label} className="bg-muted/30 rounded-xl p-4">
                                     <div className="flex items-center gap-2 mb-2">
@@ -325,7 +329,7 @@ export default function AIAnalytics() {
                                         <span className="font-extrabold text-foreground text-sm">{dept.name}</span>
                                     </div>
                                     <span className="text-sm font-bold text-foreground">
-                                        {dept.revenue >= 100000 ? `₹${(dept.revenue / 100000).toFixed(1)}L` : `₹${Math.round(dept.revenue).toLocaleString()}`}
+                                        {dept.enrollments?.toLocaleString() || 0} enrolled
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4 ml-8">

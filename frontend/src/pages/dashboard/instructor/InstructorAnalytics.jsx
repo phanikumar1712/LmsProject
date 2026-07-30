@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Users, TrendingUp, BarChart2, Star } from 'lucide-react';
+import { Users, TrendingUp, BarChart2, Star } from 'lucide-react';
 import { statsAPI, coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
@@ -26,9 +26,8 @@ export default function InstructorAnalytics() {
     const coursePerformanceData = courses.map(c => ({
         name: c.title.substring(0, 15) + '...',
         fullTitle: c.title,
-        revenue: c.price * c.enrollmentCount * 0.8,
         students: c.enrollmentCount
-    })).sort((a, b) => b.revenue - a.revenue);
+    })).sort((a, b) => b.students - a.students);
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload?.length) {
@@ -37,7 +36,7 @@ export default function InstructorAnalytics() {
                     <p className="text-muted-foreground font-bold mb-2">{payload[0].payload.fullTitle || label}</p>
                     {payload.map((p, i) => (
                         <p key={i} className="font-bold flex items-center gap-1" style={{ color: p.color }}>
-                            {p.dataKey === 'revenue' ? `₹${p.value.toLocaleString()}` : p.value.toLocaleString()} {p.name}
+                            {p.value.toLocaleString()} {p.name}
                         </p>
                     ))}
                 </div>
@@ -50,19 +49,16 @@ export default function InstructorAnalytics() {
 
     const statItems = [
         {
-            icon: DollarSign, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600', glow: 'bg-emerald-50 dark:bg-emerald-900/10',
-            label: 'Total Lifetime Earnings', value: `₹${stats?.earnings?.toLocaleString()}`,
-            badge: stats?.thisMonth?.earnings > 0 ? `+₹${stats.thisMonth.earnings.toLocaleString()} New` : null,
-            badgeClass: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+            icon: Users, iconBg: 'bg-indigo-100 dark:bg-indigo-900/30', iconColor: 'text-indigo-600', glow: 'bg-indigo-50 dark:bg-indigo-900/10',
+            label: 'Total Students', value: stats?.totalEnrollments?.toLocaleString(),
         },
         {
-            icon: TrendingUp, iconBg: 'bg-indigo-100 dark:bg-indigo-900/30', iconColor: 'text-indigo-600', glow: 'bg-indigo-50 dark:bg-indigo-900/10',
-            label: 'Current Month Earnings', value: `₹${(stats?.thisMonth?.earnings || 0).toLocaleString()}`,
-            badge: 'Active Month', badgeClass: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 border border-indigo-100 dark:border-indigo-700',
+            icon: TrendingUp, iconBg: 'bg-cyan-100 dark:bg-cyan-900/30', iconColor: 'text-cyan-600', glow: 'bg-cyan-50 dark:bg-cyan-900/10',
+            label: 'Total Courses', value: stats?.totalCourses,
         },
         {
-            icon: Users, iconBg: 'bg-cyan-100 dark:bg-cyan-900/30', iconColor: 'text-cyan-600', glow: 'bg-cyan-50 dark:bg-cyan-900/10',
-            label: 'Total Students Reach', value: stats?.totalEnrollments?.toLocaleString(),
+            icon: Users, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600', glow: 'bg-emerald-50 dark:bg-emerald-900/10',
+            label: 'Total Enrollments', value: stats?.totalEnrollments?.toLocaleString(),
         },
         {
             icon: Star, iconBg: 'bg-amber-100 dark:bg-amber-900/30', iconColor: 'text-amber-500', glow: 'bg-amber-50 dark:bg-amber-900/10',
@@ -97,23 +93,23 @@ export default function InstructorAnalytics() {
 
             <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
                 <div className="bg-card border border-border shadow-sm rounded-2xl p-6">
-                    <h2 className="text-foreground font-bold text-lg mb-6 flex items-center gap-2"><BarChart2 size={20} className="text-indigo-600" /> Revenue by Course</h2>
+                    <h2 className="text-foreground font-bold text-lg mb-6 flex items-center gap-2"><BarChart2 size={20} className="text-indigo-600" /> Students by Course</h2>
                     <div className="h-72">
                         {coursePerformanceData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={coursePerformanceData.slice(0, 5)} layout="vertical" margin={{ left: 50 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                                    <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
+                                    <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     <YAxis dataKey="name" type="category" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
                                     {/* eslint-disable-next-line react-hooks/static-components */}
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                                    <Bar dataKey="revenue" name="Revenue" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={24} />
+                                    <Bar dataKey="students" name="Students" fill="#0891b2" radius={[0, 4, 4, 0]} barSize={24} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/20 rounded-xl border border-dashed border-border">
                                 <BarChart2 size={32} className="opacity-20" />
-                                <p className="text-sm font-medium">No course revenue to show</p>
+                                <p className="text-sm font-medium">No student data to show</p>
                             </div>
                         )}
                     </div>

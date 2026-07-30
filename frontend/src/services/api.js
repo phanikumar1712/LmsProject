@@ -108,7 +108,7 @@ export const coursesAPI = {
 
     getById: async (id) => http('GET', `/courses/${id}`),
 
-    getLessons: async (courseId) => http('GET', `/courses/${courseId}/lessons`),
+    getLessons: async (courseId) => http('GET', `/courses/${courseId}/lessons`, null, getToken()),
 
     getByInstructor: async (instructorId) =>
         http('GET', `/courses/instructor/${instructorId}`, null, getToken()),
@@ -208,6 +208,9 @@ export const enrollmentsAPI = {
         const res = await http('GET', `/enrollments/stats/${instructorId}`, null, getToken());
         return res.data || [];
     },
+
+    bulkEnroll: async (courseId, studentIds, rollNos = []) =>
+        http('POST', '/enrollments/bulk', { courseId, studentIds, rollNos }, getToken()),
 };
 
 // ─── QUIZZES ─────────────────────────────────────────────────────────────────
@@ -279,6 +282,38 @@ export const usersAPI = {
 
     createInstructor: async (data) =>
         http('POST', '/users/instructors', data, getToken()),
+
+    downloadInstructorTemplate: async () => {
+        const token = getToken();
+        const res = await fetch(`${BASE_URL}/users/instructors/template`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to download template');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Instructor_Import_Template.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    },
+
+    downloadStudentTemplate: async () => {
+        const token = getToken();
+        const res = await fetch(`${BASE_URL}/users/students/template`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to download template');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Student_Import_Template.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    },
 
     importInstructors: async (file, { signal, timeoutMs = 120000 } = {}) => {
         const formData = new FormData();
@@ -428,6 +463,27 @@ export const subscriptionsAPI = {
         http('DELETE', `/subscriptions/plans/${planId}`, null, getToken()),
 };
 
+// ─── ANNOUNCEMENTS ────────────────────────────────────────────────────────────
+export const announcementsAPI = {
+    list: async (all = false) =>
+        http('GET', `/announcements${all ? '?all=true' : ''}`, null, getToken()),
+
+    create: async (data) =>
+        http('POST', '/announcements', data, getToken()),
+
+    update: async (id, data) =>
+        http('PUT', `/announcements/${id}`, data, getToken()),
+
+    delete: async (id) =>
+        http('DELETE', `/announcements/${id}`, null, getToken()),
+
+    markRead: async (id) =>
+        http('POST', `/announcements/${id}/mark-read`, {}, getToken()),
+
+    getReads: async (id) =>
+        http('GET', `/announcements/${id}/reads`, null, getToken()),
+};
+
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
 export const notificationsAPI = {
     getByUser: async () => {
@@ -483,7 +539,10 @@ export const statsAPI = {
         http('GET', '/stats/ai-report', null, getToken()),
 
     getCategories: async () =>
-        http('GET', '/stats/categories'),
+        http('GET', '/stats/categories', null, getToken()),
+
+    getCategoryDetail: async (id) =>
+        http('GET', `/stats/categories/${id}`, null, getToken()),
 
     createCategory: async (data) =>
         http('POST', '/stats/categories', data, getToken()),
@@ -493,6 +552,12 @@ export const statsAPI = {
 
     deleteCategory: async (id) =>
         http('DELETE', `/stats/categories/${id}`, null, getToken()),
+
+    assignCourseToCategory: async (categoryId, courseId) =>
+        http('PUT', `/stats/categories/${categoryId}/courses`, { courseId }, getToken()),
+
+    removeCourseFromCategory: async (categoryId, courseId) =>
+        http('DELETE', `/stats/categories/${categoryId}/courses/${courseId}`, null, getToken()),
 
     bulkEnroll: async (courseId, studentIds, rollNos = []) =>
         http('POST', '/enrollments/bulk', { courseId, studentIds, rollNos }, getToken()),

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-    BookOpen, Users, Star, DollarSign, PlusCircle,
+    BookOpen, Users, Star, PlusCircle, TrendingUp,
     ChevronRight, BarChart2, Eye
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,7 +31,7 @@ export default function InstructorDashboard() {
         { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#4f46e5', bg: 'bg-indigo-50', change: `+${stats.thisMonth?.newCourses || 0} this month`, showTrend: (stats.thisMonth?.newCourses > 0) },
         { label: 'Total Students', value: stats.totalEnrollments?.toLocaleString(), icon: Users, color: '#0891b2', bg: 'bg-cyan-50', change: `+${stats.thisMonth?.enrollments || 0} this month`, showTrend: (stats.thisMonth?.enrollments > 0) },
         { label: 'Avg Rating', value: `${stats.avgRating}/5`, icon: Star, color: '#d97706', bg: 'bg-amber-50', change: 'Live rating', showTrend: false },
-        { label: 'Total Earnings', value: `₹${stats.earnings?.toLocaleString()}`, icon: DollarSign, color: '#059669', bg: 'bg-emerald-50', change: `+₹${stats.thisMonth?.earnings?.toLocaleString()} this month`, showTrend: (stats.thisMonth?.earnings > 0) },
+        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString(), icon: Users, color: '#059669', bg: 'bg-emerald-50', change: `+${stats.thisMonth?.enrollments || 0} this month`, showTrend: (stats.thisMonth?.enrollments > 0) },
     ] : [];
 
     return (
@@ -57,32 +57,31 @@ export default function InstructorDashboard() {
             )}
 
             <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                {/* Earnings Chart */}
+                {/* Enrollments Chart */}
                 <ChartCard
-                    title="Monthly Earnings"
-                    badge={stats?.thisMonth?.earnings > 0 && <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-md text-xs sm:text-sm font-bold">+₹{stats.thisMonth.earnings.toLocaleString()} this month</span>}
+                    title="Monthly Enrollments"
                     className="lg:col-span-2"
                 >
                     {stats?.monthlyEarnings && stats.monthlyEarnings.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={stats.monthlyEarnings} margin={CHART_MARGIN}>
                                 <defs>
-                                    <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                    <linearGradient id="enrollGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0891b2" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#0891b2" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} dy={10} />
-                                <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} tickFormatter={v => `₹${v.toLocaleString()}`} />
-                                <Tooltip content={<ChartTooltip prefix="₹" />} />
-                                <Area type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={3} fill="url(#earningsGrad)" activeDot={{ r: 6, fill: '#4f46e5', stroke: '#fff', strokeWidth: 2 }} />
+                                <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
+                                <Tooltip content={<ChartTooltip />} />
+                                <Area type="monotone" dataKey="revenue" stroke="#0891b2" strokeWidth={3} fill="url(#enrollGrad)" activeDot={{ r: 6, fill: '#0891b2', stroke: '#fff', strokeWidth: 2 }} />
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-2">
-                            <DollarSign size={32} className="opacity-20" />
-                            <p className="text-sm font-medium">No revenue data available yet</p>
+                            <TrendingUp size={32} className="opacity-20" />
+                            <p className="text-sm font-medium">No enrollment data available yet</p>
                         </div>
                     )}
                 </ChartCard>

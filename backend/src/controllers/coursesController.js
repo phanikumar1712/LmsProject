@@ -1,30 +1,24 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
-const { mapCourse, normalizePlan } = require('../utils/formatters');
+const { mapCourse } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
 
 const courseFields = `
-    c.id, c.title, c.description, c.short_desc, c.thumbnail, c.price, c.discount_price,
+    c.id, c.title, c.description, c.short_desc, c.thumbnail, 0 as price, NULL as discount_price,
     c.level, c.language, c.tags, c.what_you_learn, c.requirements,
     c.status, c.rating, c.review_count, c.enrollment_count, c.duration,
-    c.certificate, c.required_plan, c.created_at, c.updated_at,
-    COALESCE(sp_agg.accessible_plans, '{}'::text[]) as "accessiblePlans",
+    c.certificate, 'FREE' as required_plan, c.created_at, c.updated_at,
+    '{}'::text[] as "accessiblePlans",
     COALESCE(l_agg.lesson_count, 0)::int as "lessonsCount",
     u.id as "instructorId", u.name as "instructorName", u.avatar as "instructorAvatar", u.bio as "instructorBio",
     u.role as "instructorRole", u.subscription_plan as "instructorPlan",
     u.created_at as "instructorJoined",
-    cat.id as "categoryId", cat.name as "categoryName", cat.icon as "categoryIcon"
+    cat.id as "categoryId", cat.name as "categoryName", cat.icon as "categoryIcon", cat.department_id as "departmentId",
+    dept.name as "departmentName"
 `;
 
-// Co-authored lateral join fragments used in most course queries to replace
-// N+1 correlated subqueries with set-oriented joins.
+// N+1 lateral join fragments — subscription_plan_courses is no longer used.
 const courseJoins = `
-    LEFT JOIN LATERAL (
-        SELECT array_agg(sp.name ORDER BY spc.priority ASC) AS accessible_plans
-        FROM subscription_plan_courses spc
-        JOIN subscription_plans sp ON sp.id = spc.plan_id
-        WHERE spc.course_id = c.id
-    ) sp_agg ON true
     LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS lesson_count
         FROM lessons l
@@ -82,6 +76,7 @@ const assertCourseInScope = async (req, courseId) => {
     const r = await query(
         `SELECT cat.department_id FROM courses c
          LEFT JOIN categories cat ON c.category_id = cat.id
+         LEFT JOIN departments dept ON cat.department_id = dept.id
          WHERE c.id = $1`,
         [courseId]
     );
@@ -93,9 +88,7 @@ const assertCourseInScope = async (req, courseId) => {
 
 const COURSE_UPDATE_ALIASES = {
     shortDesc: 'short_desc',
-    discountPrice: 'discount_price',
     categoryId: 'category_id',
-    requiredPlan: 'required_plan',
     startDate: 'start_date',
     endDate: 'end_date',
     reviewLevel: 'review_level',
@@ -108,16 +101,12 @@ const normalizeCourseUpdateBody = (body) => {
             normalized[to] = normalized[from];
         }
     });
-    ['price', 'discount_price'].forEach((field) => {
-        if (normalized[field] === undefined) return;
-        if (normalized[field] === '' || normalized[field] === null) {
-            normalized[field] = field === 'price' ? 0 : null;
-            return;
-        }
-        const value = Number(normalized[field]);
-        if (!Number.isFinite(value) || value < 0) throw createError(`${field} must be a non-negative number`, 400);
-        normalized[field] = value;
-    });
+    // Price, discount_price, and required_plan are no longer used
+    delete normalized.price;
+    delete normalized.discount_price;
+    delete normalized.discountPrice;
+    delete normalized.required_plan;
+    delete normalized.requiredPlan;
     return normalized;
 };
 
@@ -148,7 +137,10 @@ const getAll = async (req, res) => {
     // to filter by department.
     const { scoped, departmentId } = getDepartmentScope(req);
     if (adminView && scoped) {
-        conditions.push(`cat.department_id = $${i++}`);
+        const deptParam = `$${i++}`;
+        // Show courses whose category belongs to the admin's department, OR
+        // uncategorized courses whose instructor is in the admin's department.
+        conditions.push(`(cat.department_id = ${deptParam} OR (c.category_id IS NULL AND u.department_id = ${deptParam}))`);
         values.push(departmentId);
     } else if (adminView && qDepartmentId) {
         // SUPER_ADMIN can filter courses by a specific department
@@ -165,7 +157,7 @@ const getAll = async (req, res) => {
     let orderBy = 'c.created_at DESC';
     if (sort === 'popular') orderBy = 'c.enrollment_count DESC';
     if (sort === 'rating') orderBy = 'c.rating DESC';
-    if (sort === 'price_low') orderBy = 'COALESCE(c.discount_price, c.price) ASC';
+    // Price sort is no longer relevant — all courses are free
     if (sort === 'newest') orderBy = 'c.created_at DESC';
 
     const { getPagination } = require('../utils/pagination');
@@ -178,6 +170,7 @@ const getAll = async (req, res) => {
         FROM courses c
         JOIN users u ON c.instructor_id = u.id
         LEFT JOIN categories cat ON c.category_id = cat.id
+        LEFT JOIN departments dept ON cat.department_id = dept.id
         ${where}
     `;
     const countResult = await query(countSql, values);
@@ -188,6 +181,7 @@ const getAll = async (req, res) => {
         FROM courses c
         JOIN users u ON c.instructor_id = u.id
         LEFT JOIN categories cat ON c.category_id = cat.id
+        LEFT JOIN departments dept ON cat.department_id = dept.id
         ${courseJoins}
         ${where}
         ORDER BY ${orderBy}
@@ -212,6 +206,7 @@ const getById = async (req, res) => {
         `SELECT ${courseFields} FROM courses c
          JOIN users u ON c.instructor_id = u.id
          LEFT JOIN categories cat ON c.category_id = cat.id
+         LEFT JOIN departments dept ON cat.department_id = dept.id
          ${courseJoins}
          WHERE c.id = $1`,
         [req.params.id]
@@ -236,6 +231,43 @@ const getLessons = async (req, res) => {
         ORDER BY s."order" ASC, l."order" ASC NULLS LAST
     `, [courseId]);
 
+    // Determine whether the caller has full access to content URLs.
+    // Full access is granted to: admins, the course instructor, or enrolled students.
+    const user = req.user; // set by optionalAuth if token present
+    let fullAccess = false;
+    if (user) {
+        if (user.role === 'SUPER_ADMIN') {
+            fullAccess = true;
+        } else if (user.role === 'ADMIN') {
+            if (!user.department_id) {
+                fullAccess = true;
+            } else {
+                const r = await query(
+                    `SELECT cat.department_id FROM courses c
+                     LEFT JOIN categories cat ON c.category_id = cat.id
+                     WHERE c.id = $1`,
+                    [courseId]
+                );
+                if (r.rows.length && r.rows[0].department_id === user.department_id) {
+                    fullAccess = true;
+                }
+            }
+        } else {
+            // Check if user is the course instructor
+            const courseRow = await query('SELECT instructor_id FROM courses WHERE id = $1', [courseId]);
+            if (courseRow.rows.length && courseRow.rows[0].instructor_id === user.id) {
+                fullAccess = true;
+            } else {
+                // Check if user is enrolled in this course
+                const enrollRow = await query(
+                    'SELECT id FROM enrollments WHERE student_id = $1 AND course_id = $2 LIMIT 1',
+                    [user.id, courseId]
+                );
+                if (enrollRow.rows.length) fullAccess = true;
+            }
+        }
+    }
+
     // De-duplicate sections (there will be one row per lesson per section)
     const seenSections = new Set();
     const sections = [];
@@ -254,20 +286,22 @@ const getLessons = async (req, res) => {
             });
         }
         if (row.id) {
+            // Only expose content_url for preview lessons or users with full access
+            const showUrl = fullAccess || row.preview;
             lessons.push({
                 id: row.id,
                 section_id: row.section_id,
                 course_id: row.course_id,
                 title: row.title,
                 type: row.type,
-                content_url: row.content_url,
+                content_url: showUrl ? row.content_url : null,
                 duration: row.duration,
                 preview: row.preview,
                 order: row.order,
                 created_at: row.created_at,
                 sectionId: row.section_id,
                 courseId: row.course_id,
-                contentUrl: row.content_url,
+                contentUrl: showUrl ? row.content_url : null,
                 createdAt: row.created_at,
             });
         }
@@ -282,6 +316,7 @@ const getByInstructor = async (req, res) => {
         `SELECT ${courseFields} FROM courses c
          JOIN users u ON c.instructor_id = u.id
          LEFT JOIN categories cat ON c.category_id = cat.id
+         LEFT JOIN departments dept ON cat.department_id = dept.id
          ${courseJoins}
          WHERE c.instructor_id = $1
          ORDER BY c.created_at DESC`,
@@ -304,10 +339,10 @@ const resolveCustomCategory = async (name) => {
 // POST /api/courses
 const create = async (req, res) => {
     const {
-        title, description, short_desc, shortDesc, thumbnail, price = 0, discount_price, discountPrice,
+        title, description, short_desc, shortDesc, thumbnail,
         level = 'Beginner', language = 'English', tags = [], what_you_learn = [], whatYouLearn,
         requirements = [], category_id, categoryId, duration = '0h', certificate = true,
-        required_plan = 'FREE', requiredPlan, status: bodyStatus, custom_category, customCategory
+        status: bodyStatus, custom_category, customCategory
     } = req.body;
 
     if (!title) throw createError('Title is required', 400);
@@ -323,12 +358,12 @@ const create = async (req, res) => {
         : 'PENDING';
 
     const result = await query(
-        `INSERT INTO courses (title, description, short_desc, instructor_id, category_id, thumbnail, price, discount_price, level, language, tags, what_you_learn, requirements, duration, certificate, required_plan, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        `INSERT INTO courses (title, description, short_desc, instructor_id, category_id, thumbnail, level, language, tags, what_you_learn, requirements, duration, certificate, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING id`,
         [title, description, short_desc || shortDesc, req.user.id, finalCategoryId, thumbnail,
-            price, discount_price || discountPrice || null, level, language, tags, what_you_learn || whatYouLearn || [], requirements,
-            duration, certificate, normalizePlan(required_plan || requiredPlan), status]
+            level, language, tags, what_you_learn || whatYouLearn || [], requirements,
+            duration, certificate, status]
     );
 
     await query(
@@ -337,7 +372,7 @@ const create = async (req, res) => {
     ).catch(() => { });
 
     const course = await query(
-        `SELECT ${courseFields} FROM courses c JOIN users u ON c.instructor_id = u.id LEFT JOIN categories cat ON c.category_id = cat.id ${courseJoins} WHERE c.id = $1`,
+        `SELECT ${courseFields} FROM courses c JOIN users u ON c.instructor_id = u.id LEFT JOIN categories cat ON c.category_id = cat.id LEFT JOIN departments dept ON cat.department_id = dept.id ${courseJoins} WHERE c.id = $1`,
         [result.rows[0].id]
     );
     res.status(201).json(mapCourse(course.rows[0]));
@@ -357,8 +392,8 @@ const update = async (req, res) => {
         body.category_id = await resolveCustomCategory(body.custom_category || body.customCategory);
     }
 
-    const fields = ['title', 'description', 'short_desc', 'thumbnail', 'price', 'discount_price',
-        'level', 'language', 'tags', 'what_you_learn', 'requirements', 'category_id', 'duration', 'certificate', 'required_plan',
+    const fields = ['title', 'description', 'short_desc', 'thumbnail',
+        'level', 'language', 'tags', 'what_you_learn', 'requirements', 'category_id', 'duration', 'certificate',
         'start_date', 'end_date', 'review_level', 'review_note'];
     const updates = [];
     const values = [];
@@ -367,7 +402,7 @@ const update = async (req, res) => {
     fields.forEach(f => {
         if (body[f] !== undefined) {
             updates.push(`${f} = $${i++}`);
-            values.push(f === 'required_plan' ? normalizePlan(body[f]) : body[f]);
+            values.push(body[f]);
         }
     });
 
@@ -411,7 +446,7 @@ const update = async (req, res) => {
     }
 
     const result = await query(
-        `SELECT ${courseFields} FROM courses c JOIN users u ON c.instructor_id = u.id LEFT JOIN categories cat ON c.category_id = cat.id ${courseJoins} WHERE c.id = $1`,
+        `SELECT ${courseFields} FROM courses c JOIN users u ON c.instructor_id = u.id LEFT JOIN categories cat ON c.category_id = cat.id LEFT JOIN departments dept ON cat.department_id = dept.id ${courseJoins} WHERE c.id = $1`,
         [id]
     );
     res.json(mapCourse(result.rows[0]));

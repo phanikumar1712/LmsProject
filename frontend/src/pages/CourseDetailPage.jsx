@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
     BookOpen, Clock, Users, Star, Award, Play, CheckCircle, Lock, ChevronDown,
-    ChevronUp, ArrowLeft, FileText, ShoppingCart, Heart, Unlock
+    ChevronUp, ArrowLeft, FileText, ShoppingCart, Heart, Unlock, HelpCircle
 } from 'lucide-react';
 import ReactPlayer from 'react-player';
-import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI } from '../services/api';
+import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI, quizzesAPI } from '../services/api';
+import { getYouTubeEmbedUrl } from '../lib/video';
 import DiscussionSection from '../components/ui/DiscussionSection';
 import { useAuth } from '../contexts/AuthContext';
 import { RatingDisplay, RatingStars } from '../components/ui/RatingStars';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import toast from 'react-hot-toast';
-import { canAccessCourse } from '../lib/courseAccess';
+
 
 export default function CourseDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user, updateUser } = useAuth();
+    const [searchParams] = useSearchParams();
 
     const [course, setCourse] = useState(null);
     const [lessons, setLessons] = useState([]);
@@ -26,7 +28,10 @@ export default function CourseDetailPage() {
     const [loading, setLoading] = useState(true);
     const [enrolling, setEnrolling] = useState(false);
     const [expandedSections, setExpandedSections] = useState({ 0: true });
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+    const [quizzes, setQuizzes] = useState([]);
+    const [quizzesLoading, setQuizzesLoading] = useState(false);
+    const [expandedQuiz, setExpandedQuiz] = useState(null);
     const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
     const [submittingRating, setSubmittingRating] = useState(false);
     const [editingRating, setEditingRating] = useState(false);
@@ -69,18 +74,29 @@ export default function CourseDetailPage() {
         }
     }, [id, user]);
 
-    const requiredPlan = course?.requiredPlan || 'FREE';
-    const canAccess = canAccessCourse(user, course);
-    const isAdminPreview = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role);
-    const effectivePrice = course?.discountPrice ?? course?.price ?? 0;
+    const isAdminPreview = user?.role === 'SUPER_ADMIN' || (
+        user?.role === 'ADMIN' && (!user.departmentId || course?.departmentId === user.departmentId)
+    );
+    // The course's own instructor gets the same full-preview treatment as admins
+    const isOwnerInstructor = user?.role === 'INSTRUCTOR' && course?.instructorId === user?.id;
+    const canFullPreview = isAdminPreview || isOwnerInstructor;
+
+    // Admins reviewing a course can inspect its quizzes (questions + answers)
+    useEffect(() => {
+        if (!isAdminPreview) return;
+        setQuizzesLoading(true);
+        quizzesAPI.getByCourse(id)
+            .then(qs => setQuizzes(qs || []))
+            .catch(() => setQuizzes([]))
+            .finally(() => setQuizzesLoading(false));
+    }, [id, isAdminPreview]);
+
     const isEnrolled = user?.role === 'STUDENT' && !!enrollment;
     const existingRating = Array.isArray(ratings) ? ratings.find(r => r.studentId === user?.id) : null;
     const hasRated = !!existingRating;
 
     const handleEnroll = async () => {
-        if (isAdminPreview) { toast('Admins can preview courses without enrolling'); return; }
         if (!user) { navigate('/login'); return; }
-        if (!canAccess) { navigate('/student/subscription'); toast.error(`Upgrade to ${course.requiredPlan} plan to access this course`); return; }
         setEnrolling(true);
         try {
             const e = await enrollmentsAPI.enroll(user.id, id);
@@ -167,6 +183,11 @@ export default function CourseDetailPage() {
                         <div className="absolute bottom-6 left-6">
                             <div className="flex gap-2 flex-wrap mb-3">
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-sm uppercase tracking-wide shadow-sm ${LEVEL_COLORS[course.level] || 'bg-indigo-100 text-indigo-800'}`}>{course.level}</span>
+                                {course.departmentName && (
+                                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-sm uppercase tracking-wide shadow-sm">
+                                        {course.departmentName}
+                                    </span>
+                                )}
                                 {course.certificate && <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-sm uppercase tracking-wide shadow-sm">🏆 Certificate</span>}
                             </div>
                         </div>
@@ -209,7 +230,7 @@ export default function CourseDetailPage() {
 
                     {/* Tabs */}
                     <div id="tabs-section" className="flex gap-2 mb-8 border-b border-border overflow-x-auto no-scrollbar">
-                        {['overview', 'curriculum', 'preview', 'reviews', 'discuss'].map(tab => (
+                        {['overview', 'curriculum', 'preview', 'reviews', 'discuss', ...(isAdminPreview ? ['quizzes'] : [])].map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)}
                                 className={`px-5 py-3 text-sm font-semibold capitalize whitespace-nowrap transition-all border-b-2 -mb-[1px] ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                                 {tab}
@@ -286,10 +307,12 @@ export default function CourseDetailPage() {
                                                                 onClick={() => {
                                                                     if (isEnrolled) {
                                                                         navigate(`/courses/${id}/learn`, { state: { lessonId: lesson.id } });
-                                                                    } else if (isAdminPreview) {
+                                                                    } else if (canFullPreview) {
                                                                         if (lesson.type === 'video' && lesson.contentUrl) {
                                                                             setActiveTab('preview');
                                                                             setPreviewVideo(lesson);
+                                                                        } else {
+                                                                            toast('Only video lessons can be previewed here');
                                                                         }
                                                                     } else if (lesson.preview) {
                                                                         setActiveTab('preview');
@@ -337,20 +360,35 @@ export default function CourseDetailPage() {
                                 {previewVideo ? (
                                     <div className="space-y-6">
                                         <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl relative">
-                                            <ReactPlayer
-                                                url={previewVideo.contentUrl}
-                                                width="100%"
-                                                height="100%"
-                                                controls
-                                                playing={false}
-                                                config={{
-                                                    youtube: { playerVars: { showinfo: 1 } }
-                                                }}
-                                            />
+                                            {getYouTubeEmbedUrl(previewVideo.contentUrl) ? (
+                                                <iframe
+                                                    key={previewVideo.id}
+                                                    src={getYouTubeEmbedUrl(previewVideo.contentUrl)}
+                                                    className="w-full h-full border-0"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                    title={previewVideo.title}
+                                                />
+                                            ) : (
+                                                <ReactPlayer
+                                                    key={previewVideo.id}
+                                                    url={previewVideo.contentUrl}
+                                                    width="100%"
+                                                    height="100%"
+                                                    controls
+                                                    playing={false}
+                                                />
+                                            )}
                                         </div>
                                         <div>
-                                            <h3 className="text-xl font-bold text-foreground mb-2">Free Preview: {previewVideo.title}</h3>
-                                            <p className="text-muted-foreground font-medium">Get a glimpse of what's inside this comprehensive course. Enjoy this free lesson!</p>
+                                            <h3 className="text-xl font-bold text-foreground mb-2">
+                                                {isAdminPreview ? 'Admin Preview' : 'Free Preview'}: {previewVideo.title}
+                                            </h3>
+                                            <p className="text-muted-foreground font-medium">
+                                                {isAdminPreview
+                                                    ? 'You are reviewing this lesson with admin access.'
+                                                    : "Get a glimpse of what's inside this comprehensive course. Enjoy this free lesson!"}
+                                            </p>
                                         </div>
                                     </div>
                                 ) : (
@@ -366,6 +404,82 @@ export default function CourseDetailPage() {
                         {activeTab === 'discuss' && (
                             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                                 <DiscussionSection courseId={id} />
+                            </div>
+                        )}
+
+                        {activeTab === 'quizzes' && isAdminPreview && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 flex items-center gap-3">
+                                    <Unlock size={18} className="text-indigo-600 flex-shrink-0" />
+                                    <p className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
+                                        Admin review mode — you can see all quiz questions and correct answers.
+                                    </p>
+                                </div>
+                                {quizzesLoading ? (
+                                    <div className="flex items-center justify-center py-16">
+                                        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : quizzes.length === 0 ? (
+                                    <div className="text-center py-16 bg-muted/20 rounded-2xl border border-border border-dashed">
+                                        <HelpCircle size={48} className="text-muted-foreground/20 mx-auto mb-4" />
+                                        <p className="text-muted-foreground font-medium">No quizzes in this course yet.</p>
+                                    </div>
+                                ) : (
+                                    quizzes.map(quiz => (
+                                        <div key={quiz.id} className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+                                            <button
+                                                onClick={() => setExpandedQuiz(expandedQuiz === quiz.id ? null : quiz.id)}
+                                                className="w-full flex items-center justify-between p-5 bg-muted/20 hover:bg-muted/40 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3 text-left">
+                                                    <HelpCircle size={18} className="text-indigo-600 flex-shrink-0" />
+                                                    <div>
+                                                        <span className="text-foreground font-bold text-[15px] block">{quiz.title}</span>
+                                                        <span className="text-xs text-muted-foreground font-medium">
+                                                            {quiz.questionCount} questions • Pass: {quiz.passingScore}% • {quiz.timeLimit ? `${quiz.timeLimit} min` : 'No time limit'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {expandedQuiz === quiz.id ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground" />}
+                                            </button>
+                                            {expandedQuiz === quiz.id && (
+                                                <div className="border-t border-border divide-y divide-border">
+                                                    {(quiz.questions || []).map((qn, qi) => (
+                                                        <div key={qn.id || qi} className="p-5">
+                                                            <div className="flex items-start gap-3">
+                                                                <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{qi + 1}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-semibold text-foreground text-sm">{qn.text}</p>
+                                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">{qn.type} • {qn.difficulty}</p>
+                                                                    {(qn.options || []).length > 0 && (
+                                                                        <div className="mt-3 space-y-1.5">
+                                                                            {qn.options.map((opt, oi) => {
+                                                                                const isCorrect = Array.isArray(qn.correctAnswer)
+                                                                                    ? qn.correctAnswer.includes(opt)
+                                                                                    : qn.correctAnswer === opt;
+                                                                                return (
+                                                                                    <div key={oi} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 text-emerald-700 dark:text-emerald-400 font-semibold' : 'border-border text-muted-foreground'}`}>
+                                                                                        {isCorrect && <CheckCircle size={14} className="flex-shrink-0" />}
+                                                                                        <span>{opt}</span>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                    {(qn.options || []).length === 0 && qn.correctAnswer && (
+                                                                        <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 rounded-lg px-3 py-2 inline-block">
+                                                                            Answer: {qn.correctAnswer}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
 
@@ -484,29 +598,6 @@ export default function CourseDetailPage() {
                 {/* Right - Enroll card */}
                 <div className="lg:col-span-1 hidden lg:block">
                     <div className="bg-card border border-border shadow-xl rounded-2xl p-6 sticky top-24">
-                        {/* Price */}
-                        <div className="mb-6">
-                            {course.price === 0 ? (
-                                <p className="text-4xl font-extrabold text-emerald-600 tracking-tight">Free</p>
-                            ) : (
-                                <div className="flex items-end gap-3">
-                                    <p className="text-4xl font-extrabold text-foreground tracking-tight">₹{effectivePrice.toLocaleString()}</p>
-                                    {course.discountPrice !== null && course.discountPrice < course.price && (
-                                        <p className="text-muted-foreground font-medium text-lg line-through mb-1">₹{course.price?.toLocaleString()}</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Plan requirement */}
-                        {requiredPlan !== 'FREE' && (
-                            <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50">
-                                <p className="text-amber-800 text-sm font-bold flex items-center gap-2">
-                                    <Unlock size={16} /> Requires {requiredPlan} plan
-                                </p>
-                            </div>
-                        )}
-
                         {/* Progress if enrolled */}
                         {isEnrolled && (
                             <div className="mb-6 bg-muted/40 rounded-xl p-4 border border-border">
@@ -519,12 +610,12 @@ export default function CourseDetailPage() {
                         )}
 
                         {/* CTA */}
-                        {isAdminPreview ? (
+                        {isAdminPreview || isOwnerInstructor ? (
                             <button
-                                onClick={() => navigate('/admin/courses')}
+                                onClick={() => navigate(`/courses/${id}/learn`)}
                                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl text-[15px] font-bold mb-4 shadow-sm transition-colors flex items-center justify-center gap-2"
                             >
-                                <Unlock size={18} /> Admin Preview Mode
+                                <Play size={18} fill="currentColor" /> View Full Course
                             </button>
                         ) : isEnrolled ? (
                             <button
@@ -541,11 +632,11 @@ export default function CourseDetailPage() {
                             >
                                 {enrolling
                                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enrolling...</>
-                                    : canAccess ? <><ShoppingCart size={18} /> Enroll Now</> : <><Lock size={18} /> Upgrade to Enroll</>}
+                                    : <><ShoppingCart size={18} /> Enroll Now</>}
                             </button>
                         )}
 
-                        {!isAdminPreview && (
+                        {!(isAdminPreview || isOwnerInstructor) && (
                             <button onClick={handleWishlist} disabled={wishlisted && !user} className="w-full bg-card border border-border hover:bg-muted/50 py-3.5 rounded-xl text-foreground font-bold text-[14px] flex items-center justify-center gap-2 transition-colors">
                                 <Heart size={18} className={wishlisted ? 'text-rose-500 fill-rose-500' : 'text-muted-foreground/60'} />
                                 {wishlisted ? 'Saved to Wishlist' : 'Add to Wishlist'}
@@ -578,16 +669,13 @@ export default function CourseDetailPage() {
             </div>
             {/* Mobile sticky enroll button */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border shadow-[0_-10px_20px_rgba(0,0,0,0.05)] lg:hidden z-50 flex items-center justify-between gap-4">
-                <div>
-                    {course.price === 0 ? <p className="font-bold text-lg text-emerald-600">Free</p> : <p className="font-bold text-lg text-foreground">₹{effectivePrice.toLocaleString()}</p>}
-                </div>
-                {isAdminPreview ? (
-                    <button onClick={() => navigate('/admin/courses')} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Admin Preview</button>
+                {(isAdminPreview || isOwnerInstructor) ? (
+                    <button onClick={() => navigate(`/courses/${id}/learn`)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px] ml-auto">View Full Course</button>
                 ) : isEnrolled ? (
-                    <button onClick={() => navigate(`/courses/${id}/learn`)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px]">Continue</button>
+                    <button onClick={() => navigate(`/courses/${id}/learn`)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px] ml-auto">Continue</button>
                 ) : (
-                    <button onClick={handleEnroll} disabled={enrolling} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px] disabled:opacity-60">
-                        {canAccess ? 'Enroll Now' : 'Upgrade'}
+                    <button onClick={handleEnroll} disabled={enrolling} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold flex-1 max-w-[200px] disabled:opacity-60 ml-auto">
+                        Enroll Now
                     </button>
                 )}
             </div>

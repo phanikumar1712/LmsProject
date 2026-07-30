@@ -572,10 +572,7 @@ export default function HomePage() {
                 .hp-card__instructor {
                     font-size: 0.85rem; color: var(--color-muted-foreground); font-weight: 600;
                 }
-                .hp-card__price {
-                    font-size: 1.15rem; font-weight: 800; color: var(--color-foreground);
-                }
-                .hp-card__price-free { color: #059669; }
+
                 .hp-card__dur {
                     display: flex; align-items: center; gap: 6px;
                     font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.5rem;
@@ -1044,7 +1041,6 @@ export default function HomePage() {
 
                             {!loading && !error && courses.slice(0, 8).map((course, i) => {
                                 const rating = parseFloat(course.rating) || 0;
-                                const price = course.discountPrice ?? course.price ?? 0;
                                 const thumbnail = course.thumbnail ||
                                     `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80`;
 
@@ -1100,9 +1096,6 @@ export default function HomePage() {
                                             <div className="hp-card__footer">
                                                 <span className="hp-card__instructor">
                                                     {course.instructorName || 'Instructor'}
-                                                </span>
-                                                <span className={`hp-card__price ${price === 0 ? 'hp-card__price-free' : ''}`}>
-                                                    {price === 0 ? 'Free' : `₹${price.toLocaleString()}`}
                                                 </span>
                                             </div>
                                         </div>

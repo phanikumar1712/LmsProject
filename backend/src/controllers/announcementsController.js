@@ -6,13 +6,26 @@ const { getDepartmentScope } = require('../utils/scope');
 const list = async (req, res) => {
     const { scoped, departmentId } = getDepartmentScope(req);
 
+    const showAll = req.query.all === 'true';
+
     let where = '';
     const values = [];
 
-    if (req.user.role === 'INSTRUCTOR' || req.user.role === 'STUDENT') {
-        // Instructors/students see announcements from their own department
-        where = 'WHERE a.department_id = $1 OR a.department_id IS NULL';
-        values.push(req.user.department_id);
+    if (showAll) {
+        // Bypass role filtering — show all announcements the user can possibly see
+        // based on their department scope.
+        where = scoped ? 'WHERE a.department_id = $1' : '';
+        if (scoped) values.push(departmentId);
+    } else if (req.user.role === 'STUDENT') {
+        // Students see announcements meant for STUDENT role (or legacy with no roles set)
+        where = 'WHERE (a.target_roles IS NULL OR $1 = ANY(a.target_roles)) AND (a.department_id IS NULL OR a.department_id = $2)';
+        values.push('STUDENT');
+        values.push(req.user.department_id || null);
+    } else if (req.user.role === 'INSTRUCTOR') {
+        // Instructors see announcements meant for INSTRUCTOR role (or legacy with no roles set)
+        where = 'WHERE (a.target_roles IS NULL OR $1 = ANY(a.target_roles)) AND (a.department_id IS NULL OR a.department_id = $2)';
+        values.push('INSTRUCTOR');
+        values.push(req.user.department_id || null);
     } else if (scoped) {
         where = 'WHERE a.department_id = $1';
         values.push(departmentId);
@@ -49,18 +62,23 @@ const create = async (req, res) => {
         RETURNING *
     `, [scoped ? departmentId : null, req.user.id, title, content, priority, pinned, targetRoles]);
 
-    // Create notifications for all department users if department-scoped
-    if (scoped || departmentId) {
-        const deptUsers = await query(
+    // Create notifications for target users. Department-scoped admins notify
+    // their department; global admins/super-admins notify all matching roles.
+    const targetUsers = scoped
+        ? await query(
             'SELECT id FROM users WHERE department_id = $1 AND role = ANY($2) AND active = true',
-            [scoped ? departmentId : departmentId, targetRoles]
+            [departmentId, targetRoles]
+        )
+        : await query(
+            'SELECT id FROM users WHERE role = ANY($1) AND active = true',
+            [targetRoles]
         );
-        for (const user of deptUsers.rows) {
-            await query(
-                `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-                [user.id, `📢 New announcement: ${title}`, 'announcement', '/announcements']
-            ).catch(() => {});
-        }
+    const announcementLink = `/announcements?focus=${result.rows[0].id}`;
+    for (const user of targetUsers.rows) {
+        await query(
+            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
+            [user.id, `📢 New announcement: ${title}`, 'announcement', announcementLink]
+        ).catch(() => {});
     }
 
     await query(
@@ -103,4 +121,49 @@ const remove = async (req, res) => {
     res.json({ success: true });
 };
 
-module.exports = { list, create, update, remove };
+// POST /api/announcements/:id/mark-read — mark announcement as read by current user
+const markRead = async (req, res) => {
+    // Only increment view_count when the user hasn't already read this announcement.
+    // The CTE ensures the INSERT and conditional UPDATE are atomic.
+    await query(`
+        WITH inserted AS (
+            INSERT INTO announcement_reads (announcement_id, user_id)
+            VALUES ($1, $2)
+            ON CONFLICT (announcement_id, user_id) DO NOTHING
+            RETURNING 1 AS is_new
+        )
+        UPDATE announcements SET view_count = view_count + (
+            SELECT CASE WHEN EXISTS (SELECT 1 FROM inserted) THEN 1 ELSE 0 END
+        )
+        WHERE id = $1
+    `, [req.params.id, req.user.id]);
+
+    res.json({ success: true });
+};
+
+// GET /api/announcements/:id/reads — get read receipts (admin only)
+const getReads = async (req, res) => {
+    const result = await query(`
+        SELECT ar.read_at, u.id as user_id, u.name, u.avatar, u.role,
+               COALESCE(u.department_id::text, '') as department_id
+        FROM announcement_reads ar
+        JOIN users u ON ar.user_id = u.id
+        WHERE ar.announcement_id = $1
+        ORDER BY ar.read_at DESC
+        LIMIT 200
+    `, [req.params.id]);
+
+    res.json({
+        total: result.rows.length,
+        readers: result.rows.map(r => ({
+            userId: r.user_id,
+            name: r.name,
+            avatar: r.avatar,
+            role: r.role,
+            departmentId: r.department_id,
+            readAt: r.read_at,
+        })),
+    });
+};
+
+module.exports = { list, create, update, remove, markRead, getReads };

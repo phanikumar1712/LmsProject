@@ -17,7 +17,21 @@ export default function AdminBulkEnrollment() {
     const [results, setResults] = useState(null);
 
     const { data: courses } = useAsyncData(() => coursesAPI.getAll({ admin: true, limit: 200 }), []);
-    const { data: students } = useAsyncData(() => usersAPI.getAll({ role: 'STUDENT', limit: 500 }), []);
+
+    const course = (courses || []).find(c => c.id === selectedCourse);
+
+    // Only list students from the selected course's department
+    const { data: students, loading: studentsLoading } = useAsyncData(
+        () => course?.departmentId
+            ? usersAPI.getAll({ role: 'STUDENT', limit: 500, departmentId: course.departmentId })
+            : Promise.resolve([]),
+        [course?.departmentId]
+    );
+
+    const handleCourseChange = (courseId) => {
+        setSelectedCourse(courseId);
+        setSelectedStudents([]); // students belong to the previous course's department
+    };
 
     const filteredStudents = (students || []).filter(s =>
         s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -61,8 +75,6 @@ export default function AdminBulkEnrollment() {
         setResults(null);
     };
 
-    const course = (courses || []).find(c => c.id === selectedCourse);
-
     return (
         <div className="space-y-6 max-w-4xl mx-auto">
             <PageHeader
@@ -78,7 +90,7 @@ export default function AdminBulkEnrollment() {
                 <div className="p-6">
                     <select
                         value={selectedCourse}
-                        onChange={e => setSelectedCourse(e.target.value)}
+                        onChange={e => handleCourseChange(e.target.value)}
                         className="w-full px-4 py-3 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-bold shadow-sm"
                     >
                         <option value="">Choose a course...</option>
@@ -121,7 +133,17 @@ export default function AdminBulkEnrollment() {
                 />
                 <div className="p-6">
                     {enrollMethod === 'students' ? (
+                        !selectedCourse ? (
+                            <p className="py-8 text-center text-muted-foreground text-sm font-medium">
+                                Select a course first — only students from the course's department will be listed
+                            </p>
+                        ) : (
                         <>
+                            {course?.departmentName && (
+                                <p className="text-xs font-bold text-indigo-600 mb-3">
+                                    Showing students from {course.departmentName} department only
+                                </p>
+                            )}
                             <div className="relative mb-4">
                                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input
@@ -151,14 +173,18 @@ export default function AdminBulkEnrollment() {
                                         </div>
                                     </button>
                                 ))}
-                                {filteredStudents.length === 0 && (
-                                    <p className="py-8 text-center text-muted-foreground text-sm">No students found</p>
+                                {studentsLoading && (
+                                    <p className="py-8 text-center text-muted-foreground text-sm">Loading students...</p>
+                                )}
+                                {!studentsLoading && filteredStudents.length === 0 && (
+                                    <p className="py-8 text-center text-muted-foreground text-sm">No students found in this department</p>
                                 )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-2 font-medium">
                                 {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
                             </p>
                         </>
+                        )
                     ) : (
                         <div>
                             <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2 block">

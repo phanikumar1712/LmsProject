@@ -489,6 +489,15 @@ export default function AdminUsers() {
                             {!importResults ? (
                                 <form onSubmit={handleImport} className="space-y-4">
                                     <p className="text-sm text-muted-foreground">Upload a <b>CSV or Excel</b> file with columns <code className="font-mono">name, email</code> (optional <code className="font-mono">phone</code>). Each instructor is created in {isSuperAdmin() ? 'the global pool' : 'your department'} with an auto-generated password.</p>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => { usersAPI.downloadInstructorTemplate().catch(err => toast.error(err.message)); }}
+                                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <Download size={14} /> Download sample template
+                                        </button>
+                                    </div>
                                     <input type="file" accept=".csv,.xlsx,.xls" onChange={e => setImportFile(e.target.files[0])}
                                         className="w-full text-sm file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:text-white file:font-bold hover:file:bg-indigo-700 cursor-pointer" />
                                     <div className="flex gap-3 pt-2">
@@ -542,7 +551,16 @@ export default function AdminUsers() {
                                     <p className="text-sm text-muted-foreground">Upload a <b>CSV or Excel</b> file with columns <code className="font-mono">name, email, roll_no</code> (optional <code className="font-mono">phone</code>). Each student is created in {isSuperAdmin() ? 'the global pool' : 'your department'} with an auto-generated password. Roll numbers must be unique per department.</p>
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-2xl p-4">
                                         <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-2">Expected CSV/Excel format:</p>
-                                        <code className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono">name,email,roll_no,phone\nJohn Doe,john@example.com,CS22001,9876543210</code>
+                                        <code className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono">name,email,roll_no,phone\nJane Doe,jane@example.com,CS22001,9876543210</code>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => { usersAPI.downloadStudentTemplate().catch(err => toast.error(err.message)); }}
+                                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <Download size={14} /> Download sample template
+                                        </button>
                                     </div>
                                     <input type="file" accept=".csv,.xlsx,.xls" onChange={e => setStudentImportFile(e.target.files[0])}
                                         className="w-full text-sm file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:text-white file:font-bold hover:file:bg-indigo-700 cursor-pointer" />

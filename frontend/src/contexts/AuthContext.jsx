@@ -11,6 +11,7 @@ const mapUser = (u) => ({
     subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
     currentStreak: u.current_streak || u.currentStreak || 0,
     longestStreak: u.longest_streak || u.longestStreak || 0,
+    departmentId: u.department_id ?? u.departmentId ?? null,
     createdAt: u.created_at || u.createdAt,
 });
 

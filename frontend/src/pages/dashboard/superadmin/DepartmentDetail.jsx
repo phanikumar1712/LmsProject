@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-    Building2, Users, BookOpen, DollarSign, Star, GraduationCap,
+    Building2, Users, BookOpen, Star, GraduationCap,
     ShieldCheck, TrendingUp, ArrowLeft, BarChart3, Layers, Save,
-    UserCheck, Eye, ExternalLink, Gauge
+    UserCheck, Eye, ExternalLink, Gauge, Plus, X, Mail, Lock, User
 } from 'lucide-react';
 import { statsAPI, usersAPI, coursesAPI, departmentsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
@@ -56,8 +56,8 @@ function OverviewTab({ dept, deptStats }) {
 
     const stats = deptStats;
     const kpiCards = stats ? [
-        { label: 'Revenue', value: stats.totalRevenue >= 100000 ? `₹${(stats.totalRevenue / 100000).toFixed(1)}L` : `₹${stats.totalRevenue?.toLocaleString()}`, icon: DollarSign, color: '#16a34a', bg: 'bg-emerald-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% this month` },
-        { label: 'Enrollments', value: stats.totalEnrollments?.toLocaleString() || '0', icon: TrendingUp, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
+        { label: 'Active Students', value: stats.activeStudents?.toLocaleString() || stats.totalEnrollments?.toLocaleString() || '0', icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: 'Currently enrolled' },
+        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString() || '0', icon: TrendingUp, color: '#16a34a', bg: 'bg-emerald-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
         { label: 'Courses', value: `${dept.coursePublished}/${dept.courseTotal}`, icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${dept.coursePending || 0} pending approval` },
         { label: 'Rating', value: dept.avgRating?.toFixed(1) || '—', icon: Star, color: '#f59e0b', bg: 'bg-amber-50', change: 'Avg course rating' },
     ] : [];
@@ -151,27 +151,27 @@ function OverviewTab({ dept, deptStats }) {
 
             {/* Charts */}
             <div className="grid lg:grid-cols-2 gap-6">
-                <ChartCard title="Revenue Trend">
-                    {stats?.monthlyRevenue?.length > 0 ? (
+                <ChartCard title="Enrollment Trend">
+                    {stats?.enrollmentsByMonth?.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={stats.monthlyRevenue} margin={CHART_MARGIN}>
+                            <AreaChart data={stats.enrollmentsByMonth} margin={CHART_MARGIN}>
                                 <defs>
-                                    <linearGradient id={`revGrad-${dept.id}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                    <linearGradient id={`enrollGrad-${dept.id}`} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.15} />
+                                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
-                                <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
-                                <Tooltip content={<ChartTooltip prefix="₹" />} />
-                                <Area type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={2.5} fill={`url(#revGrad-${dept.id})`} dot={{ fill: '#4f46e5', r: 4 }} />
+                                <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
+                                <Tooltip content={<ChartTooltip />} />
+                                <Area type="monotone" dataKey="count" name="Enrollments" stroke="#0ea5e9" strokeWidth={2.5} fill={`url(#enrollGrad-${dept.id})`} dot={{ fill: '#0ea5e9', r: 4 }} />
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60">
-                            <DollarSign size={32} className="opacity-20 mb-2" />
-                            <p className="text-sm font-medium">No revenue data</p>
+                            <TrendingUp size={32} className="opacity-20 mb-2" />
+                            <p className="text-sm font-medium">No enrollment trend data</p>
                         </div>
                     )}
                 </ChartCard>
@@ -301,7 +301,7 @@ function UsersTab({ dept }) {
             </div>
             <div className="divide-y divide-border max-h-96 overflow-y-auto">
                 {userList.slice(0, 50).map(user => (
-                    <div key={user.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                    <Link key={user.id} to={`/admin/users/${user.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
                         {user.avatar ? (
                             <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-xl object-cover border border-border" />
                         ) : (
@@ -310,7 +310,7 @@ function UsersTab({ dept }) {
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate">{user.name}</p>
+                            <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">{user.name}</p>
                             <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
                         </div>
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${
@@ -321,7 +321,7 @@ function UsersTab({ dept }) {
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${
                             user.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
                         }`}>{user.active !== false ? 'Active' : 'Suspended'}</span>
-                    </div>
+                    </Link>
                 ))}
                 {userList.length === 0 && (
                     <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
@@ -374,7 +374,7 @@ function CoursesTab({ dept }) {
             </div>
             <div className="divide-y divide-border max-h-96 overflow-y-auto">
                 {courses.slice(0, 50).map(course => (
-                    <div key={course.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                    <Link key={course.id} to={`/courses/${course.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
                         {course.thumbnail ? (
                             <img src={course.thumbnail} alt={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
                         ) : (
@@ -383,8 +383,8 @@ function CoursesTab({ dept }) {
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate">
-                                <Link to={`/courses/${course.id}`} className="hover:text-indigo-600 transition-colors">{course.title}</Link>
+                            <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">
+                                {course.title}
                             </p>
                             <p className="text-[10px] text-muted-foreground truncate">
                                 {course.instructorName} · {course.categoryName || 'Uncategorized'}
@@ -400,7 +400,7 @@ function CoursesTab({ dept }) {
                                 </span>
                             )}
                         </div>
-                    </div>
+                    </Link>
                 ))}
                 {courses.length === 0 && (
                     <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
@@ -418,12 +418,12 @@ function ReportsTab({ dept, deptStats }) {
 
     const stats = deptStats;
     const metrics = [
-        { label: 'Total Revenue', value: stats.totalRevenue >= 100000 ? `₹${(stats.totalRevenue / 100000).toFixed(1)}L` : `₹${stats.totalRevenue?.toLocaleString() || 0}`, sub: 'All time earnings', color: 'text-emerald-600' },
-        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString() || '0', sub: 'Across all courses', color: 'text-indigo-600' },
-        { label: 'Avg Revenue/Enrollment', value: stats.totalEnrollments > 0 ? `₹${Math.round(stats.totalRevenue / stats.totalEnrollments)}` : '₹0', sub: 'Per student', color: 'text-cyan-600' },
+        { label: 'Active Students', value: stats.activeStudents?.toLocaleString() || stats.totalEnrollments?.toLocaleString() || '0', sub: 'Currently enrolled', color: 'text-indigo-600' },
+        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString() || '0', sub: 'Across all courses', color: 'text-emerald-600' },
+        { label: 'Total Courses', value: dept.courseTotal?.toLocaleString() || '0', sub: 'All statuses', color: 'text-cyan-600' },
         { label: 'Platform Rating', value: stats.avgRating?.toFixed(1) || '—', sub: 'Out of 5.0', color: 'text-amber-500' },
-        { label: 'Premium Subscribers', value: stats.premiumSubscribers?.toLocaleString() || '0', sub: 'Paid plan users', color: 'text-violet-600' },
-        { label: 'Pending Courses', value: stats.pendingCourses || '0', sub: 'Awaiting approval', color: 'text-orange-600' },
+        { label: 'Instructors', value: dept.instructorCount?.toLocaleString() || '0', sub: 'Active instructors', color: 'text-emerald-600' },
+        { label: 'Pending Courses', value: stats.pendingCourses || dept.coursePending || '0', sub: 'Awaiting approval', color: 'text-orange-600' },
     ];
 
     return (
@@ -470,10 +470,40 @@ function ReportsTab({ dept, deptStats }) {
 
 // ─── Admins Tab ────────────────────────────────────────────────────────────────
 function AdminsTab({ dept }) {
-    const { data: deptAdmins, loading } = useAsyncData(
+    const { data: deptAdmins, loading, reload } = useAsyncData(
         () => usersAPI.getAll({ role: 'ADMIN', departmentId: dept.id, limit: 100 }),
         [dept.id]
     );
+
+    const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+    const [createAdminForm, setCreateAdminForm] = useState({ name: '', email: '', password: '' });
+    const [creatingAdmin, setCreatingAdmin] = useState(false);
+
+    const handleCreateAdmin = async (e) => {
+        e.preventDefault();
+        if (!createAdminForm.password || createAdminForm.password.length < 8) {
+            toast.error('Password must be at least 8 characters');
+            return;
+        }
+        setCreatingAdmin(true);
+        try {
+            await usersAPI.inviteAdmin({
+                name: createAdminForm.name,
+                email: createAdminForm.email,
+                password: createAdminForm.password,
+                role: 'ADMIN',
+                departmentIds: [dept.id],
+            });
+            toast.success(`Admin "${createAdminForm.name}" created for ${dept.name}`);
+            setShowCreateAdmin(false);
+            setCreateAdminForm({ name: '', email: '', password: '' });
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Failed to create admin');
+        } finally {
+            setCreatingAdmin(false);
+        }
+    };
 
     const [adminExtraDepts, setAdminExtraDepts] = useState({});
 
@@ -500,64 +530,134 @@ function AdminsTab({ dept }) {
 
     if (loading) return <LoadingContainer height="h-48" />;
 
+    const inputCls = 'w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium';
+
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
-                <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <ShieldCheck size={16} /> Admins ({dept.adminCount})
-                </h4>
-                <Link
-                    to={`/super-admin/admins`}
-                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
-                >
-                    <ExternalLink size={12} /> Manage All Admins
-                </Link>
-            </div>
-            <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {adminList.slice(0, 50).map(admin => {
-                    const extraDepts = adminExtraDepts[admin.id] || [];
-                    return (
-                        <div key={admin.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
-                            {admin.avatar ? (
-                                <img src={admin.avatar} alt={admin.name} className="w-9 h-9 rounded-xl object-cover border border-border" />
-                            ) : (
-                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-white text-sm font-bold">
-                                    {admin.name?.charAt(0)?.toUpperCase()}
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-foreground truncate">{admin.name}</p>
-                                <p className="text-[10px] text-muted-foreground truncate">{admin.email}</p>
-                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-amber-100 text-amber-700">
-                                        {admin.role}
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${admin.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
-                                        {admin.active !== false ? 'Active' : 'Suspended'}
-                                    </span>
-                                    {extraDepts.length > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-purple-100 text-purple-700">
-                                            +{extraDepts.length} depts
+        <>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
+                    <h4 className="font-bold text-foreground flex items-center gap-2">
+                        <ShieldCheck size={16} /> Admins ({dept.adminCount})
+                    </h4>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowCreateAdmin(true)}
+                            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        >
+                            <Plus size={14} /> Create Admin
+                        </button>
+                        <Link
+                            to={`/super-admin/admins`}
+                            className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
+                        >
+                            <ExternalLink size={12} /> Manage All
+                        </Link>
+                    </div>
+                </div>
+                <div className="divide-y divide-border max-h-96 overflow-y-auto">
+                    {adminList.slice(0, 50).map(admin => {
+                        const extraDepts = adminExtraDepts[admin.id] || [];
+                        return (
+                            <div key={admin.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                                <Link to={`/admin/users/${admin.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
+                                {admin.avatar ? (
+                                    <img src={admin.avatar} alt={admin.name} className="w-9 h-9 rounded-xl object-cover border border-border" />
+                                ) : (
+                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-white text-sm font-bold">
+                                        {admin.name?.charAt(0)?.toUpperCase()}
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">{admin.name}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{admin.email}</p>
+                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-amber-100 text-amber-700">
+                                            {admin.role}
                                         </span>
-                                    )}
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${admin.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                                            {admin.active !== false ? 'Active' : 'Suspended'}
+                                        </span>
+                                        {extraDepts.length > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-purple-100 text-purple-700">
+                                                +{extraDepts.length} depts
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                </Link>
+                                <Link
+                                    to={`/super-admin/admins`}
+                                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold whitespace-nowrap"
+                                >
+                                    Manage
+                                </Link>
+                            </div>
+                        );
+                    })}
+                    {adminList.length === 0 && (
+                        <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
+                            No admins assigned to this department
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Create Admin Modal */}
+            {showCreateAdmin && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <ShieldCheck size={20} className="text-amber-600" /> Admin for {dept.name}
+                            </h3>
+                            <button onClick={() => setShowCreateAdmin(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateAdmin} className="p-8 space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Full Name *</label>
+                                <div className="relative">
+                                    <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="text" placeholder="e.g. Alex Rivera" value={createAdminForm.name}
+                                        onChange={e => setCreateAdminForm(f => ({ ...f, name: e.target.value }))}
+                                        className={inputCls} />
                                 </div>
                             </div>
-                            <Link
-                                to={`/super-admin/admins`}
-                                className="text-xs text-indigo-600 hover:text-indigo-700 font-bold whitespace-nowrap"
-                            >
-                                Manage
-                            </Link>
-                        </div>
-                    );
-                })}
-                {adminList.length === 0 && (
-                    <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
-                        No admins assigned to this department
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
+                                <div className="relative">
+                                    <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="email" placeholder="alex@example.com" value={createAdminForm.email}
+                                        onChange={e => setCreateAdminForm(f => ({ ...f, email: e.target.value }))}
+                                        className={inputCls} />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Password *</label>
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="password" placeholder="Min. 8 characters" value={createAdminForm.password}
+                                        onChange={e => setCreateAdminForm(f => ({ ...f, password: e.target.value }))}
+                                        className={inputCls} />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">The admin will be auto-assigned to {dept.name} department.</p>
+                            </div>
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setShowCreateAdmin(false)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={creatingAdmin}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]">
+                                    {creatingAdmin ? 'Creating...' : 'Create Admin'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -590,12 +690,16 @@ function CategoriesTab({ dept }) {
                     deptCategories.map(cat => {
                         const colorIdx = deptCategories.indexOf(cat) % CHART_COLORS.length;
                         return (
-                            <div key={cat.id} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors">
+                            <Link
+                                key={cat.id}
+                                to={`/super-admin/categories/${cat.id}?departmentId=${dept.id}`}
+                                className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors cursor-pointer group"
+                            >
                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ backgroundColor: CHART_COLORS[colorIdx] + '20' }}>
                                     {cat.icon || '📚'}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-foreground">{cat.name}</p>
+                                    <p className="text-sm font-bold text-foreground group-hover:text-indigo-600 transition-colors">{cat.name}</p>
                                     <p className="text-[11px] text-muted-foreground/70 font-medium">
                                         {cat.courseCount || 0} courses
                                     </p>
@@ -604,7 +708,7 @@ function CategoriesTab({ dept }) {
                                     style={{ backgroundColor: CHART_COLORS[colorIdx] + '15', color: CHART_COLORS[colorIdx] }}>
                                     <BookOpen size={12} /> {cat.courseCount || 0} courses
                                 </span>
-                            </div>
+                            </Link>
                         );
                     })
                 ) : (
@@ -620,71 +724,170 @@ function CategoriesTab({ dept }) {
 
 // ─── Instructors Tab ───────────────────────────────────────────────────────────
 function InstructorsTab({ dept }) {
-    const { data: instructors, loading } = useAsyncData(
+    const { data: instructors, loading, reload } = useAsyncData(
         () => usersAPI.getAll({ role: 'INSTRUCTOR', departmentId: dept.id, limit: 100 }),
         [dept.id]
     );
+
+    const [showCreateInstructor, setShowCreateInstructor] = useState(false);
+    const [createInstructorForm, setCreateInstructorForm] = useState({ name: '', email: '', password: '' });
+    const [creatingInstructor, setCreatingInstructor] = useState(false);
+
+    const handleCreateInstructor = async (e) => {
+        e.preventDefault();
+        if (!createInstructorForm.password || createInstructorForm.password.length < 8) {
+            toast.error('Password must be at least 8 characters');
+            return;
+        }
+        setCreatingInstructor(true);
+        try {
+            await usersAPI.createInstructor({
+                name: createInstructorForm.name,
+                email: createInstructorForm.email,
+                password: createInstructorForm.password,
+                departmentId: dept.id,
+            });
+            toast.success(`Instructor "${createInstructorForm.name}" created for ${dept.name}`);
+            setShowCreateInstructor(false);
+            setCreateInstructorForm({ name: '', email: '', password: '' });
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Failed to create instructor');
+        } finally {
+            setCreatingInstructor(false);
+        }
+    };
 
     const instructorList = Array.isArray(instructors) ? instructors : instructors?.data || [];
 
     if (loading) return <LoadingContainer height="h-48" />;
 
+    const inputCls = 'w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium';
+
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
-                <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <GraduationCap size={16} /> Instructors ({dept.instructorCount || instructorList.length})
-                </h4>
-                <Link
-                    to={`/admin/users?role=INSTRUCTOR&departmentId=${dept.id}`}
-                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
-                >
-                    <ExternalLink size={12} /> Manage
-                </Link>
-            </div>
-            <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
-                {instructorList.length > 0 ? (
-                    instructorList.map(instructor => (
-                        <div key={instructor.id} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors">
-                            {instructor.avatar ? (
-                                <img src={instructor.avatar} alt={instructor.name} className="w-11 h-11 rounded-xl object-cover border border-border" />
-                            ) : (
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold">
-                                    {instructor.name?.charAt(0)?.toUpperCase()}
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-foreground truncate">{instructor.name}</p>
-                                <p className="text-[11px] text-muted-foreground truncate">{instructor.email}</p>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
-                                        instructor.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
-                                    }`}>
-                                        {instructor.active !== false ? 'Active' : 'Suspended'}
-                                    </span>
-                                    {instructor.rollNo && (
-                                        <span className="text-[10px] font-mono font-bold text-muted-foreground/60">
-                                            {instructor.rollNo}
+        <>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
+                    <h4 className="font-bold text-foreground flex items-center gap-2">
+                        <GraduationCap size={16} /> Instructors ({dept.instructorCount || instructorList.length})
+                    </h4>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowCreateInstructor(true)}
+                            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        >
+                            <Plus size={14} /> Create Instructor
+                        </button>
+                        <Link
+                            to={`/admin/users?role=INSTRUCTOR&departmentId=${dept.id}`}
+                            className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
+                        >
+                            <ExternalLink size={12} /> Manage
+                        </Link>
+                    </div>
+                </div>
+                <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
+                    {instructorList.length > 0 ? (
+                        instructorList.map(instructor => (
+                            <div key={instructor.id} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors">
+                                <Link to={`/admin/users/${instructor.id}`} className="flex items-center gap-4 flex-1 min-w-0 group">
+                                {instructor.avatar ? (
+                                    <img src={instructor.avatar} alt={instructor.name} className="w-11 h-11 rounded-xl object-cover border border-border" />
+                                ) : (
+                                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold">
+                                        {instructor.name?.charAt(0)?.toUpperCase()}
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">{instructor.name}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate">{instructor.email}</p>
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
+                                            instructor.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+                                        }`}>
+                                            {instructor.active !== false ? 'Active' : 'Suspended'}
                                         </span>
-                                    )}
+                                        {instructor.rollNo && (
+                                            <span className="text-[10px] font-mono font-bold text-muted-foreground/60">
+                                                {instructor.rollNo}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                </Link>
+                                <Link
+                                    to={`/instructor/${instructor.id}`}
+                                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold whitespace-nowrap"
+                                >
+                                    View Profile
+                                </Link>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
+                            <GraduationCap size={32} className="opacity-20 mx-auto mb-2" />
+                            <p>No instructors in this department</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Create Instructor Modal */}
+            {showCreateInstructor && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <GraduationCap size={20} className="text-emerald-600" /> Instructor for {dept.name}
+                            </h3>
+                            <button onClick={() => setShowCreateInstructor(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateInstructor} className="p-8 space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Full Name *</label>
+                                <div className="relative">
+                                    <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="text" placeholder="e.g. Jane Smith" value={createInstructorForm.name}
+                                        onChange={e => setCreateInstructorForm(f => ({ ...f, name: e.target.value }))}
+                                        className={inputCls} />
                                 </div>
                             </div>
-                            <Link
-                                to={`/instructor/${instructor.id}`}
-                                className="text-xs text-indigo-600 hover:text-indigo-700 font-bold whitespace-nowrap"
-                            >
-                                View Profile
-                            </Link>
-                        </div>
-                    ))
-                ) : (
-                    <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
-                        <GraduationCap size={32} className="opacity-20 mx-auto mb-2" />
-                        <p>No instructors in this department</p>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
+                                <div className="relative">
+                                    <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="email" placeholder="jane@example.com" value={createInstructorForm.email}
+                                        onChange={e => setCreateInstructorForm(f => ({ ...f, email: e.target.value }))}
+                                        className={inputCls} />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Password *</label>
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="password" placeholder="Min. 8 characters" value={createInstructorForm.password}
+                                        onChange={e => setCreateInstructorForm(f => ({ ...f, password: e.target.value }))}
+                                        className={inputCls} />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">The instructor will be auto-assigned to {dept.name} department.</p>
+                            </div>
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setShowCreateInstructor(false)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={creatingInstructor}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]">
+                                    {creatingInstructor ? 'Creating...' : 'Create Instructor'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -763,15 +966,13 @@ export default function DepartmentDetail() {
                             </span>
                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-xl text-xs font-bold">
                                 <BookOpen size={14} /> {dept.coursePublished} Courses
-                            </span>                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold">
-                                        <DollarSign size={14} /> ₹{(dept.totalRevenue || 0) >= 100000 ? `${(dept.totalRevenue / 100000).toFixed(1)}L` : (dept.totalRevenue || 0).toLocaleString()}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold">
-                                        <Star size={14} /> {dept.avgRating ? dept.avgRating.toFixed(1) : '—'}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-xl text-xs font-bold">
-                                        <Gauge size={14} /> Limits: {dept.maxStudentsOverride ?? '∞'}/{dept.maxCoursesOverride ?? '∞'}
-                                    </span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold">
+                                <Star size={14} /> {dept.avgRating ? dept.avgRating.toFixed(1) : '—'}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-xl text-xs font-bold">
+                                <Gauge size={14} /> Limits: {dept.maxStudentsOverride ?? '∞'}/{dept.maxCoursesOverride ?? '∞'}
+                            </span>
                         </div>
                     </div>
                 </div>

@@ -275,6 +275,9 @@ export default function DiscussionSection({ courseId }) {
                                                                 {a.userRole === 'INSTRUCTOR' && (
                                                                     <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Instructor</span>
                                                                 )}
+                                                                {['ADMIN', 'SUPER_ADMIN'].includes(a.userRole) && (
+                                                                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Admin</span>
+                                                                )}
                                                                 {a.isBestAnswer && (
                                                                     <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
                                                                         <CheckCircle size={10} /> Best Answer

@@ -14,8 +14,11 @@ router.get('/admins', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.
 router.get('/student/streak', authenticate, authorize('STUDENT'), asyncHandler(ctrl.getStudentStreak));
 router.get('/students/progress', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getStudentProgress));
 router.get('/categories', optionalAuth, asyncHandler(ctrl.getCategories));
+router.get('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getCategoryDetail));
 router.post('/categories', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.createCategory));
 router.put('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateCategory));
+router.put('/categories/:id/courses', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.assignCourseToCategory));
+router.delete('/categories/:id/courses/:courseId', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.removeCourseFromCategory));
 router.delete('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.deleteCategory));
 router.post('/categories/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importCategories));
 router.get('/departments', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getDepartmentsStats));

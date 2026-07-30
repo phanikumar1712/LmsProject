@@ -411,15 +411,6 @@ const inviteAdmin = async (req, res) => {
     // Primary department (first in the list, or null)
     const primaryDeptId = finalDeptIds.length > 0 ? finalDeptIds[0] : null;
 
-    // One admin per department check (only for the primary department)
-    if (role === 'ADMIN' && primaryDeptId) {
-        const existingAdmin = await query(
-            `SELECT id FROM users WHERE role = 'ADMIN' AND department_id = $1`,
-            [primaryDeptId]
-        );
-        if (existingAdmin.rows.length) throw createError('This department already has an admin', 409);
-    }
-
     // Check if user exists
     const checkUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (checkUser.rows.length) throw createError('User already exists', 409);
@@ -607,6 +598,40 @@ const createInstructor = async (req, res) => {
     res.status(201).json({ user: mapUser(user), tempPassword });
 };
 
+// GET /api/users/instructors/template — download an Excel template for importing instructors.
+const downloadInstructorTemplate = async (req, res) => {
+    const xlsx = require('xlsx');
+    const wb = xlsx.utils.book_new();
+    const data = [
+        { name: 'John Doe', email: 'john.doe@example.com', phone: '9876543210' },
+    ];
+    const ws = xlsx.utils.json_to_sheet(data);
+    // Set column widths
+    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }];
+    xlsx.utils.book_append_sheet(wb, ws, 'Instructors');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Disposition', 'attachment; filename="Instructor_Import_Template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+};
+
+// GET /api/users/students/template — download an Excel template for importing students.
+const downloadStudentTemplate = async (req, res) => {
+    const xlsx = require('xlsx');
+    const wb = xlsx.utils.book_new();
+    const data = [
+        { name: 'Jane Doe', email: 'jane.doe@example.com', roll_no: 'CS22001', phone: '9876543210' },
+    ];
+    const ws = xlsx.utils.json_to_sheet(data);
+    // Set column widths
+    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 16 }, { wch: 18 }];
+    xlsx.utils.book_append_sheet(wb, ws, 'Students');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Disposition', 'attachment; filename="Student_Import_Template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+};
+
 // POST /api/users/instructors/import — bulk create from CSV/XLSX.
 // Columns (case-insensitive): name, email, phone (optional). Returns per-row results.
 const importInstructors = async (req, res) => {
@@ -705,12 +730,25 @@ const importStudents = async (req, res) => {
     res.status(201).json({ total: results.length, created, failed: results.length - created, results });
 };
 
-// GET /api/users/:id — full user detail for Admin/Super Admin
+// GET /api/users/:id — full user detail for Admin/Super Admin/Instructor
 const getById = async (req, res) => {
     const { id } = req.params;
 
-    // Department isolation check
+    // Department isolation check (for admins)
     await assertUserInScope(req, id);
+
+    // Instructors may only view students enrolled in their courses
+    if (req.user.role === 'INSTRUCTOR') {
+        const check = await query(`
+            SELECT 1 FROM enrollments e
+            JOIN courses c ON e.course_id = c.id
+            WHERE e.student_id = $1 AND c.instructor_id = $2
+            LIMIT 1
+        `, [id, req.user.id]);
+        if (!check.rows.length && id !== req.user.id) {
+            throw createError('You can only view students enrolled in your courses', 403);
+        }
+    }
 
     // Get user record
     const userRes = await query(`SELECT ${safeUserFields} FROM users WHERE id = $1`, [id]);
@@ -797,5 +835,6 @@ module.exports = {
     submitInstructorRequest, getInstructorRequests, approveInstructorRequest,
     getInstructorProfile, followInstructor, unfollowInstructor, inviteAdmin,
     createInstructor, importInstructors, importStudents,
-    setAdminDepartments, getUserDepartments
+    setAdminDepartments, getUserDepartments,
+    downloadInstructorTemplate, downloadStudentTemplate
 };

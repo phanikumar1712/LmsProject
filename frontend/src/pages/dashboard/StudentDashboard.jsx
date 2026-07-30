@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Award, Play, ClipboardList, CreditCard, Flame, ChevronRight, Target } from 'lucide-react';
+import { BookOpen, Award, Play, ClipboardList, Flame, ChevronRight, Target } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { enrollmentsAPI, quizzesAPI, statsAPI } from '../../services/api';
 import { ProgressBar } from '../../components/ui/ProgressBar';
@@ -7,7 +7,6 @@ import { StatCard, StatCardGrid, StatCardSkeleton } from '../../components/ui/St
 import { PageHeader, SectionHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/Feedback';
 import { useMultipleAsync } from '../../hooks/useAsyncData';
-import { PLAN_COLORS } from '../../lib/constants';
 import PullToRefresh from '../../components/ui/PullToRefresh';
 
 export default function StudentDashboard() {
@@ -30,8 +29,6 @@ export default function StudentDashboard() {
     const avgProgress = safeEnrollments.length > 0
         ? Math.round(safeEnrollments.reduce((acc, e) => acc + e.progress, 0) / safeEnrollments.length)
         : 0;
-
-    const planColor = PLAN_COLORS[user?.subscriptionPlan] ?? PLAN_COLORS.FREE;
 
     const statCards = [
         { label: 'Enrolled Courses', value: safeEnrollments.length, icon: BookOpen, color: '#4f46e5', bg: 'bg-indigo-50' },
@@ -133,32 +130,6 @@ export default function StudentDashboard() {
 
                 {/* Side Panel */}
                 <div className="space-y-4 sm:space-y-6">
-                    {/* Subscription */}
-                    <div className="bg-card border border-border rounded-xl p-4 sm:p-6 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-foreground font-bold">Subscription</h3>
-                            <span className="badge" style={{ backgroundColor: `${planColor}15`, color: planColor }}>
-                                {user.subscriptionPlan}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3 mb-5 px-4 py-3 bg-muted/50 rounded-lg">
-                            <CreditCard size={18} style={{ color: planColor }} />
-                            <div>
-                                <p className="text-foreground font-medium text-sm">Active Plan</p>
-                                {user.subscriptionExpiry
-                                    ? <p className="text-muted-foreground text-xs mt-0.5">Renews on: {user.subscriptionExpiry}</p>
-                                    : <p className="text-muted-foreground text-xs mt-0.5">Free forever</p>}
-                            </div>
-                        </div>
-                        <Link
-                            to="/student/subscription"
-                            className="text-sm font-medium flex items-center justify-center w-full py-2 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
-                            style={{ color: planColor }}
-                        >
-                            {user.subscriptionPlan === 'FREE' ? 'Upgrade Plan' : 'Manage Subscription'}
-                        </Link>
-                    </div>
-
                     {/* Learning Streak */}
                     <div className="bg-card border border-border rounded-xl p-4 sm:p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-4 sm:mb-6">

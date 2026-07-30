@@ -30,11 +30,7 @@ const getPlatform = async (req, res) => {
                JOIN courses c ON e.course_id = c.id
                LEFT JOIN categories cat ON c.category_id = cat.id
                WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
-        query(`SELECT COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) as total
-               FROM enrollments e
-               JOIN courses c ON e.course_id = c.id
-               LEFT JOIN categories cat ON c.category_id = cat.id
-               WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
+        query(`SELECT 0 as total`, []),
         query(`SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE' AND ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
         query(`SELECT ROUND(AVG(r.stars)::numeric, 1) as avg_rating FROM ratings r
                JOIN courses c ON r.course_id = c.id
@@ -47,7 +43,7 @@ const getPlatform = async (req, res) => {
     const [usersByRoleQuery, monthlyStatsQuery, topCatQuery] = await Promise.all([
         query(`SELECT role, COUNT(*) as count FROM users WHERE ($1::uuid IS NULL OR department_id = $1) GROUP BY role`, [deptId]),
         query(`
-            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) as revenue
+            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, 0 as revenue
             FROM enrollments e JOIN courses c ON e.course_id = c.id
             LEFT JOIN categories cat ON c.category_id = cat.id
             WHERE e.enrolled_at >= NOW() - INTERVAL '6 months'
@@ -94,12 +90,12 @@ const getPlatform = async (req, res) => {
         approvedCourses: parseInt(courses.rows[0].published),
         pendingCourses: parseInt(courses.rows[0].pending),
         totalEnrollments: parseInt(enrollments.rows[0].count),
-        totalRevenue: parseFloat(revenue.rows[0].total),
+        totalRevenue: 0,
         usersByRole,
         monthlyRevenue,
         enrollmentsByMonth,
         topCategories,
-        revenueGrowth,
+        revenueGrowth: 0,
         studentGrowth,
         platformGrowth: studentGrowth // Proxy for platform growth
     });
@@ -123,7 +119,7 @@ const getInstructor = async (req, res) => {
     ]);
 
     const monthlyEarningsQuery = query(`
-        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) * 0.8 as revenue
+        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, 0 as revenue
         FROM enrollments e JOIN courses c ON e.course_id = c.id
         WHERE c.instructor_id = $1 AND e.enrolled_at >= NOW() - INTERVAL '6 months'
         GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
@@ -133,7 +129,7 @@ const getInstructor = async (req, res) => {
     const thisMonthQuery = query(`
         SELECT 
             COUNT(e.id) as enrollments,
-            COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) * 0.8 as earnings
+            0 as earnings
         FROM enrollments e 
         JOIN courses c ON e.course_id = c.id 
         WHERE c.instructor_id = $1 AND e.enrolled_at >= DATE_TRUNC('month', NOW())
@@ -253,10 +249,67 @@ const getAdminOverview = async (req, res) => {
 };
 
 // GET /api/stats/categories
+// GET /api/stats/categories/:id — full category detail with stats (courses, users, enrollments)
+const getCategoryDetail = async (req, res) => {
+    await assertCategoryInScope(req, req.params.id);
+    const result = await query(`
+        SELECT
+            cat.*,
+            COUNT(DISTINCT c.id)::int AS course_count,
+            COUNT(DISTINCT e.student_id)::int AS user_count,
+            COUNT(DISTINCT e.id)::int AS enrollment_count
+        FROM categories cat
+        LEFT JOIN courses c ON c.category_id = cat.id
+        LEFT JOIN enrollments e ON e.course_id = c.id
+        WHERE cat.id = $1
+        GROUP BY cat.id
+    `, [req.params.id]);
+    if (!result.rows.length) throw createError('Category not found', 404);
+    const { mapCategory } = require('../utils/formatters');
+    res.json({
+        ...mapCategory(result.rows[0]),
+        courseCount: parseInt(result.rows[0].course_count),
+        userCount: parseInt(result.rows[0].user_count),
+        enrollmentCount: parseInt(result.rows[0].enrollment_count),
+    });
+};
+
+// PUT /api/stats/categories/:id/courses — assign a course to this category
+const assignCourseToCategory = async (req, res) => {
+    await assertCategoryInScope(req, req.params.id);
+    const { courseId } = req.body;
+    if (!courseId) throw createError('courseId is required', 400);
+    const course = await query('SELECT id, title FROM courses WHERE id = $1', [courseId]);
+    if (!course.rows.length) throw createError('Course not found', 404);
+    await query('UPDATE courses SET category_id = $1 WHERE id = $2', [req.params.id, courseId]);
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'COURSE_ASSIGNED_CATEGORY', 'courses', courseId,
+         JSON.stringify({ categoryId: req.params.id, courseTitle: course.rows[0].title })]
+    ).catch(() => {});
+    res.json({ success: true, courseId, categoryId: req.params.id });
+};
+
+// DELETE /api/stats/categories/:id/courses/:courseId — remove a course from this category
+const removeCourseFromCategory = async (req, res) => {
+    await assertCategoryInScope(req, req.params.id);
+    const course = await query('SELECT id, title FROM courses WHERE id = $1', [req.params.courseId]);
+    if (!course.rows.length) throw createError('Course not found', 404);
+    await query('UPDATE courses SET category_id = NULL WHERE id = $1 AND category_id = $2',
+        [req.params.courseId, req.params.id]);
+    await query(
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'COURSE_REMOVED_CATEGORY', 'courses', req.params.courseId,
+         JSON.stringify({ categoryId: req.params.id, courseTitle: course.rows[0].title })]
+    ).catch(() => {});
+    res.json({ success: true, courseId: req.params.courseId, categoryId: req.params.id });
+};
+
 const getCategories = async (req, res) => {
     // Public endpoint (no auth) → getDepartmentScope returns unscoped for anonymous
     // callers, so browsing is unaffected; a scoped ADMIN sees only their categories.
     const { scoped, departmentId } = getDepartmentScope(req);
+    // Scoped admins see only their own department's categories (not global ones).
     const where = scoped ? 'WHERE cat.department_id = $1' : '';
     const values = scoped ? [departmentId] : [];
     const result = await query(`
@@ -277,6 +330,7 @@ const assertCategoryInScope = async (req, categoryId) => {
     if (!scoped) return;
     const r = await query('SELECT department_id FROM categories WHERE id = $1', [categoryId]);
     if (!r.rows.length) throw createError('Category not found', 404);
+    // Scoped admins may ONLY access categories within their own department.
     if (r.rows[0].department_id !== departmentId) {
         throw createError('This category is outside your department', 403);
     }
@@ -627,8 +681,7 @@ const getDepartmentsStats = async (req, res) => {
         ) c_agg ON c_agg.department_id = d.id
         LEFT JOIN (
             SELECT cat.department_id,
-                   COUNT(e.id)                                                      AS enrollments,
-                   COALESCE(SUM(COALESCE(c2.discount_price, c2.price)), 0)          AS revenue
+                   COUNT(e.id)                                                      AS enrollments,                    0          AS revenue
             FROM enrollments e
             JOIN courses c2 ON e.course_id = c2.id
             JOIN categories cat ON c2.category_id = cat.id
@@ -671,7 +724,7 @@ const getAiReport = async (req, res) => {
                 (SELECT COUNT(*) FROM users) as total_users,
                 (SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED') as published_courses,
                 (SELECT COUNT(*) FROM enrollments) as total_enrollments,
-                (SELECT COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) FROM enrollments e JOIN courses c ON e.course_id = c.id) as total_revenue,
+                (SELECT 0) as total_revenue,
                 (SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE') as premium_subs,
                 (SELECT COUNT(*) FROM courses WHERE status = 'PENDING') as pending_courses,
                 (SELECT COUNT(*) FROM departments) as total_departments
@@ -710,8 +763,7 @@ const getAiReport = async (req, res) => {
             SELECT d.name,
                    COALESCE(u_agg.users, 0)::int as users,
                    COALESCE(c_agg.courses, 0)::int as courses,
-                   COALESCE(e_agg.enrollments, 0)::int as enrollments,
-                   COALESCE(e_agg.revenue, 0)::float as revenue
+                   COALESCE(e_agg.enrollments, 0)::int as enrollments,                    0 as revenue
             FROM departments d
             LEFT JOIN (SELECT department_id, COUNT(*) as users FROM users WHERE department_id IS NOT NULL GROUP BY department_id) u_agg ON u_agg.department_id = d.id
             LEFT JOIN (SELECT cat.department_id, COUNT(*) as courses FROM courses c JOIN categories cat ON c.category_id = cat.id WHERE c.status = 'PUBLISHED' AND cat.department_id IS NOT NULL GROUP BY cat.department_id) c_agg ON c_agg.department_id = d.id
@@ -723,7 +775,7 @@ const getAiReport = async (req, res) => {
                 (SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days') as new_users_30d,
                 (SELECT COUNT(*) FROM courses WHERE created_at >= NOW() - INTERVAL '30 days') as new_courses_30d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '30 days') as new_enrollments_30d,
-                (SELECT COALESCE(SUM(COALESCE(c.discount_price, c.price)), 0) FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.enrolled_at >= NOW() - INTERVAL '30 days') as revenue_30d,
+                (SELECT 0) as revenue_30d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '7 days') as enrollments_7d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '14 days' AND enrolled_at < NOW() - INTERVAL '7 days') as enrollments_prev_7d
         `)
@@ -1024,9 +1076,12 @@ module.exports = {
     getAuditLogs,
     getAdminOverview,
     getCategories,
+    getCategoryDetail,
     createCategory,
     updateCategory,
     deleteCategory,
+    assignCourseToCategory,
+    removeCourseFromCategory,
     getPublicStats,
     getStudentStreak,
     getStudentProgress,

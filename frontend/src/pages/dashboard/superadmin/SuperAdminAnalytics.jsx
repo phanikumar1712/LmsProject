@@ -1,4 +1,4 @@
-import { TrendingUp, Users, BookOpen, DollarSign, Star, CheckCircle, AlertTriangle, Layers, Building2 } from 'lucide-react';
+import { TrendingUp, Users, BookOpen, Star, CheckCircle, AlertTriangle, Layers, Building2 } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -17,7 +17,6 @@ export default function SuperAdminAnalytics() {
     const admins = adminOverview?.data || [];
 
     const kpis = stats ? [
-        { label: 'Total Revenue', value: stats.totalRevenue >= 100000 ? `₹${(stats.totalRevenue / 100000).toFixed(1)}L` : `₹${stats.totalRevenue?.toLocaleString()}`, icon: DollarSign, color: '#16a34a', bg: 'bg-emerald-50', change: `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth || 0}% this month` },
         { label: 'Active Students', value: stats.activeStudents?.toLocaleString() || '0', icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
         { label: 'Total Courses', value: stats.totalCourses || '0', icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published` },
         { label: 'Platform Rating', value: stats.avgRating?.toFixed(1) || '0.0', icon: Star, color: '#f59e0b', bg: 'bg-amber-50', change: 'Global avg course rating' },
@@ -40,43 +39,24 @@ export default function SuperAdminAnalytics() {
                 {kpis.map(card => <StatCard key={card.label} {...card} />)}
             </StatCardGrid>
 
-            {/* Revenue + Enrollment Charts */}
+            {/* Enrollment + Student Charts */}
             <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
-                <ChartCard title="Monthly Revenue">
-                    {stats?.monthlyRevenue?.length > 0 ? (
+                <ChartCard title="Monthly Enrollments">
+                    {stats?.enrollmentsByMonth?.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={stats.monthlyRevenue} margin={CHART_MARGIN}>
+                            <AreaChart data={stats.enrollmentsByMonth} margin={CHART_MARGIN}>
                                 <defs>
-                                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                    <linearGradient id="enrollGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.15} />
+                                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
-                                <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
-                                <Tooltip content={<ChartTooltip prefix="₹" />} />
-                                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#4f46e5" strokeWidth={2.5} fill="url(#revGrad)" dot={{ fill: '#4f46e5', r: 4 }} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
-                            <DollarSign size={32} className="opacity-20 mb-2" />
-                            <p className="text-sm font-medium">No revenue data</p>
-                        </div>
-                    )}
-                </ChartCard>
-
-                <ChartCard title="Monthly Enrollments">
-                    {stats?.enrollmentsByMonth?.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.enrollmentsByMonth} margin={CHART_MARGIN}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
                                 <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
                                 <Tooltip content={<ChartTooltip />} />
-                                <Bar dataKey="count" name="Enrollments" fill="#0ea5e9" radius={[6, 6, 0, 0]} barSize={36} />
-                            </BarChart>
+                                <Area type="monotone" dataKey="count" name="Enrollments" stroke="#0ea5e9" strokeWidth={2.5} fill="url(#enrollGrad)" dot={{ fill: '#0ea5e9', r: 4 }} />
+                            </AreaChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
@@ -84,6 +64,30 @@ export default function SuperAdminAnalytics() {
                             <p className="text-sm font-medium">No enrollment data</p>
                         </div>
                     )}
+                </ChartCard>
+
+                <ChartCard title="Platform Overview">
+                    <div className="h-full flex flex-col items-center justify-center text-center px-6">
+                        <BookOpen size={40} className="text-indigo-400 mb-4" />
+                        <p className="text-foreground font-bold text-lg mb-2">All Courses Are Free 🎉</p>
+                        <p className="text-muted-foreground font-medium text-sm max-w-sm">
+                            The platform provides all courses at no cost. Focus on learning, not pricing.
+                        </p>
+                        <div className="flex gap-8 mt-6">
+                            <div className="text-center">
+                                <p className="text-2xl font-extrabold text-foreground">{stats?.totalCourses || 0}</p>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Courses</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-2xl font-extrabold text-foreground">{stats?.totalEnrollments?.toLocaleString() || 0}</p>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Enrollments</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-2xl font-extrabold text-foreground">{stats?.totalInstructors || 0}</p>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Instructors</p>
+                            </div>
+                        </div>
+                    </div>
                 </ChartCard>
             </div>
 

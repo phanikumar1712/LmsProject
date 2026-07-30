@@ -2,36 +2,16 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Play, CheckCircle, FileText, ChevronLeft, ChevronRight, Menu, X,
-    HelpCircle, BookOpen, Trophy, Clock, Loader2, Lock, GitBranch, Sparkles
+    HelpCircle, BookOpen, Trophy, Clock, Loader2, Lock, GitBranch, Sparkles, Star
 } from 'lucide-react';
-import { coursesAPI, enrollmentsAPI } from '../../../services/api';
+import { coursesAPI, enrollmentsAPI, ratingsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { RatingStars } from '../../../components/ui/RatingStars';
-import { ratingsAPI } from '../../../services/api';
-import { Star } from 'lucide-react';
+import { getYouTubeEmbedUrl } from '../../../lib/video';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ReactPlayer = lazy(() => import('react-player'));
-
-// ── YouTube URL parser ─────────────────────────────────────────────────────────
-function getYouTubeEmbedUrl(url) {
-    if (!url) return null;
-    if (url.includes('/embed/')) return url;
-    let videoId = '';
-    try {
-        if (url.includes('youtube.com/watch?v=')) {
-            videoId = new URL(url).searchParams.get('v');
-        } else if (url.includes('youtu.be/')) {
-            videoId = url.split('youtu.be/')[1].split('?')[0];
-        } else if (url.includes('youtube.com/shorts/')) {
-            videoId = url.split('shorts/')[1].split('?')[0];
-        } else if (/^[a-zA-Z0-9_-]{11}$/.test(url.split('?')[0])) {
-            videoId = url.split('?')[0];
-        }
-    } catch { /* noop */ }
-    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=0` : null;
-}
 
 // ── Progress Ring component ────────────────────────────────────────────────────
 function ProgressRing({ progress, size = 36, stroke = 3 }) {
@@ -321,7 +301,15 @@ export default function CourseLearningPlayer() {
                             </div>
                         ) : activeLesson.type === 'video' ? (
                             <div className="absolute inset-0">
-                                {embedUrl ? (
+                                {!activeLesson.contentUrl ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                                        <div className="text-center p-8">
+                                            <Play size={48} className="text-slate-700 mx-auto mb-4" />
+                                            <p className="text-slate-500 font-semibold text-lg">No video content</p>
+                                            <p className="text-slate-600 text-sm mt-2">This lesson has no video URL configured.</p>
+                                        </div>
+                                    </div>
+                                ) : embedUrl ? (
                                     <iframe
                                         key={embedUrl}
                                         src={embedUrl}
@@ -340,7 +328,10 @@ export default function CourseLearningPlayer() {
                                             url={activeLesson.contentUrl}
                                             width="100%" height="100%"
                                             controls playing={false} playsinline
-                                            onError={() => toast.error('Error loading video')}
+                                            onError={(e) => {
+                                                console.error('ReactPlayer error:', e);
+                                                toast.error('Error loading video. The URL may be invalid or inaccessible.');
+                                            }}
                                         />
                                     </Suspense>
                                 )}

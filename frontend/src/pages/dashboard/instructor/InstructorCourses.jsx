@@ -89,11 +89,7 @@ export default function InstructorCourses() {
                                 <span className={`absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${course.status === 'PUBLISHED' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' : course.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400' : 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400'}`}>
                                     {course.status}
                                 </span>
-                                {course.price === 0 ? (
-                                    <span className="absolute top-3 right-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">Free</span>
-                                ) : (
-                                    <span className="absolute top-3 right-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">₹{course.discountPrice || course.price}</span>
-                                )}
+
                             </div>
                             <div className="p-5 flex-1 flex flex-col">
                                 <h3 className="font-bold text-foreground text-base mb-4 line-clamp-2 leading-snug flex-1 group-hover:text-indigo-600 transition-colors" title={course.title}>

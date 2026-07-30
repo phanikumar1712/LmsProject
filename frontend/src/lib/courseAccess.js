@@ -1,12 +1,9 @@
-import { PLAN_ORDER } from './constants';
-
+// All courses are free and accessible — no subscription plan checks needed.
 export const canAccessCourse = (user, course) => {
     if (!user || !course) return false;
-    if (['ADMIN', 'SUPER_ADMIN'].includes(user.role)) return true;
-
-    const userPlan = String(user.subscriptionPlan || 'FREE').toUpperCase();
-    const requiredPlan = String(course.requiredPlan || 'FREE').toUpperCase();
-    const explicitPlans = (course.accessiblePlans || []).map(plan => String(plan).toUpperCase());
-
-    return explicitPlans.includes(userPlan) || (PLAN_ORDER[userPlan] ?? 0) >= (PLAN_ORDER[requiredPlan] ?? 0);
+    if (user.role === 'SUPER_ADMIN') return true;
+    if (user.role === 'ADMIN') {
+        if (!user.departmentId || course.departmentId === user.departmentId) return true;
+    }
+    return true;
 };

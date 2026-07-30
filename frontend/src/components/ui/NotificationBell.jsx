@@ -14,6 +14,8 @@ const TYPE_ICONS = {
     approval: '✅',
     report: '🚨',
     system: '⚙️',
+    announcement: '📢',
+    discussion: '💬',
 };
 
 export function NotificationBell() {

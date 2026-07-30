@@ -18,7 +18,7 @@ export default function ModerateReviews() {
             const data = await ratingsAPI.getAll();
             setReviews(data);
         } catch {
-            toast.error("Cloud not load reviews");
+            toast.error("Could not load reviews");
         } finally {
             setLoading(false);
         }

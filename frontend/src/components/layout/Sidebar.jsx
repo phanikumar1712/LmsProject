@@ -3,8 +3,8 @@ import {
     LayoutDashboard, BookOpen, Award, CreditCard, BarChart2, Users, Settings,
     ShieldCheck, Layers, GraduationCap, PlusCircle, Star, Activity, Database,
     ChevronLeft, LogOut, ClipboardList, MessageSquare, BarChart3, Heart, User,
-    Building2, Zap, Megaphone, UserPlus, FileText, Calendar, TrendingUp,
-    GitBranch, Video, HelpCircle,
+    Building2, Zap, Megaphone, UserPlus, TrendingUp,
+    HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -15,6 +15,7 @@ const STUDENT_NAV = [
     { to: '/student/quizzes', icon: ClipboardList, label: 'My Quizzes' },
     { to: '/student/certificates', icon: Award, label: 'Certificates' },
     { to: '/student/subscription', icon: CreditCard, label: 'Subscription' },
+    { to: '/announcements', icon: Megaphone, label: 'Announcements' },
     { to: '/courses', icon: GraduationCap, label: 'Browse Courses' },
     { to: '/become-instructor', icon: Star, label: 'Become Instructor' },
 ];
@@ -27,39 +28,37 @@ const INSTRUCTOR_NAV = [
     { to: '/instructor/reviews', icon: Star, label: 'Reviews' },
     { to: '/instructor/analytics', icon: BarChart2, label: 'Analytics' },
     { to: '/instructor/quiz-builder', icon: HelpCircle, label: 'Quiz Builder' },
-    { to: '/instructor/versions', icon: GitBranch, label: 'Versions & Changelog' },
-    { to: '/instructor/live-sessions', icon: Video, label: 'Live Sessions' },
+    { to: '/announcements', icon: Megaphone, label: 'Announcements' },
 ];
 
 const ADMIN_NAV = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/admin/users', icon: Users, label: 'Manage Users' },
     { to: '/admin/courses', icon: BookOpen, label: 'Manage Courses' },
+    { to: '/courses', icon: GraduationCap, label: 'Browse & Preview' },
     { to: '/admin/categories', icon: Layers, label: 'Categories' },
     { to: '/admin/announcements', icon: Megaphone, label: 'Announcements' },
     { to: '/admin/bulk-enroll', icon: UserPlus, label: 'Bulk Enrollment' },
     { to: '/admin/student-progress', icon: BarChart3, label: 'Student Progress' },
-    { to: '/admin/assignments', icon: FileText, label: 'Assignments' },
-    { to: '/admin/timetable', icon: Calendar, label: 'Academic Calendar' },
     { to: '/admin/reviews', icon: MessageSquare, label: 'Moderate Reviews' },
     { to: '/admin/reports', icon: TrendingUp, label: 'Reports' },
-    { to: '/admin/attendance', icon: Users, label: 'Attendance' },
 ];
 
 const SUPER_ADMIN_NAV = [
     { to: '/super-admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/super-admin/departments', icon: Building2, label: 'Departments' },
     { to: '/super-admin/admins', icon: ShieldCheck, label: 'Manage Admins' },
+    { to: '/super-admin/admins/create', icon: PlusCircle, label: 'Create Admin' },
+    { to: '/super-admin/categories', icon: Layers, label: 'Categories' },
     { to: '/super-admin/analytics', icon: BarChart2, label: 'Analytics' },
     { to: '/super-admin/settings', icon: Settings, label: 'Platform Settings' },
-    { to: '/admin/subscriptions', icon: CreditCard, label: 'Subscription Plans' },
     { to: '/super-admin/audit-logs', icon: Database, label: 'Audit Logs' },
     { to: '/super-admin/ai-analytics', icon: Zap, label: 'AI Reports' },
     { to: '/super-admin/system', icon: Activity, label: 'System Health' },
     { to: '/admin/users', icon: Users, label: 'Manage Users' },
     { to: '/admin/courses', icon: BookOpen, label: 'Manage Courses' },
+    { to: '/courses', icon: GraduationCap, label: 'Browse & Preview' },
     { to: '/admin/announcements', icon: Megaphone, label: 'Announcements' },
-    { to: '/admin/attendance', icon: Users, label: 'Attendance' },
     { to: '/admin/categories', icon: Layers, label: 'Categories' },
     { to: '/admin/bulk-enroll', icon: UserPlus, label: 'Bulk Enrollment' },
     { to: '/admin/reports', icon: TrendingUp, label: 'Reports' },

@@ -13,6 +13,7 @@ import CourseDetailPage from './pages/CourseDetailPage';
 import QuizPage from './pages/QuizPage';
 import InstructorProfilePage from './pages/InstructorProfilePage';
 import CertificateVerifyPage from './pages/CertificateVerifyPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
 
 
 
@@ -45,6 +46,9 @@ import PlatformSettings from './pages/dashboard/superadmin/PlatformSettings';
 import ManageAdmins from './pages/dashboard/superadmin/ManageAdmins';
 import DepartmentOverview from './pages/dashboard/superadmin/DepartmentOverview';
 import DepartmentDetail from './pages/dashboard/superadmin/DepartmentDetail';
+import CategoryOverview from './pages/dashboard/superadmin/CategoryOverview';
+import CategoryDetail from './pages/dashboard/superadmin/CategoryDetail';
+import CreateAdmin from './pages/dashboard/superadmin/CreateAdmin';
 import AIAnalytics from './pages/dashboard/superadmin/AIAnalytics';
 import SubscriptionPlans from './pages/dashboard/superadmin/SubscriptionPlans';
 import AdminCategories from './pages/dashboard/admin/AdminCategories';
@@ -102,7 +106,7 @@ export default function App() {
 
           {/* Fullscreen quiz route - no navbar/sidebar */}
           <Route path="/courses/:courseId/quiz/:quizId" element={
-            <ProtectedRoute allowedRoles={['STUDENT']}><QuizPage /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['STUDENT', 'ADMIN', 'SUPER_ADMIN']}><QuizPage /></ProtectedRoute>
           } />
 
           {/* Dashboard Routes with Sidebar & Navbar */}
@@ -114,13 +118,14 @@ export default function App() {
             <Route path="/student/quizzes" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentQuizzes /></ProtectedRoute>} />
             <Route path="/student/certificates" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentCertificates /></ProtectedRoute>} />
             <Route path="/student/subscription" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubscription /></ProtectedRoute>} />
-            <Route path="/courses/:courseId/learn" element={<ProtectedRoute allowedRoles={['STUDENT']}><CourseLearningPlayer /></ProtectedRoute>} />
+            <Route path="/courses/:courseId/learn" element={<ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><CourseLearningPlayer /></ProtectedRoute>} />
 
             {/* Instructor */}
             <Route path="/instructor" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorDashboard /></ProtectedRoute>} />
             <Route path="/instructor/courses" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorCourses /></ProtectedRoute>} />
             <Route path="/instructor/create-course" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><CreateCourseForm /></ProtectedRoute>} />
             <Route path="/instructor/students" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorStudents /></ProtectedRoute>} />
+            <Route path="/instructor/students/:id" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><UserDetail /></ProtectedRoute>} />
             <Route path="/instructor/reviews" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorReviews /></ProtectedRoute>} />
             <Route path="/instructor/analytics" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorAnalytics /></ProtectedRoute>} />
             <Route path="/instructor/quiz-builder" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorQuizBuilder /></ProtectedRoute>} />
@@ -148,6 +153,9 @@ export default function App() {
             <Route path="/super-admin/admins" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><ManageAdmins /></ProtectedRoute>} />
             <Route path="/super-admin/departments" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><DepartmentOverview /></ProtectedRoute>} />
             <Route path="/super-admin/departments/:id" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><DepartmentDetail /></ProtectedRoute>} />
+            <Route path="/super-admin/categories" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><CategoryOverview /></ProtectedRoute>} />
+            <Route path="/super-admin/categories/:id" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><CategoryDetail /></ProtectedRoute>} />
+            <Route path="/super-admin/admins/create" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><CreateAdmin /></ProtectedRoute>} />
             <Route path="/super-admin/analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SuperAdminAnalytics /></ProtectedRoute>} />
             <Route path="/super-admin/settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><PlatformSettings /></ProtectedRoute>} />
             <Route path="/super-admin/audit-logs" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><AuditLogs /></ProtectedRoute>} />
@@ -156,6 +164,7 @@ export default function App() {
 
             {/* General Protected */}
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
           </Route>
 
           {/* Catch all */}

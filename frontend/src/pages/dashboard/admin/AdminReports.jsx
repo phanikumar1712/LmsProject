@@ -42,10 +42,6 @@ export default function AdminReports() {
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += "Metric,Month,Value\n";
 
-        stats.monthlyRevenue.forEach(r => {
-            csvContent += `Revenue,${r.month},${r.revenue}\n`;
-        });
-
         stats.enrollmentsByMonth.forEach(e => {
             csvContent += `Enrollments,${e.month},${e.count}\n`;
         });
@@ -55,7 +51,6 @@ export default function AdminReports() {
         });
 
         csvContent += `\nSummary Metrics\n`;
-        csvContent += `Platform Revenue,,${stats.totalRevenue}\n`;
         csvContent += `Total Users,,${stats.totalUsers}\n`;
         csvContent += `Total Enrollments,,${stats.totalEnrollments}\n`;
 
@@ -147,22 +142,10 @@ export default function AdminReports() {
                         </div>
                     </div>
                     <div className="h-64">
-                        {stats?.monthlyRevenue && stats.monthlyRevenue.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.monthlyRevenue} margin={CHART_MARGIN}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
-                                    <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 1000}k`} />
-                                    <Tooltip content={<ChartTooltip prefix="₹" />} cursor={{ fill: '#f8fafc' }} />
-                                    <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
-                                <TrendingUp size={32} className="opacity-20 mb-2" />
-                                <p className="text-sm font-medium">No revenue data</p>
-                            </div>
-                        )}
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
+                            <TrendingUp size={32} className="opacity-20 mb-2" />
+                            <p className="text-sm font-medium">Enrollment reports coming soon</p>
+                        </div>
                     </div>
                 </div>
 
@@ -216,7 +199,6 @@ export default function AdminReports() {
                 <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-center">
                     <div className="grid grid-cols-2 gap-4">
                         {[
-                            { label: 'Avg Enrollment Fee', value: stats?.totalEnrollments > 0 ? `₹${Math.round(stats.totalRevenue / stats.totalEnrollments)}` : '₹0', sub: 'Per student', color: 'text-indigo-600' },
                             { label: 'Student Growth', value: stats?.totalUsers > 0 ? '+14.2%' : '0%', sub: 'Last 30 days', color: 'text-emerald-600' },
                             { label: 'Platform Rating', value: stats?.avgRating?.toFixed(1) || '0.0', sub: 'Out of 5.0', color: 'text-amber-500' },
                             { label: 'Retention Rate', value: stats?.totalUsers > 0 ? '82%' : '0%', sub: 'Active monthly students', color: 'text-orange-600' }

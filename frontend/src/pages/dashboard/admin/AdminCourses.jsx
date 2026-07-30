@@ -5,14 +5,15 @@ import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function AdminCourses() {
     const { isSuperAdmin } = useAuth();
+    const [searchParams] = useSearchParams();
     const [filter, setFilter] = useState('ALL');
     const [search, setSearch] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('ALL');
+    const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'ALL');
     const [departmentFilter, setDepartmentFilter] = useState('ALL');
     const [sort, setSort] = useState('newest');
 
@@ -82,8 +83,6 @@ export default function AdminCourses() {
         setEditForm({
             title: course.title || '',
             shortDesc: course.shortDesc || '',
-            price: course.price ?? 0,
-            discountPrice: course.discountPrice ?? '',
             level: course.level || 'Beginner',
             language: course.language || 'English',
             duration: course.duration || '',
@@ -94,17 +93,9 @@ export default function AdminCourses() {
         e.preventDefault();
         setSaving(true);
         try {
-            const price = editForm.price === '' ? 0 : Number(editForm.price);
-            const discountPrice = editForm.discountPrice === '' ? null : Number(editForm.discountPrice);
-            if (!Number.isFinite(price) || (discountPrice !== null && !Number.isFinite(discountPrice))) {
-                throw new Error('Enter a valid price');
-            }
-
             const updated = await coursesAPI.update(editingCourse.id, {
                 title: editForm.title,
                 short_desc: editForm.shortDesc,
-                price,
-                discount_price: discountPrice,
                 level: editForm.level,
                 language: editForm.language,
                 duration: editForm.duration,
@@ -133,8 +124,6 @@ export default function AdminCourses() {
             switch (sort) {
                 case 'oldest': return new Date(a.createdAt) - new Date(b.createdAt);
                 case 'popular': return (b.enrollmentCount || 0) - (a.enrollmentCount || 0);
-                case 'price_low': return (a.discountPrice || a.price || 0) - (b.discountPrice || b.price || 0);
-                case 'price_high': return (b.discountPrice || b.price || 0) - (a.discountPrice || a.price || 0);
                 case 'newest':
                 default: return new Date(b.createdAt) - new Date(a.createdAt);
             }
@@ -156,8 +145,8 @@ export default function AdminCourses() {
                 action={
                     <button
                         onClick={() => {
-                            const csv = "Title,Instructor,Category,Price,Status,Enrollments\n" +
-                                displayCourses.map(c => `"${c.title}","${c.instructorName}","${c.category}",${c.price},"${c.status}",${c.enrollmentsCount || 0}`).join("\n");
+                            const csv = "Title,Instructor,Category,Status,Enrollments\n" +
+                                displayCourses.map(c => `"${c.title}","${c.instructorName}","${c.category}","${c.status}",${c.enrollmentsCount || 0}`).join("\n");
                             const blob = new Blob([csv], { type: 'text/csv' });
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement('a');
@@ -236,8 +225,6 @@ export default function AdminCourses() {
                             <option value="newest">Newest</option>
                             <option value="oldest">Oldest</option>
                             <option value="popular">Most Popular</option>
-                            <option value="price_low">Price: Low to High</option>
-                            <option value="price_high">Price: High to Low</option>
                         </select>
                     </div>
                 </div>
@@ -254,18 +241,31 @@ export default function AdminCourses() {
                             <div key={course.id} className="bg-muted/40 border border-border p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center hover:bg-muted transition-colors relative group shadow-sm">
                                 <div className="w-full md:w-56 h-32 rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-border">
                                     <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                                    <div className="absolute top-3 right-3 flex gap-1">
-                                        <span className="bg-card/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] text-foreground font-bold tracking-wider shadow-sm border border-border">₹{course.discountPrice || course.price}</span>
-                                    </div>
+                                    
                                 </div>
 
                                 <div className="flex-1">
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
-                                            <h3 className="text-lg font-bold text-foreground mb-1">
-                                                <Link to={`/courses/${course.id}`} className="hover:text-indigo-600 transition-colors">{course.title}</Link>
-                                            </h3>
-                                            <p className="text-[13px] font-semibold text-muted-foreground flex items-center gap-2">By {course.instructorName} • {course.category}</p>
+                                        <h3 className="text-lg font-bold text-foreground mb-1">
+                                            <Link to={`/courses/${course.id}`} className="hover:text-indigo-600 transition-colors">{course.title}</Link>
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <Link
+                                                to={`/courses/${course.id}/learn`}
+                                                className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors flex items-center gap-1"
+                                            >
+                                                🎬 Full Preview
+                                            </Link>
+                                        </div>
+                                            <p className="text-[13px] font-semibold text-muted-foreground flex items-center gap-2 flex-wrap">
+                                                By {course.instructorName} • {course.category}
+                                                {course.departmentName && (
+                                                    <span className="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                                        {course.departmentName}
+                                                    </span>
+                                                )}
+                                            </p>
                                             <p className="text-[12px] font-bold text-muted-foreground/60 mt-2 bg-card border border-border px-3 py-1 rounded-lg inline-block">{course.lessonsCount} lessons • {course.duration}</p>
                                         </div>
                                     </div>
@@ -360,29 +360,6 @@ export default function AdminCourses() {
                                     onChange={e => setEditForm(p => ({ ...p, shortDesc: e.target.value }))}
                                     className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium resize-none"
                                 />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1 block">Price (₹)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={editForm.price}
-                                        onChange={e => setEditForm(p => ({ ...p, price: e.target.value }))}
-                                        className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1 block">Discount Price (₹)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={editForm.discountPrice}
-                                        onChange={e => setEditForm(p => ({ ...p, discountPrice: e.target.value }))}
-                                        placeholder="Optional"
-                                        className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
-                                    />
-                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>

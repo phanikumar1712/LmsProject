@@ -61,6 +61,8 @@ const mapCourse = (c) => ({
     category: c.categoryName,
     categoryId: c.categoryId,
     categoryIcon: c.categoryIcon,
+    departmentId: c.departmentId,
+    departmentName: c.departmentName,
     instructorBio: c.instructorBio,
     instructorRole: c.instructorRole,
     instructorEarnings: c.instructorEarnings,
@@ -70,6 +72,10 @@ const mapCourse = (c) => ({
 
 const mapCategory = (cat) => ({
     ...cat,
+    id: cat.id,
+    name: cat.name,
+    icon: cat.icon,
+    departmentId: cat.department_id ?? cat.departmentId ?? null,
     courseCount: parseInt(cat.course_count ?? cat.courseCount ?? 0, 10) || 0,
     createdAt: cat.created_at || cat.createdAt,
 });

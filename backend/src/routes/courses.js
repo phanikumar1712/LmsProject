@@ -7,7 +7,7 @@ const ctrl = require('../controllers/coursesController');
 router.get('/', optionalAuth, asyncHandler(ctrl.getAll));
 router.get('/instructor/:instructorId', authenticate, asyncHandler(ctrl.getByInstructor));
 router.get('/:id', asyncHandler(ctrl.getById));
-router.get('/:id/lessons', asyncHandler(ctrl.getLessons));
+router.get('/:id/lessons', optionalAuth, asyncHandler(ctrl.getLessons));
 
 // Instructor + Admin routes — Admins can edit/delete courses within their own
 // department (enforced by assertCourseInScope in the controller).

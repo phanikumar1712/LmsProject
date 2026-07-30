@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
-import { coursesAPI, statsAPI } from '../services/api';
+import { Search, X, SlidersHorizontal, ChevronDown, Building2 } from 'lucide-react';
+import { coursesAPI, statsAPI, departmentsAPI } from '../services/api';
 import { CourseCard, SkeletonCard } from '../components/ui/CourseCard';
 import { useAuth } from '../contexts/AuthContext';
 import { enrollmentsAPI } from '../services/api';
@@ -11,7 +11,6 @@ const SORTS = [
     { value: 'popular', label: 'Most Popular' },
     { value: 'newest', label: 'Newest' },
     { value: 'rating', label: 'Highest Rated' },
-    { value: 'price_low', label: 'Price: Low to High' },
 ];
 
 export default function CoursesPage() {
@@ -20,19 +19,35 @@ export default function CoursesPage() {
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [enrollments, setEnrollments] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
+
+    const isAdmin = user && ['SUPER_ADMIN', 'ADMIN'].includes(user.role);
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
     const [filters, setFilters] = useState({
         search: params.get('search') || '',
         category: params.get('category') || '',
+        department: params.get('department') || '',
         level: 'All',
         sort: 'popular',
     });
 
     useEffect(() => {
         statsAPI.getCategories().then(cats => setCategories([{ id: '', name: 'All Categories', icon: '📚' }, ...cats]));
-        if (user) enrollmentsAPI.getByStudent(user.id).then(setEnrollments);
+        if (user) {
+            enrollmentsAPI.getByStudent(user.id).then(setEnrollments);
+            if (isAdmin) {
+                departmentsAPI.list().then(deps => {
+                    setDepartments(deps || []);
+                    // Auto-set department for scoped admins
+                    if (user.role === 'ADMIN' && user.departmentId && !params.get('department')) {
+                        setFilters(f => ({ ...f, department: user.departmentId }));
+                    }
+                });
+            }
+        }
     }, [user]);
 
     useEffect(() => {
@@ -45,6 +60,10 @@ export default function CoursesPage() {
             level: filters.level !== 'All' ? filters.level : undefined,
             sort: filters.sort,
         };
+        if (filters.department) {
+            f.departmentId = filters.department;
+            if (isAdmin) f.admin = true;
+        }
         coursesAPI.getAll(f).then(setCourses).finally(() => setLoading(false));
     }, [filters]);
 
@@ -56,11 +75,11 @@ export default function CoursesPage() {
     };
 
     const clearFilters = () => {
-        setFilters({ search: '', category: '', level: 'All', sort: 'popular' });
+        setFilters({ search: '', category: '', department: '', level: 'All', sort: 'popular' });
         setParams({}, { replace: true });
     };
 
-    const hasActiveFilters = filters.search || filters.category || filters.level !== 'All';
+    const hasActiveFilters = filters.search || filters.category || filters.department || filters.level !== 'All';
 
     const getEnrollment = (courseId) => enrollments.find(e => e.courseId === courseId);
 
@@ -145,6 +164,40 @@ export default function CoursesPage() {
                                 ))}
                             </div>
                         </div>
+                        {/* Department */}
+                        {isAdmin && departments.length > 0 && (
+                            <div className="md:border-l md:border-border/50 md:pl-8">
+                                <p className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                                    <Building2 size={13} /> Department
+                                </p>
+                                {isSuperAdmin ? (
+                                    /* Super Admin: full department picker */
+                                    <div className="flex gap-2.5 flex-wrap">
+                                        <button
+                                            onClick={() => updateFilter('department', '')}
+                                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${!filters.department ? 'bg-indigo-600 text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-border/50'}`}
+                                        >
+                                            All Departments
+                                        </button>
+                                        {departments.map(dept => (
+                                            <button
+                                                key={dept.id}
+                                                onClick={() => updateFilter('department', dept.id)}
+                                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filters.department === dept.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80 border border-border/50'}`}
+                                            >
+                                                {dept.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Department Admin: show their department as a label */
+                                    <div className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm inline-block">
+                                        <Building2 size={14} className="inline mr-1.5 -mt-0.5" />
+                                        {departments.find(d => d.id === user?.departmentId)?.name || 'Your Department'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     {hasActiveFilters && (
                         <div className="mt-8 pt-5 border-t border-border/50 flex justify-end">

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Mail, Filter, BookOpen } from 'lucide-react';
+import { Mail, Filter, BookOpen, Upload, Download, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { coursesAPI, enrollmentsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
@@ -7,11 +8,15 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { SearchInput, FilterSelect, FilterBar } from '../../../components/ui/SearchInput';
 import { DataTable, UserCell } from '../../../components/ui/DataTable';
 import { useMultipleAsync } from '../../../hooks/useAsyncData';
+import toast from 'react-hot-toast';
 
 export default function InstructorStudents() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCourse, setFilterCourse] = useState('All');
+    const [importing, setImporting] = useState(false);
+    const [showImport, setShowImport] = useState(false);
 
     // Only 2 API calls now — both are accessible to instructors
     const { results, loading } = useMultipleAsync([
@@ -24,6 +29,23 @@ export default function InstructorStudents() {
 
     // Build per-course lookup for titles
     const courseMap = Object.fromEntries(myCourses.map(c => [c.id, c]));
+
+    const handleImport = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const result = await usersAPI.importStudents(file);
+            toast.success(`Imported ${result.imported || 0} students`);
+            setShowImport(false);
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Import failed');
+        } finally {
+            setImporting(false);
+        }
+        e.target.value = '';
+    };
 
     // Build rows directly from enriched enrollment stats (student info already included)
     const tableRows = enrollments
@@ -79,7 +101,11 @@ export default function InstructorStudents() {
                 emptyText="No students found matching your filters."
             >
                 {tableRows.map((row, idx) => (
-                    <tr key={`${row.studentId}-${row.courseId}-${idx}`} className="hover:bg-muted/40 transition-colors group">
+                    <tr
+                        key={`${row.studentId}-${row.courseId}-${idx}`}
+                        className="hover:bg-muted/40 transition-colors group cursor-pointer"
+                        onClick={() => navigate(`/instructor/students/${row.studentId}`)}
+                    >
                         <td className="px-6 py-4">
                             <UserCell name={row.studentName} email={row.studentEmail} avatar={row.studentAvatar} />
                         </td>
@@ -111,13 +137,23 @@ export default function InstructorStudents() {
                                 : 'Never'}
                         </td>
                         <td className="px-6 py-4 text-right">
-                            <a
-                                href={`mailto:${row.studentEmail}`}
-                                className="p-2.5 inline-flex items-center justify-center rounded-xl bg-card border border-border text-muted-foreground hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all shadow-sm"
-                                title="Email Student"
-                            >
-                                <Mail size={18} />
-                            </a>
+                            <div className="flex items-center justify-end gap-2">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/instructor/students/${row.studentId}`); }}
+                                    className="p-2.5 inline-flex items-center justify-center rounded-xl bg-card border border-border text-muted-foreground hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all shadow-sm"
+                                    title="View Student Details"
+                                >
+                                    <Eye size={18} />
+                                </button>
+                                <a
+                                    href={`mailto:${row.studentEmail}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-2.5 inline-flex items-center justify-center rounded-xl bg-card border border-border text-muted-foreground hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all shadow-sm"
+                                    title="Email Student"
+                                >
+                                    <Mail size={18} />
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 ))}

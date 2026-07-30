@@ -229,17 +229,29 @@ const bulkEnroll = async (req, res) => {
     if (!courseId) throw createError('courseId is required', 400);
     if (!studentIds.length && !rollNos.length) throw createError('Provide studentIds or rollNos to enroll', 400);
 
-    // Resolve roll_no to user IDs if provided
+    // Verify course exists and resolve its department (course → category → department)
+    const course = await query(
+        `SELECT c.id, c.title, c.enrollment_count, cat.department_id AS "departmentId"
+         FROM courses c
+         LEFT JOIN categories cat ON cat.id = c.category_id
+         WHERE c.id = $1`,
+        [courseId]
+    );
+    if (!course.rows.length) throw createError('Course not found', 404);
+    const courseDeptId = course.rows[0].departmentId;
+
+    // Resolve roll_no to user IDs if provided — restricted to the course's department
     let allStudentIds = [...studentIds];
     if (rollNos.length) {
         const { scoped, departmentId } = getDepartmentScope(req);
+        const deptFilter = scoped ? departmentId : courseDeptId;
         const resolved = await query(
             `SELECT id FROM users
              WHERE roll_no = ANY($1)
                AND role = 'STUDENT'
                AND active = true
-               ${scoped ? 'AND department_id = $2' : ''}`,
-            scoped ? [rollNos, departmentId] : [rollNos]
+               ${deptFilter ? 'AND department_id = $2' : ''}`,
+            deptFilter ? [rollNos, deptFilter] : [rollNos]
         );
         const resolvedIds = resolved.rows.map(r => r.id);
         allStudentIds = [...new Set([...allStudentIds, ...resolvedIds])];
@@ -247,16 +259,23 @@ const bulkEnroll = async (req, res) => {
 
     if (!allStudentIds.length) throw createError('No valid students found to enroll', 400);
 
+    // Students must belong to the course's department
+    const deptMismatched = new Set();
+    if (courseDeptId && allStudentIds.length) {
+        const matched = await query(
+            `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND department_id = $2`,
+            [allStudentIds, courseDeptId]
+        );
+        const matchedIds = new Set(matched.rows.map(r => r.id));
+        allStudentIds.forEach(sid => { if (!matchedIds.has(sid)) deptMismatched.add(sid); });
+    }
+
     // Get latest version to assign
     const latestVersion = await query(
         'SELECT id FROM course_versions WHERE course_id = $1 ORDER BY version_number DESC LIMIT 1',
         [courseId]
     );
     const versionId = latestVersion.rows.length ? latestVersion.rows[0].id : null;
-
-    // Verify course exists
-    const course = await query('SELECT id, title, enrollment_count FROM courses WHERE id = $1', [courseId]);
-    if (!course.rows.length) throw createError('Course not found', 404);
 
     const client = await query.pool.connect();
     try {
@@ -266,6 +285,12 @@ const bulkEnroll = async (req, res) => {
         let enrolledCount = 0;
 
         for (const studentId of allStudentIds) {
+            // Skip students from a different department than the course
+            if (deptMismatched.has(studentId)) {
+                results.push({ studentId, status: 'skipped', reason: 'Different department' });
+                continue;
+            }
+
             // Check duplicate
             const existing = await client.query(
                 'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Plus, Search, CheckCircle, Key, X, Mail, User, Phone, Lock, Building2, AlertTriangle, Copy, LayoutDashboard, UserX, UserCheck, KeyRound, Crown, UserMinus } from 'lucide-react';
 import { usersAPI, departmentsAPI } from '../../../services/api';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 
@@ -388,6 +389,7 @@ export default function ManageAdmins() {
                         <div className="divide-y divide-border min-w-[700px]">
                             {filtered.map(user => (
                                 <div key={user.id} className="flex items-center gap-4 px-6 py-5 hover:bg-muted/30 transition-colors group">
+                                    <Link to={`/admin/users/${user.id}`} className="flex items-center gap-4 flex-1 min-w-0">
                                     {user.avatar ? (
                                         <img src={user.avatar}
                                             alt={user.name} className="w-12 h-12 rounded-2xl object-cover border border-border flex-shrink-0 shadow-sm" />
@@ -397,7 +399,7 @@ export default function ManageAdmins() {
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-foreground font-extrabold text-[15px] mb-0.5">{user.name}</p>
+                                        <p className="text-foreground font-extrabold text-[15px] mb-0.5 group-hover:text-indigo-600 transition-colors">{user.name}</p>
                                         <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-tight truncate">{user.email}</p>
                                         <div className="flex items-center gap-2 mt-2">
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${user.role === 'SUPER_ADMIN' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -418,6 +420,7 @@ export default function ManageAdmins() {
                                             )}
                                         </div>
                                     </div>
+                                    </Link>
                                     <div className="text-right hidden sm:block px-4 border-l border-border h-10 flex flex-col justify-center">
                                         <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none mb-1">Joined</p>
                                         <p className="text-foreground font-extrabold text-xs">{new Date(user.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
