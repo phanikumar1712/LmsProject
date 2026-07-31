@@ -19,7 +19,7 @@ export default function StudentCourses() {
     const enrolledCourses = (enrollments ?? []).map(e =>
         e.course ? {
             course: { ...e.course },
-            enrollment: e  // pass full enrollment so CourseCard shows price & progress correctly
+            enrollment: e  // pass full enrollment so CourseCard shows progress correctly
         } : null
     ).filter(Boolean);
 

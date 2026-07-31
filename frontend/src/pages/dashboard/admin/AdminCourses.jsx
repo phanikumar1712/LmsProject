@@ -4,6 +4,7 @@ import { coursesAPI, statsAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -240,7 +241,7 @@ export default function AdminCourses() {
                         ) : displayCourses.map(course => (
                             <div key={course.id} className="bg-muted/40 border border-border p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center hover:bg-muted transition-colors relative group shadow-sm">
                                 <div className="w-full md:w-56 h-32 rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-border">
-                                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                                    <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover" />
                                     
                                 </div>
 

@@ -8,7 +8,6 @@ const TYPE_ICONS = {
     quiz_result: '📊',
     enrollment: '📚',
     certificate: '🏆',
-    subscription: '💎',
     pending_course: '📋',
     review: '⭐',
     approval: '✅',

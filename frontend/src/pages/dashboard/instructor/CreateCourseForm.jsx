@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle, Clock, Award, Play, FileSpreadsheet, Download, Shuffle } from 'lucide-react';
+import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle, Clock, Award, Play, FileSpreadsheet, Download, Shuffle, Smile } from 'lucide-react';
 import { coursesAPI, statsAPI, quizzesAPI, uploadAPI } from '../../../services/api';
 import { parseQuestionFile, downloadQuestionTemplate } from '../../../utils/quizImport';
 import { useAuth } from '../../../contexts/AuthContext';
+import { CourseThumbnail, EMOJI_OPTIONS } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 
 export default function CreateCourseForm() {
@@ -24,6 +25,9 @@ export default function CreateCourseForm() {
     });
 
     const [thumbnailPreview, setThumbnailPreview] = useState('');
+    const [thumbnailType, setThumbnailType] = useState('image'); // 'image' | 'emoji'
+    const [selectedEmoji, setSelectedEmoji] = useState('');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [courseStatus, setCourseStatus] = useState(null); // current status when editing
     const thumbnailInputRef = useRef(null);
 
@@ -64,6 +68,13 @@ export default function CreateCourseForm() {
                 });
                 setThumbnailPreview(course.thumbnail || '');
                 setCourseStatus(course.status || null);
+                if (course.thumbnail && course.thumbnail.startsWith('emoji:')) {
+                    setThumbnailType('emoji');
+                    setSelectedEmoji(course.thumbnail.replace('emoji:', ''));
+                } else {
+                    setThumbnailType('image');
+                    setSelectedEmoji('');
+                }
 
                 // Map curriculum data for the UI
                 if (curriculumData.sections && curriculumData.sections.length > 0) {
@@ -147,11 +158,20 @@ export default function CreateCourseForm() {
             try {
                 const res = await uploadAPI.uploadMedia(file);
                 setThumbnailPreview(res.url);
+                setThumbnailType('image');
+                setSelectedEmoji('');
                 toast.success('Thumbnail uploaded!', { id: loadToast });
             } catch (err) {
                 toast.error('Failed to upload thumbnail: ' + err.message, { id: loadToast });
             }
         }
+    };
+
+    const handleEmojiSelect = (emoji) => {
+        setSelectedEmoji(emoji);
+        setThumbnailPreview(`emoji:${emoji}`);
+        setThumbnailType('emoji');
+        setShowEmojiPicker(false);
     };
 
     // Curriculum functions
@@ -599,56 +619,112 @@ export default function CreateCourseForm() {
                     </div>
                 </div>
 
-                {/* Media & Thumbnail */}
-                <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
-                    <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Settings</h2>
-                    <div className="space-y-6">
-                        {/* Thumbnail Upload */}
-                        <div>
-                            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-3">Course Thumbnail</label>
-                            <div className="flex gap-6 items-start">
-                                <div
-                                    className="w-64 h-36 border-2 border-dashed border-border rounded-xl bg-muted/40 flex flex-col items-center justify-center cursor-pointer hover:bg-muted hover:border-indigo-300 transition-colors overflow-hidden relative group shadow-sm"
-                                    onClick={() => thumbnailInputRef.current?.click()}
-                                >
-                                    <input type="file" ref={thumbnailInputRef} onChange={handleThumbnailUpload} accept="image/*" className="hidden" />
-                                    {thumbnailPreview ? (
-                                        <>
-                                            <img src={thumbnailPreview} alt="Thumbnail preview" className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <p className="text-white text-sm font-bold flex items-center gap-2"><Upload size={16} /> Change Image</p>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-center p-4">
-                                            <div className="w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-sm mx-auto mb-3">
-                                                <ImageIcon size={20} className="text-muted-foreground/60" />
-                                            </div>
-                                            <p className="text-[13px] font-bold text-muted-foreground leading-tight">Click to upload image<br />(Max 5MB)</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-1 bg-muted/40 p-4 rounded-xl border border-border">
-                                    <p className="text-[13px] font-semibold text-muted-foreground leading-relaxed">
-                                        Upload your course image here. It must meet our course image quality standards to be accepted.<br /><br />
-                                        Important guidelines: 750x422 pixels; .jpg, .jpeg,. gif, or .png. No text on the image.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+{/* Media & Thumbnail */}
+                 <div className="bg-card border border-border shadow-sm rounded-2xl p-8">
+                     <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2"><ImageIcon size={20} className="text-cyan-600" /> Thumbnail & Settings</h2>
+                     <div className="space-y-6">
+                         {/* Thumbnail Upload */}
+                         <div>
+                             <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-3">Course Thumbnail</label>
+                             <div className="flex gap-3 items-start mb-3">
+                                 <button
+                                     type="button"
+                                     onClick={() => { setThumbnailType('image'); setSelectedEmoji(''); }}
+                                     className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${
+                                         thumbnailType === 'image'
+                                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                             : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                                     }`}
+                                 >
+                                     <ImageIcon size={16} className="inline mr-1.5" /> Image Upload
+                                 </button>
+                                 <button
+                                     type="button"
+                                     onClick={() => { setThumbnailType('emoji'); setThumbnailPreview(''); }}
+                                     className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all border ${
+                                         thumbnailType === 'emoji'
+                                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                             : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                                     }`}
+                                 >
+                                     <Smile size={16} className="inline mr-1.5" /> Choose Emoji
+                                 </button>
+                             </div>
+                             {thumbnailType === 'image' ? (
+                                 <div className="flex gap-6 items-start">
+                                     <div
+                                         className="w-64 h-36 border-2 border-dashed border-border rounded-xl bg-muted/40 flex flex-col items-center justify-center cursor-pointer hover:bg-muted hover:border-indigo-300 transition-colors overflow-hidden relative group shadow-sm"
+                                         onClick={() => thumbnailInputRef.current?.click()}
+                                     >
+                                         <input type="file" ref={thumbnailInputRef} onChange={handleThumbnailUpload} accept="image/*" className="hidden" />
+                                         {thumbnailPreview ? (
+                                             <>
+                                                 <img src={thumbnailPreview} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                                                 <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                     <p className="text-white text-sm font-bold flex items-center gap-2"><Upload size={16} /> Change Image</p>
+                                                 </div>
+                                             </>
+                                         ) : (
+                                             <div className="text-center p-4">
+                                                 <div className="w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-sm mx-auto mb-3">
+                                                     <ImageIcon size={20} className="text-muted-foreground/60" />
+                                                 </div>
+                                                 <p className="text-[13px] font-bold text-muted-foreground leading-tight">Click to upload image<br />(Max 5MB)</p>
+                                             </div>
+                                         )}
+                                     </div>
+                                     <div className="flex-1 bg-muted/40 p-4 rounded-xl border border-border">
+                                         <p className="text-[13px] font-semibold text-muted-foreground leading-relaxed">
+                                             Upload your course image here. It must meet our course image quality standards to be accepted.<br /><br />
+                                             Important guidelines: 750x422 pixels; .jpg, .jpeg, .gif, or .png. No text on the image.
+                                         </p>
+                                     </div>
+                                 </div>
+                             ) : (
+                                 <div>
+                                     <div className="flex flex-wrap gap-2 mb-3">
+                                         {EMOJI_OPTIONS.map(({ emoji, label }) => (
+                                             <button
+                                                 key={emoji}
+                                                 type="button"
+                                                 onClick={() => handleEmojiSelect(emoji)}
+                                                 className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center text-2xl transition-all ${
+                                                     selectedEmoji === emoji
+                                                         ? 'border-indigo-500 bg-indigo-50 shadow-sm scale-110'
+                                                         : 'border-border bg-muted/40 hover:border-indigo-300 hover:bg-muted'
+                                                 }`}
+                                                 title={label}
+                                             >
+                                                 {emoji}
+                                             </button>
+                                         ))}
+                                     </div>
+                                     {selectedEmoji && (
+                                         <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border">
+                                             <span className="text-3xl">{selectedEmoji}</span>
+                                             <span className="text-[13px] font-semibold text-muted-foreground">Emoji thumbnail selected</span>
+                                             <button type="button" onClick={() => { setSelectedEmoji(''); setThumbnailPreview(''); setThumbnailType('image'); }} className="ml-auto text-xs text-rose-500 hover:text-rose-700 font-bold">Remove</button>
+                                         </div>
+                                     )}
+                                     {!selectedEmoji && (
+                                         <p className="text-[13px] text-muted-foreground font-medium">Select an emoji to use as your course thumbnail. It will appear as a large icon on course cards and detail pages.</p>
+                                     )}
+                                 </div>
+                             )}
+                         </div>
 
-                        <div className="grid sm:grid-cols-2 gap-5 border-t border-border pt-6">
-                            <div>
-                                <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Est. Total Duration</label>
-                                <input type="text" name="duration" value={formData.duration} onChange={handleChange} className={InputClass} placeholder="e.g. 10 hours" />
-                            </div>
-                            <div className="flex items-center gap-3 pt-8">
-                                <input type="checkbox" id="cert" name="certificate" checked={formData.certificate} onChange={handleChange} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-border" />
-                                <label htmlFor="cert" className="text-[14px] font-semibold text-foreground/80 cursor-pointer">Offer Certificate on completion</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                         <div className="grid sm:grid-cols-2 gap-5 border-t border-border pt-6">
+                             <div>
+                                 <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Est. Total Duration</label>
+                                 <input type="text" name="duration" value={formData.duration} onChange={handleChange} className={InputClass} placeholder="e.g. 10 hours" />
+                             </div>
+                             <div className="flex items-center gap-3 pt-8">
+                                 <input type="checkbox" id="cert" name="certificate" checked={formData.certificate} onChange={handleChange} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-border" />
+                                 <label htmlFor="cert" className="text-[14px] font-semibold text-foreground/80 cursor-pointer">Offer Certificate on completion</label>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
 
                 {/* Curriculum Builder */}
                 <div className="bg-card border border-border shadow-sm rounded-2xl p-8">

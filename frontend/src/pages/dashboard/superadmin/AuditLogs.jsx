@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Search, Shield, UserX, BookOpen, CreditCard, MessageSquare, Filter } from 'lucide-react';
+import { Database, Search, Shield, UserX, BookOpen, MessageSquare, Filter } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -8,7 +8,6 @@ const ACTION_META = {
     COURSE_APPROVED: { color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: BookOpen, label: 'Course Approved' },
     USER_DEACTIVATED: { color: 'text-rose-600 bg-rose-50 border-rose-200', icon: UserX, label: 'User Deactivated' },
     REVIEW_DELETED: { color: 'text-amber-600 bg-amber-50 border-amber-200', icon: MessageSquare, label: 'Review Deleted' },
-    PLAN_UPDATED: { color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: CreditCard, label: 'Plan Updated' },
     USER_ROLE_CHANGED: { color: 'text-purple-600 bg-purple-50 border-purple-200', icon: Shield, label: 'Role Changed' },
 };
 

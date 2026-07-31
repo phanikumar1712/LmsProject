@@ -22,11 +22,6 @@ const createTables = async () => {
                 CREATE TYPE lesson_type AS ENUM ('video', 'document', 'quiz', 'text');
             EXCEPTION WHEN duplicate_object THEN null; END $$;
         `);
-        await client.query(`
-            DO $$ BEGIN
-                CREATE TYPE subscription_plan AS ENUM ('FREE', 'BASIC', 'PRO', 'ENTERPRISE');
-            EXCEPTION WHEN duplicate_object THEN null; END $$;
-        `);
 
         // ── USERS ──────────────────────────────────────────────────────────────
         await client.query(`
@@ -40,9 +35,6 @@ const createTables = async () => {
                 avatar      TEXT DEFAULT '',
                 bio         TEXT DEFAULT '',
                 active      BOOLEAN NOT NULL DEFAULT true,
-                subscription_plan subscription_plan NOT NULL DEFAULT 'FREE',
-                subscription_expiry DATE,
-                earnings    DECIMAL(10,2) DEFAULT 0,
                 current_streak INTEGER DEFAULT 0,
                 longest_streak INTEGER DEFAULT 0,
                 last_activity_date DATE,
@@ -86,8 +78,6 @@ const createTables = async () => {
                 instructor_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 category_id     UUID REFERENCES categories(id) ON DELETE SET NULL,
                 thumbnail       TEXT DEFAULT '',
-                price           DECIMAL(10,2) DEFAULT 0,
-                discount_price  DECIMAL(10,2),
                 level           VARCHAR(50) DEFAULT 'Beginner',
                 language        VARCHAR(50) DEFAULT 'English',
                 tags            TEXT[] DEFAULT '{}',
@@ -99,7 +89,6 @@ const createTables = async () => {
                 enrollment_count INT DEFAULT 0,
                 duration        VARCHAR(50) DEFAULT '0h',
                 certificate     BOOLEAN DEFAULT true,
-                required_plan   subscription_plan DEFAULT 'FREE',
                 created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
@@ -238,31 +227,6 @@ const createTables = async () => {
             );
         `);
 
-        // ── SUBSCRIPTION PLANS ────────────────────────────────────────────────
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS subscription_plans (
-                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                name        VARCHAR(100) UNIQUE NOT NULL,
-                price       DECIMAL(10,2) NOT NULL,
-                duration    INT NOT NULL DEFAULT 30,
-                features    TEXT[] DEFAULT '{}',
-                popular     BOOLEAN DEFAULT false,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
-        `);
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS subscription_plan_courses (
-                plan_id     UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,
-                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-                priority    INT NOT NULL DEFAULT 1,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                PRIMARY KEY (plan_id, course_id),
-                UNIQUE (plan_id, priority)
-            );
-        `);
-
         // ── INSTRUCTOR REQUESTS ───────────────────────────────────────────────
         await client.query(`
             CREATE TABLE IF NOT EXISTS instructor_requests (
@@ -332,7 +296,6 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(user_id, action, created_at DESC); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_at ON enrollments(enrolled_at); `);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_plan_courses_course ON subscription_plan_courses(course_id); `);
 
         // ── PERFORMANCE INDEXES (batch 2) ─────────────────────────────────────
         // Trigram indexes for ILIKE text search on courses and users.
@@ -360,30 +323,6 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_lessons_course_count ON lessons(course_id) WHERE course_id IS NOT NULL; `);
 
         // ── PATCH EXISTING DATABASES ──────────────────────────────────────────
-        await client.query(`
-            ALTER TABLE subscription_plans
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-        `);
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS subscription_plan_courses (
-                plan_id     UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,
-                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-                priority    INT NOT NULL DEFAULT 1,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                PRIMARY KEY (plan_id, course_id)
-            );
-        `);
-        await client.query(`
-            ALTER TABLE subscription_plan_courses
-            ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 1,
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-        `);
-        await client.query(`
-            ALTER TABLE users
-            ALTER COLUMN subscription_plan DROP DEFAULT,
-            ALTER COLUMN subscription_plan TYPE VARCHAR(100) USING subscription_plan::text,
-            ALTER COLUMN subscription_plan SET DEFAULT 'FREE';
-        `);
         await client.query(`
             ALTER TABLE enrollments
             ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
@@ -815,23 +754,12 @@ const createTables = async () => {
             WHERE email = 'admin@demo.com' AND department_id IS NULL;
         `);
 
-        // ── SEED SUBSCRIPTION PLANS ───────────────────────────────────────────
-        await client.query(`
-            INSERT INTO subscription_plans(name, price, duration, features, popular) VALUES
-            ('FREE', 0, 0, ARRAY['Access to free courses', 'Community support', 'Certificate on completion'], false),
-            ('BASIC', 9.99, 30, ARRAY['50+ Premium courses', 'HD Video quality', 'Certificate on completion', '1 course download'], false),
-            ('PRO', 19.99, 30, ARRAY['All BASIC features', 'Unlimited premium courses', 'Offline downloads', 'Priority support', 'Advanced analytics'], true),
-            ('ENTERPRISE', 49.99, 30, ARRAY['All PRO features', 'Team management', 'Custom LMS branding', 'API access', 'Dedicated account manager'], false)
-            ON CONFLICT(name) DO NOTHING;
-        `);
-
         // ── SEED DEFAULT SETTINGS ─────────────────────────────────────────────
         const defaultSettings = {
             siteName: 'EduNexus LMS',
             siteTagline: 'Learn Without Limits',
             supportEmail: 'support@edunexus.com',
             defaultCurrency: 'INR',
-            instructorRevenueShare: 70,
             maxUploadSizeMB: 500,
             requireApproval: true,
             maintenanceMode: false,

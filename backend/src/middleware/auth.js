@@ -14,7 +14,7 @@ const authenticate = async (req, res, next) => {
         const userId = decoded.userId || decoded.id;
         if (!userId) return res.status(401).json({ error: 'Invalid token payload' });
         const result = await query(
-            'SELECT id, name, email, role, avatar, bio, active, subscription_plan, subscription_expiry, earnings, department_id, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, role, avatar, bio, active, department_id, created_at FROM users WHERE id = $1',
             [userId]
         );
         if (!result.rows.length) {

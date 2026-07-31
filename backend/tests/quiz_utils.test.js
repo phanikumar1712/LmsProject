@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const {
     validateQuizPayload,
     serializeQuiz,
-    hasRequiredPlan,
     answersMatch,
 } = require('../src/utils/quiz');
 
@@ -56,10 +55,8 @@ test('multi-select grading is order independent and rejects extra choices', () =
     assert.equal(answersMatch(question, ['A', 'B', 'C']), false);
 });
 
-test('expired paid plans fall back to FREE access', () => {
-    assert.equal(hasRequiredPlan({ subscription_plan: 'PRO' }, 'BASIC'), true);
-    assert.equal(hasRequiredPlan({
-        subscription_plan: 'PRO',
-        subscription_expiry: '2000-01-01',
-    }, 'BASIC'), false);
+test('multi-select grading rejects extra choices beyond correct set', () => {
+    const question = { type: 'MCQ_MULTI', correctAnswer: ['A', 'B'] };
+    assert.equal(answersMatch(question, ['B', 'A']), true);
+    assert.equal(answersMatch(question, ['A', 'B', 'C']), false);
 });

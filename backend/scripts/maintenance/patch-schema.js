@@ -9,10 +9,6 @@ async function run() {
     const client = await pool.connect();
     try {
         await client.query(`
-            ALTER TABLE subscription_plans
-            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-        `);
-        await client.query(`
             ALTER TABLE enrollments
             ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
         `);

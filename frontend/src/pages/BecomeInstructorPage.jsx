@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    GraduationCap, CheckCircle, Users, BookOpen, DollarSign,
+    GraduationCap, CheckCircle, Users, BookOpen, Share2,
     Star, ArrowRight, Zap, Globe, Award, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +9,7 @@ import { usersAPI, statsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const BENEFITS = [
-    { icon: DollarSign, color: '#16a34a', bg: '#dcfce7', title: 'Earn Revenue', desc: 'Get up to 70% revenue share on every course sale. Build a passive income stream.' },
+    { icon: Share2, color: '#16a34a', bg: '#dcfce7', title: 'Share Your Knowledge', desc: 'Teach what you love and make a real impact on thousands of learners across the platform.' },
     { icon: Users, color: '#4f46e5', bg: '#e0e7ff', title: 'Reach Thousands', desc: 'Publish to our platform with 15,000+ active learners across 50+ countries.' },
     { icon: BookOpen, color: '#0891b2', bg: '#cffafe', title: 'Powerful Tools', desc: 'Use our curriculum builder, quiz maker, and analytics dashboard to create world-class courses.' },
     { icon: Star, color: '#d97706', bg: '#fef3c7', title: 'Build Your Brand', desc: 'Get a verified instructor badge and your own profile page to grow your reputation.' },
@@ -26,7 +26,6 @@ const REQUIREMENTS = [
 
 const FAQS = [
     { q: 'How long does approval take?', a: 'Our team reviews applications within 2–3 business days. You\'ll receive an email with the decision.' },
-    { q: 'How much can I earn?', a: 'Instructors earn up to 70% of course revenue. Top instructors on our platform earn ₹1,00,000+ per month.' },
     { q: 'Can I still be a student?', a: 'Yes! Your enrollments and progress stay on your account. After approval you teach as an instructor; use a separate student account if you also want the student learning dashboard.' },
     { q: 'What equipment do I need?', a: 'A decent microphone and screen recording software is a good start. We provide guides on production best practices.' },
 ];
@@ -133,24 +132,20 @@ export default function BecomeInstructorPage() {
                             <Zap size={14} fill="currentColor" /> Instructor Program
                         </div>
                         <h1 className="text-4xl font-extrabold mb-4 tracking-tight leading-tight">
-                            Share Your Knowledge,<br />Earn While You Teach
+                            Share Your Knowledge,<br />Inspire Thousands
                         </h1>
                         <p className="text-white/80 text-lg font-medium max-w-lg">
-                            Join {stats?.totalInstructors ? `${stats.totalInstructors}+` : '200+'} instructors teaching on EduNexus. Create courses, build your audience, and earn revenue doing what you love.
+                            Join {stats?.totalInstructors ? `${stats.totalInstructors}+` : '200+'} instructors teaching on EduNexus. Create courses, build your audience, and share what you love doing.
                         </p>
                     </div>
                     <div className="flex flex-col gap-4 bg-card/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 flex-shrink-0 min-w-[220px]">
                         <div className="text-center">
-                            <p className="text-4xl font-extrabold">₹1L+</p>
-                            <p className="text-white/70 text-sm font-medium">Top monthly earnings</p>
-                        </div>
-                        <div className="border-t border-white/20 pt-4 text-center">
                             <p className="text-3xl font-extrabold">{stats?.totalStudents ? `${(stats.totalStudents / 1000).toFixed(0)}K+` : '15K+'}</p>
                             <p className="text-white/70 text-sm font-medium">Active students</p>
                         </div>
                         <div className="border-t border-white/20 pt-4 text-center">
-                            <p className="text-3xl font-extrabold">70%</p>
-                            <p className="text-white/70 text-sm font-medium">Revenue share</p>
+                            <p className="text-3xl font-extrabold">100%</p>
+                            <p className="text-white/70 text-sm font-medium">Free to teach</p>
                         </div>
                     </div>
                 </div>

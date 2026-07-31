@@ -367,9 +367,6 @@ export const usersAPI = {
     toggleStatus: async (userId) =>
         http('PUT', `/users/${userId}/toggle-status`, {}, getToken()),
 
-    assignPlan: async (userId, plan) =>
-        http('PUT', `/users/${userId}/subscription`, { plan }, getToken()),
-
     delete: async (userId) =>
         http('DELETE', `/users/${userId}`, null, getToken()),
 
@@ -443,24 +440,6 @@ export const discussionsAPI = {
     deleteAnswer: async (id) => http('DELETE', `/discussions/answers/${id}`, null, getToken()),
     toggleUpvote: async (answerId) => http('POST', `/discussions/answers/${answerId}/upvote`, {}, getToken()),
     markBestAnswer: async (answerId) => http('PUT', `/discussions/answers/${answerId}/best-answer`, {}, getToken()),
-};
-
-// ─── SUBSCRIPTIONS ────────────────────────────────────────────────────────────
-export const subscriptionsAPI = {
-    getPlans: async () =>
-        http('GET', '/subscriptions/plans'),
-
-    upgrade: async (userId, planId) =>
-        http('POST', '/subscriptions/upgrade', { planId }, getToken()),
-
-    updatePlan: async (planId, data) =>
-        http('PUT', `/subscriptions/plans/${planId}`, data, getToken()),
-
-    createPlan: async (data) =>
-        http('POST', '/subscriptions/plans', data, getToken()),
-
-    deletePlan: async (planId) =>
-        http('DELETE', `/subscriptions/plans/${planId}`, null, getToken()),
 };
 
 // ─── ANNOUNCEMENTS ────────────────────────────────────────────────────────────

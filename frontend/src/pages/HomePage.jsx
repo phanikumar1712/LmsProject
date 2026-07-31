@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+import { CourseThumbnail } from '../components/ui/CourseThumbnail';
 // react-countup ships as CommonJS; under Vite's dep optimizer the default
 // import can resolve to the module namespace ({ default, useCountUp }) instead
 // of the component. Unwrap the interop so <CountUp> is always the component.
@@ -1053,9 +1054,9 @@ export default function HomePage() {
                                         viewport={{ once: true }}
                                         transition={{ delay: (i % 4) * 0.08 }}
                                         onClick={() => navigate(`/courses/${course.id}`)}
-                                    >
+>
                                         <div className="hp-card__thumb">
-                                            <img src={thumbnail} alt={course.title} loading="lazy" />
+                                            <CourseThumbnail thumbnail={thumbnail} title={course.title} />
                                             <div className="hp-card__play-overlay">
                                                 <div className="hp-card__play-btn">
                                                     <Play size={18} fill="currentColor" />

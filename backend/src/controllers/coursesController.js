@@ -4,20 +4,19 @@ const { mapCourse } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
 
 const courseFields = `
-    c.id, c.title, c.description, c.short_desc, c.thumbnail, 0 as price, NULL as discount_price,
+    c.id, c.title, c.description, c.short_desc, c.thumbnail,
     c.level, c.language, c.tags, c.what_you_learn, c.requirements,
     c.status, c.rating, c.review_count, c.enrollment_count, c.duration,
-    c.certificate, 'FREE' as required_plan, c.created_at, c.updated_at,
-    '{}'::text[] as "accessiblePlans",
+    c.certificate, c.created_at, c.updated_at,
     COALESCE(l_agg.lesson_count, 0)::int as "lessonsCount",
     u.id as "instructorId", u.name as "instructorName", u.avatar as "instructorAvatar", u.bio as "instructorBio",
-    u.role as "instructorRole", u.subscription_plan as "instructorPlan",
+    u.role as "instructorRole",
     u.created_at as "instructorJoined",
     cat.id as "categoryId", cat.name as "categoryName", cat.icon as "categoryIcon", cat.department_id as "departmentId",
     dept.name as "departmentName"
 `;
 
-// N+1 lateral join fragments — subscription_plan_courses is no longer used.
+// N+1 lateral join fragments.
 const courseJoins = `
     LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS lesson_count

@@ -4,6 +4,7 @@ import { coursesAPI, enrollmentsAPI, usersAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../../components/ui/Card';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 
 export default function AdminBulkEnrollment() {
@@ -95,12 +96,16 @@ export default function AdminBulkEnrollment() {
                     >
                         <option value="">Choose a course...</option>
                         {(courses || []).map(c => (
-                            <option key={c.id} value={c.id}>{c.title} (₹{c.discountPrice || c.price || 0})</option>
+                            <option key={c.id} value={c.id}>{c.title}</option>
                         ))}
                     </select>
                     {course && (
                         <div className="mt-3 flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl">
-                            {course.thumbnail && <img src={course.thumbnail} alt="" className="w-12 h-8 rounded-lg object-cover" />}
+                            {course.thumbnail ? (
+                                <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-12 h-8 rounded-lg object-cover" />
+                            ) : (
+                                <div className="w-12 h-8 rounded-lg bg-muted flex items-center justify-center text-lg">📚</div>
+                            )}
                             <div>
                                 <p className="font-bold text-sm">{course.title}</p>
                                 <p className="text-xs text-muted-foreground">{course.instructorName} • {course.lessonsCount} lessons</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Award, CheckCircle, Download, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Award, CheckCircle, Download, ExternalLink, ShieldCheck, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { certificatesAPI } from '../services/api';
 
@@ -21,7 +21,6 @@ export default function CertificateVerifyPage() {
     }, [certId]);
 
     const handleDownloadPDF = () => {
-        // Create a printer-friendly HTML page for the certificate
         const html = `
         <!DOCTYPE html>
         <html>
@@ -76,7 +75,6 @@ export default function CertificateVerifyPage() {
             <script>window.print();</script>
         </body>
         </html>`;
-
         const win = window.open('', '_blank');
         win.document.write(html);
         win.document.close();
@@ -89,8 +87,11 @@ export default function CertificateVerifyPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center p-4">
-                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+            <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-950 flex items-center justify-center p-4">
+                <div className="text-center">
+                    <div className="w-14 h-14 border-[4px] border-indigo-300/30 border-t-indigo-400 rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-indigo-300/70 font-medium">Verifying certificate...</p>
+                </div>
             </div>
         );
     }
@@ -104,7 +105,7 @@ export default function CertificateVerifyPage() {
                     </div>
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">Certificate Not Found</h1>
                     <p className="text-slate-500 mb-6">The certificate ID you provided is invalid or has been revoked.</p>
-                    <Link to="/" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors">
+                    <Link to="/" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
                         Return Home
                     </Link>
                 </div>
@@ -113,75 +114,64 @@ export default function CertificateVerifyPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-amber-50/30 flex items-center justify-center p-4 py-16">
-            <div className="w-full max-w-3xl">
-                {/* Verification Badge */}
-                <div className="flex items-center justify-center gap-2 mb-6 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-2xl px-6 py-3 shadow-sm mx-auto w-fit">
-                    <CheckCircle size={20} />
-                    <span className="font-bold text-sm">Verified — Authentic Certificate</span>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-amber-50 flex items-center justify-center p-4 py-16">
+            <div className="w-full max-w-3xl space-y-8">
+                <div className="flex items-center justify-center gap-2 mb-2 text-emerald-700 bg-emerald-50/80 backdrop-blur-sm border border-emerald-200 rounded-2xl px-6 py-3 shadow-sm mx-auto w-fit">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <CheckCircle size={18} className="text-emerald-600" />
+                    </div>
+                    <div>
+                        <span className="font-bold text-sm block">Verified — Authentic Certificate</span>
+                        <span className="text-[11px] text-emerald-500/70 font-medium">Issued by EduNexus LMS</span>
+                    </div>
                 </div>
 
-                {/* Certificate Card */}
-                <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 overflow-hidden" style={{ aspectRatio: '1.4' }}>
-                    {/* Gold top bar */}
-                    <div className="h-2 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400" />
-
+                <div className="relative bg-white rounded-3xl shadow-2xl border border-indigo-100 overflow-hidden transition-all hover:shadow-3xl duration-500" style={{ aspectRatio: '1.4' }}>
+                    <div className="h-2 bg-gradient-to-r from-amber-300 via-yellow-500 to-amber-300" />
                     <div className="p-8 md:p-12 text-center relative h-full flex flex-col">
-                        {/* Decorative corners */}
-                        <div className="absolute top-6 left-6 w-16 h-16 border-t-4 border-l-4 border-indigo-200 rounded-tl-xl" />
-                        <div className="absolute top-6 right-6 w-16 h-16 border-t-4 border-r-4 border-indigo-200 rounded-tr-xl" />
-                        <div className="absolute bottom-6 left-6 w-16 h-16 border-b-4 border-l-4 border-indigo-200 rounded-bl-xl" />
-                        <div className="absolute bottom-6 right-6 w-16 h-16 border-b-4 border-r-4 border-indigo-200 rounded-br-xl" />
-
-                        {/* Badge */}
-                        <div className="mx-auto w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-4 border-2 border-amber-200">
+                        <div className="absolute top-6 left-6 w-20 h-20 border-t-4 border-l-4 border-indigo-200 rounded-tl-xl" />
+                        <div className="absolute top-6 right-6 w-20 h-20 border-t-4 border-r-4 border-indigo-200 rounded-tr-xl" />
+                        <div className="absolute bottom-6 left-6 w-20 h-20 border-b-4 border-l-4 border-indigo-200 rounded-bl-xl" />
+                        <div className="absolute bottom-6 right-6 w-20 h-20 border-b-4 border-r-4 border-indigo-200 rounded-br-xl" />
+                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
+                            backgroundImage: `radial-gradient(circle at 25px 25px, #4f46e5 2px, transparent 0)`,
+                            backgroundSize: '50px 50px'
+                        }} />
+                        <div className="relative mx-auto w-20 h-20 bg-gradient-to-br from-amber-50 to-amber-100 rounded-full flex items-center justify-center mb-4 border-2 border-amber-200 shadow-sm">
                             <Award size={40} className="text-amber-600" />
                         </div>
-
-                        <div className="text-xs font-bold text-indigo-600 uppercase tracking-[6px] mb-2">
-                            Certificate of Completion
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-1 font-serif">
-                            EduNexus LMS
-                        </h1>
-                        <p className="text-sm text-slate-400 uppercase tracking-[4px] mb-6">
-                            Proudly Presents
-                        </p>
-
-                        <div className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 font-serif tracking-tight">
-                            {cert.student_name}
-                        </div>
-
-                        <p className="text-slate-500 text-sm mb-2">For completing the course</p>
-                        <p className="text-xl md:text-2xl font-bold text-indigo-700 mb-4">
-                            {cert.course_title}
-                        </p>
-                        <p className="text-slate-500 text-sm">
-                            Instructed by <span className="font-semibold text-slate-700">{cert.instructor_name}</span>
-                        </p>
-
-                        <div className="mt-auto pt-4 flex items-center justify-between text-xs text-slate-400">
+                        <div className="relative text-xs font-bold text-indigo-600 uppercase tracking-[6px] mb-2">Certificate of Completion</div>
+                        <h1 className="relative text-2xl md:text-3xl font-bold text-slate-800 mb-1 font-serif">EduNexus LMS</h1>
+                        <p className="relative text-sm text-slate-400 uppercase tracking-[4px] mb-6">Proudly Presents</p>
+                        <div className="relative text-3xl md:text-4xl font-bold text-slate-900 mb-4 font-serif tracking-tight">{cert.student_name}</div>
+                        <p className="relative text-slate-500 text-sm mb-2">For completing the course</p>
+                        <p className="relative text-xl md:text-2xl font-bold text-indigo-700 mb-4">{cert.course_title}</p>
+                        <p className="relative text-slate-500 text-sm">Instructed by <span className="font-semibold text-slate-700">{cert.instructor_name}</span></p>
+                        <div className="relative mt-auto pt-4 flex items-center justify-between text-xs text-slate-400">
                             <span>Issued: {new Date(cert.issue_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                             <span className="font-mono">ID: {cert.cert_id}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                     <button onClick={handleDownloadPDF}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200">
+                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-indigo-200 active:scale-[0.98]">
                         <Download size={16} /> Download PDF
                     </button>
                     <button onClick={handleLinkedInShare}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-200">
-                        <ExternalLink size={16} /> Add to LinkedIn Profile
+                        className="flex items-center gap-2 bg-[#0A66C2] hover:bg-[#004182] text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-blue-200 active:scale-[0.98]">
+                        <ExternalLink size={16} /> Add to LinkedIn
                     </button>
                     <button onClick={() => { navigator.clipboard.writeText(verificationUrl); toast.success('Verification link copied!'); }}
-                        className="flex items-center gap-2 bg-card border border-border text-foreground px-6 py-3 rounded-xl font-bold text-sm hover:bg-muted transition-all shadow-sm">
-                        <ExternalLink size={16} /> Copy Verify Link
+                        className="flex items-center gap-2 bg-white border-2 border-border text-foreground px-6 py-3 rounded-2xl font-bold text-sm hover:bg-muted transition-all shadow-sm active:scale-[0.98]">
+                        <Share2 size={16} /> Copy Link
                     </button>
                 </div>
+
+                <p className="text-center text-xs text-slate-400 font-medium">
+                    EduNexus LMS — Verified Digital Certificate
+                </p>
             </div>
         </div>
     );

@@ -4,7 +4,7 @@
  * @param {boolean} active
  * @param {object[]} payload
  * @param {string} label
- * @param {string} [prefix]  - value prefix, e.g. '₹'
+ * @param {string} [prefix]  - value prefix
  * @param {string} [suffix]  - value suffix, e.g. 'students'
  */
 export function ChartTooltip({ active, payload, label, prefix = '', suffix = '' }) {

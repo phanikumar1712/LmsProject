@@ -4,6 +4,7 @@ import {
     Layers, BookOpen, Users, TrendingUp, ArrowLeft, ExternalLink, CheckCircle2,
 } from 'lucide-react';
 import { statsAPI, coursesAPI } from '../../../services/api';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 
@@ -164,12 +165,12 @@ export default function CategoryDetail() {
                                 to={`/courses/${course.id}`}
                                 className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group"
                             >
-                                {course.thumbnail ? (
-                                    <img src={course.thumbnail} alt={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
-                                ) : (
-                                    <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                        {course.title?.charAt(0)}
-                                    </div>
+{course.thumbnail ? (
+                                     <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                 ) : (
+                                     <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                         {course.title?.charAt(0)}
+                                     </div>
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">

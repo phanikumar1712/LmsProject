@@ -12,5 +12,6 @@ export * from './ChartComponents';
 export * from './ProgressBar';
 export * from './RatingStars';
 export * from './CourseCard';
+export * from './CourseThumbnail';
 export * from './NotificationBell';
 export * from './button';

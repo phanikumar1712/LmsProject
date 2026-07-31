@@ -1,22 +1,5 @@
 /** Shared API response normalizers (snake_case DB → camelCase frontend) */
 
-const VALID_PLANS = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-
-const normalizePlan = (plan) => {
-    if (!plan) return 'FREE';
-    const p = String(plan).toUpperCase();
-    if (p === 'PREMIUM') return 'PRO';
-    if (p === 'BASE') return 'BASIC';
-    return VALID_PLANS.includes(p) ? p : 'FREE';
-};
-
-const normalizeUserPlan = (plan) => {
-    if (!plan) return 'FREE';
-    const p = String(plan).toUpperCase();
-    const normalized = normalizePlan(p);
-    return normalized !== 'FREE' || p === 'FREE' ? normalized : p.replace(/[^A-Z0-9_]/g, '_');
-};
-
 const toNumberOrNull = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
@@ -27,8 +10,6 @@ const mapUser = (u) => {
     if (!u) return u;
     return {
         ...u,
-        subscriptionPlan: normalizeUserPlan(u.subscription_plan || u.subscriptionPlan),
-        subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
         currentStreak: parseInt(u.current_streak ?? u.currentStreak ?? 0),
         longestStreak: parseInt(u.longest_streak ?? u.longestStreak ?? 0),
         departmentId: u.department_id ?? u.departmentId ?? null,
@@ -45,16 +26,12 @@ const mapDepartment = (d) => ({
 
 const mapCourse = (c) => ({
     ...c,
-    price: toNumberOrNull(c.price) ?? 0,
     shortDesc: c.short_desc,
-    discountPrice: toNumberOrNull(c.discount_price),
     learningOutcomes: c.what_you_learn || [],
     prerequisites: c.requirements || [],
     reviewCount: c.review_count,
     enrollmentCount: c.enrollment_count,
     certificate: c.certificate,
-    requiredPlan: normalizePlan(c.required_plan || c.requiredPlan),
-    accessiblePlans: c.accessiblePlans || c.accessible_plans || [],
     lessonsCount: parseInt(c.lessonsCount ?? c.lessons_count ?? 0, 10) || 0,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
@@ -65,8 +42,6 @@ const mapCourse = (c) => ({
     departmentName: c.departmentName,
     instructorBio: c.instructorBio,
     instructorRole: c.instructorRole,
-    instructorEarnings: c.instructorEarnings,
-    instructorPlan: normalizePlan(c.instructorPlan),
     instructorJoined: c.instructorJoined,
 });
 
@@ -136,7 +111,6 @@ const mapRating = (r) => ({
 });
 
 module.exports = {
-    normalizePlan,
     mapUser,
     mapCourse,
     mapCategory,
@@ -146,5 +120,4 @@ module.exports = {
     mapNotification,
     mapQuizAttempt,
     mapRating,
-    VALID_PLANS,
 };

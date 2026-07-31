@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Mail, CreditCard, Shield, Bell, AlertTriangle, Loader2 } from 'lucide-react';
+import { Settings, Save, Globe, Mail, Shield, Bell, AlertTriangle, Loader2 } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
 const SECTIONS = [
     { id: 'general', label: 'General', icon: Globe },
     { id: 'email', label: 'Email', icon: Mail },
-    { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
@@ -100,20 +99,6 @@ export default function PlatformSettings() {
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-5">
                                     <div>
-                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Default Currency</label>
-                                        <select className={inputCls} value={settings.defaultCurrency} onChange={e => update('defaultCurrency', e.target.value)}>
-                                            <option value="INR">INR (₹)</option>
-                                            <option value="USD">USD ($)</option>
-                                            <option value="EUR">EUR (€)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Instructor Revenue Share (%)</label>
-                                        <input type="number" className={inputCls} value={settings.instructorRevenueShare} min={0} max={100} onChange={e => update('instructorRevenueShare', e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="grid sm:grid-cols-2 gap-5">
-                                    <div>
                                         <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Max Upload Size (MB)</label>
                                         <input type="number" className={inputCls} value={settings.maxUploadSizeMB} onChange={e => update('maxUploadSizeMB', e.target.value)} />
                                     </div>
@@ -177,28 +162,6 @@ export default function PlatformSettings() {
                                 <button className="px-4 py-2.5 bg-muted hover:bg-muted text-foreground/80 rounded-xl font-bold text-sm transition-colors">
                                     Send Test Email
                                 </button>
-                            </div>
-                        </>
-                    )}
-
-                    {active === 'payments' && (
-                        <>
-                            <h2 className="text-lg font-extrabold text-foreground border-b border-border pb-4">Payment Gateways</h2>
-                            <div className="space-y-5">
-                                {[
-                                    { key: 'razorpayEnabled', label: 'Razorpay', desc: 'Accept UPI, cards, and net banking via Razorpay' },
-                                    { key: 'stripeEnabled', label: 'Stripe', desc: 'Accept international cards via Stripe' },
-                                ].map(({ key, label, desc }) => (
-                                    <div key={key} className="flex items-center justify-between p-5 border border-border rounded-xl">
-                                        <div>
-                                            <p className="text-foreground font-bold">{label}</p>
-                                            <p className="text-muted-foreground text-sm font-medium">{desc}</p>
-                                        </div>
-                                        <div onClick={() => update(key, !settings[key])} className={`w-11 h-6 rounded-full transition-colors cursor-pointer ${settings[key] ? 'bg-indigo-600' : 'bg-muted'}`}>
-                                            <div className={`w-5 h-5 bg-card rounded-full shadow-sm transform transition-transform m-0.5 ${settings[key] ? 'translate-x-5' : 'translate-x-0'}`} />
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         </>
                     )}

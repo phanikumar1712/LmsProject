@@ -90,7 +90,6 @@ const login = async (email, password, role) => {
     await test('GET /api/stats/public', 'GET', '/stats/public');
     await test('GET /api/courses (public)', 'GET', '/courses');
     await test('GET /api/departments/public', 'GET', '/departments/public');
-    await test('GET /api/subscriptions/plans', 'GET', '/subscriptions/plans');
     await test('GET /api/stats/categories', 'GET', '/stats/categories');
     await test('POST /api/auth/register', 'POST', '/auth/register', {
         body: { name: 'Test Route User', email: `route.test.${Date.now()}@demo.com`, password: 'test1234', role: 'STUDENT' },
@@ -124,9 +123,6 @@ const login = async (email, password, role) => {
 
     // Departments
     await test('GET /api/departments', 'GET', '/departments', { token: superAdminToken });
-
-    // Subscriptions
-    await test('GET /api/subscriptions/plans (SA)', 'GET', '/subscriptions/plans', { token: superAdminToken });
 
     // Courses
     await test('GET /api/courses?admin=true (SA)', 'GET', '/courses?admin=true', { token: superAdminToken });

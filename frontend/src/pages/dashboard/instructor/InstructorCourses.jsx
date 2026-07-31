@@ -5,6 +5,7 @@ import { coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SkeletonCard } from '../../../components/ui/CourseCard';
 import { RatingDisplay } from '../../../components/ui/RatingStars';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 
 export default function InstructorCourses() {
@@ -84,7 +85,7 @@ export default function InstructorCourses() {
                     filteredCourses.map(course => (
                         <div key={course.id} className="bg-card border border-border shadow-sm rounded-2xl overflow-hidden group flex flex-col hover:shadow-md transition-shadow">
                             <div className="relative h-44 overflow-hidden">
-                                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                 <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors" />
                                 <span className={`absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${course.status === 'PUBLISHED' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' : course.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400' : 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400'}`}>
                                     {course.status}

@@ -5,6 +5,7 @@ import { ProgressBar } from './ProgressBar';
 import { RatingDisplay } from './RatingStars';
 import { useAuth } from '../../contexts/AuthContext';
 import { wishlistAPI } from '../../services/api';
+import { CourseThumbnail } from './CourseThumbnail';
 import toast from 'react-hot-toast';
 
 const LEVEL_COLORS = {
@@ -49,15 +50,10 @@ export function CourseCard({ course, enrollment }) {
             tabIndex={0}
             aria-label={`Course: ${course.title}`}
         >
-            {/* Thumbnail */}
-            <div className="relative overflow-hidden aspect-video">
-                <img
-                    src={course.thumbnail}
-                    alt={course.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                />
-                {/* Badges */}
+{/* Thumbnail */}
+             <div className="relative overflow-hidden aspect-video">
+                 <CourseThumbnail thumbnail={course.thumbnail} title={course.title} />
+                 {/* Badges */}
                 <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider ${LEVEL_COLORS[course.level] || 'bg-indigo-100 text-indigo-800'}`}>{course.level}</span>
                     {course.status === 'PENDING' && <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider">Pending Review</span>}

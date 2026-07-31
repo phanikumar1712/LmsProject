@@ -3,7 +3,7 @@ const { createError } = require('../middleware/errorHandler');
 const { mapUser, mapEnrollment, mapInstructorRequest } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
 
-const safeUserFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, department_id, roll_no, created_at`;
+const safeUserFields = `id, name, email, role, phone, avatar, bio, active, department_id, roll_no, created_at`;
 
 const MAX_IMPORT_ROWS = 500;
 
@@ -198,22 +198,6 @@ const toggleStatus = async (req, res) => {
     res.json(mapUser(result.rows[0]));
 };
 
-// PUT /api/users/:id/subscription
-const assignPlan = async (req, res) => {
-    const { plan } = req.body;
-    const { normalizePlan, VALID_PLANS } = require('../utils/formatters');
-    const normalized = normalizePlan(plan);
-    if (!VALID_PLANS.includes(normalized)) throw createError('Invalid plan', 400);
-
-    const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const result = await query(
-        `UPDATE users SET subscription_plan = $1, subscription_expiry = $2, updated_at = NOW() WHERE id = $3 RETURNING ${safeUserFields}`,
-        [normalized, expiry, req.params.id]
-    );
-    if (!result.rows.length) throw createError('User not found', 404);
-    res.json(mapUser(result.rows[0]));
-};
-
 // DELETE /api/users/:id
 const deleteUser = async (req, res) => {
     if (req.params.id === req.user.id) throw createError('Cannot delete your own account', 400);
@@ -318,7 +302,7 @@ const getInstructorProfile = async (req, res) => {
     // Get instructor's courses
     const { mapCourse } = require('../utils/formatters');
     const instructorCoursesFields = `
-        c.id, c.title, c.thumbnail, c.price, c.discount_price,
+        c.id, c.title, c.thumbnail,
         c.level, c.rating, c.review_count, c.enrollment_count, c.duration,
         u.name as "instructorName", u.avatar as "instructorAvatar"
     `;
@@ -831,7 +815,7 @@ const getById = async (req, res) => {
 };
 
 module.exports = {
-    getAll, getById, updateRole, resetUserPassword, toggleStatus, assignPlan, deleteUser,
+    getAll, getById, updateRole, resetUserPassword, toggleStatus, deleteUser,
     submitInstructorRequest, getInstructorRequests, approveInstructorRequest,
     getInstructorProfile, followInstructor, unfollowInstructor, inviteAdmin,
     createInstructor, importInstructors, importStudents,

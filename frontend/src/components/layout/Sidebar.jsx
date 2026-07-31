@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-    LayoutDashboard, BookOpen, Award, CreditCard, BarChart2, Users, Settings,
+    LayoutDashboard, BookOpen, Award, BarChart2, Users, Settings,
     ShieldCheck, Layers, GraduationCap, PlusCircle, Star, Activity, Database,
     ChevronLeft, LogOut, ClipboardList, MessageSquare, BarChart3, Heart, User,
     Building2, Zap, Megaphone, UserPlus, TrendingUp,
@@ -14,7 +14,6 @@ const STUDENT_NAV = [
     { to: '/student/wishlist', icon: Heart, label: 'Wishlist' },
     { to: '/student/quizzes', icon: ClipboardList, label: 'My Quizzes' },
     { to: '/student/certificates', icon: Award, label: 'Certificates' },
-    { to: '/student/subscription', icon: CreditCard, label: 'Subscription' },
     { to: '/announcements', icon: Megaphone, label: 'Announcements' },
     { to: '/courses', icon: GraduationCap, label: 'Browse Courses' },
     { to: '/become-instructor', icon: Star, label: 'Become Instructor' },

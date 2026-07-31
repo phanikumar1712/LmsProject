@@ -7,8 +7,6 @@ const AuthContext = createContext(null);
 // Normalize snake_case DB fields to camelCase for frontend
 const mapUser = (u) => ({
     ...u,
-    subscriptionPlan: u.subscription_plan || u.subscriptionPlan || 'FREE',
-    subscriptionExpiry: u.subscription_expiry || u.subscriptionExpiry || null,
     currentStreak: u.current_streak || u.currentStreak || 0,
     longestStreak: u.longest_streak || u.longestStreak || 0,
     departmentId: u.department_id ?? u.departmentId ?? null,

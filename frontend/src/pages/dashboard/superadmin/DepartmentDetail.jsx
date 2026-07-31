@@ -6,6 +6,7 @@ import {
     UserCheck, Eye, ExternalLink, Gauge, Plus, X, Mail, Lock, User
 } from 'lucide-react';
 import { statsAPI, usersAPI, coursesAPI, departmentsAPI } from '../../../services/api';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -375,12 +376,12 @@ function CoursesTab({ dept }) {
             <div className="divide-y divide-border max-h-96 overflow-y-auto">
                 {courses.slice(0, 50).map(course => (
                     <Link key={course.id} to={`/courses/${course.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
-                        {course.thumbnail ? (
-                            <img src={course.thumbnail} alt={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
-                        ) : (
-                            <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {course.title?.charAt(0)}
-                            </div>
+{course.thumbnail ? (
+                                 <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                             ) : (
+                                 <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                     {course.title?.charAt(0)}
+                                 </div>
                         )}
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">
@@ -394,11 +395,6 @@ function CoursesTab({ dept }) {
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${statusColors[course.status] || 'bg-muted text-muted-foreground'}`}>
                                 {course.status}
                             </span>
-                            {course.price > 0 && (
-                                <span className="text-xs font-bold text-foreground/80">
-                                    ₹{course.discount_price || course.price}
-                                </span>
-                            )}
                         </div>
                     </Link>
                 ))}

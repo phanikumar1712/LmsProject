@@ -21,16 +21,15 @@ router.get('/instructors/template', authenticate, authorize('ADMIN', 'SUPER_ADMI
 router.get('/students/template', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.downloadStudentTemplate));
 router.post('/instructors/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importInstructors));
 router.post('/students/import', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), importLimiter, uploadSheet.single('file'), asyncHandler(ctrl.importStudents));
+router.post('/instructor-request', authenticate, asyncHandler(ctrl.submitInstructorRequest));
+router.get('/instructor-requests', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getInstructorRequests));
+router.put('/instructor-requests/:id/approve', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.approveInstructorRequest));
+
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAll));
 router.get('/:id', authenticate, authorize('INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getById));
 router.put('/:id/role', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.updateRole));
 router.put('/:id/reset-password', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.resetUserPassword));
 router.put('/:id/toggle-status', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.toggleStatus));
-router.put('/:id/subscription', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.assignPlan));
 router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.deleteUser));
-
-router.post('/instructor-request', authenticate, asyncHandler(ctrl.submitInstructorRequest));
-router.get('/instructor-requests', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getInstructorRequests));
-router.put('/instructor-requests/:id/approve', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.approveInstructorRequest));
 
 module.exports = router;

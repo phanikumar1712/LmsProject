@@ -18,7 +18,7 @@ const getPlatform = async (req, res) => {
     // course's category.department_id.
     const timeWin = `AND ($2::timestamptz IS NULL OR e.enrolled_at >= $2) AND ($3::timestamptz IS NULL OR e.enrolled_at <= $3)`;
 
-    const [users, courses, enrollments, revenue, premiumSubs, avgRatingQuery] = await Promise.all([
+    const [users, courses, enrollments, avgRatingQuery] = await Promise.all([
         query(`SELECT COUNT(*) FROM users WHERE ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
         query(`SELECT COUNT(*) as total,
                       COUNT(*) FILTER (WHERE c.status='PUBLISHED') as published,
@@ -30,8 +30,6 @@ const getPlatform = async (req, res) => {
                JOIN courses c ON e.course_id = c.id
                LEFT JOIN categories cat ON c.category_id = cat.id
                WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
-        query(`SELECT 0 as total`, []),
-        query(`SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE' AND ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
         query(`SELECT ROUND(AVG(r.stars)::numeric, 1) as avg_rating FROM ratings r
                JOIN courses c ON r.course_id = c.id
                LEFT JOIN categories cat ON c.category_id = cat.id
@@ -43,7 +41,7 @@ const getPlatform = async (req, res) => {
     const [usersByRoleQuery, monthlyStatsQuery, topCatQuery] = await Promise.all([
         query(`SELECT role, COUNT(*) as count FROM users WHERE ($1::uuid IS NULL OR department_id = $1) GROUP BY role`, [deptId]),
         query(`
-            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count, 0 as revenue
+            SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count
             FROM enrollments e JOIN courses c ON e.course_id = c.id
             LEFT JOIN categories cat ON c.category_id = cat.id
             WHERE e.enrolled_at >= NOW() - INTERVAL '6 months'
@@ -61,17 +59,8 @@ const getPlatform = async (req, res) => {
         `, p),
     ]);
     const usersByRole = usersByRoleQuery.rows.map(r => ({ role: r.role, count: parseInt(r.count) }));
-    const monthlyRevenue = monthlyStatsQuery.rows.map(r => ({ month: r.month, revenue: parseFloat(r.revenue) }));
     const enrollmentsByMonth = monthlyStatsQuery.rows.map(r => ({ month: r.month, count: parseInt(r.count) }));
     const topCategories = topCatQuery.rows.map(r => ({ name: r.name, enrollments: parseInt(r.enrollments) }));
-
-    let revenueGrowth = 0;
-    if (monthlyRevenue.length >= 2) {
-        const curr = monthlyRevenue[monthlyRevenue.length - 1].revenue;
-        const prev = monthlyRevenue[monthlyRevenue.length - 2].revenue;
-        if (prev > 0) revenueGrowth = Math.round(((curr - prev) / prev) * 100);
-        else if (curr > 0) revenueGrowth = 100;
-    }
 
     let studentGrowth = 0;
     if (enrollmentsByMonth.length >= 2) {
@@ -84,18 +73,14 @@ const getPlatform = async (req, res) => {
     res.json({
         totalUsers: usersCount,
         activeStudents: Math.floor(usersCount * 0.8),
-        premiumSubscribers: parseInt(premiumSubs.rows[0].count),
         avgRating: parseFloat(avgRatingQuery.rows[0].avg_rating) || 0,
         totalCourses: parseInt(courses.rows[0].total),
         approvedCourses: parseInt(courses.rows[0].published),
         pendingCourses: parseInt(courses.rows[0].pending),
         totalEnrollments: parseInt(enrollments.rows[0].count),
-        totalRevenue: 0,
         usersByRole,
-        monthlyRevenue,
         enrollmentsByMonth,
         topCategories,
-        revenueGrowth: 0,
         studentGrowth,
         platformGrowth: studentGrowth // Proxy for platform growth
     });
@@ -108,18 +93,17 @@ const getInstructor = async (req, res) => {
         throw createError('Forbidden', 403);
     }
 
-    const [courses, enrollments, ratings, user] = await Promise.all([
+    const [courses, enrollments, ratings] = await Promise.all([
         query(`SELECT COUNT(*) as total,
                       COUNT(*) FILTER (WHERE status='PUBLISHED') as published,
                       COUNT(*) FILTER (WHERE status='PENDING') as pending
                FROM courses WHERE instructor_id = $1`, [instructorId]),
         query(`SELECT COUNT(*) FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE c.instructor_id = $1`, [instructorId]),
         query(`SELECT ROUND(AVG(r.stars)::numeric,1) as avg_rating FROM ratings r JOIN courses c ON r.course_id = c.id WHERE c.instructor_id = $1`, [instructorId]),
-        query('SELECT earnings FROM users WHERE id = $1', [instructorId]),
     ]);
 
-    const monthlyEarningsQuery = query(`
-        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, 0 as revenue
+    const monthlyEnrollmentsQuery = query(`
+        SELECT TO_CHAR(e.enrolled_at, 'Mon') as month, COUNT(e.id) as count
         FROM enrollments e JOIN courses c ON e.course_id = c.id
         WHERE c.instructor_id = $1 AND e.enrolled_at >= NOW() - INTERVAL '6 months'
         GROUP BY TO_CHAR(e.enrolled_at, 'Mon'), DATE_TRUNC('month', e.enrolled_at)
@@ -128,8 +112,7 @@ const getInstructor = async (req, res) => {
 
     const thisMonthQuery = query(`
         SELECT 
-            COUNT(e.id) as enrollments,
-            0 as earnings
+            COUNT(e.id) as enrollments
         FROM enrollments e 
         JOIN courses c ON e.course_id = c.id 
         WHERE c.instructor_id = $1 AND e.enrolled_at >= DATE_TRUNC('month', NOW())
@@ -139,8 +122,8 @@ const getInstructor = async (req, res) => {
         SELECT COUNT(*) FROM courses WHERE instructor_id = $1 AND created_at >= DATE_TRUNC('month', NOW())
     `, [instructorId]);
 
-    const [monthlyEarnings, thisMonth, newCourses] = await Promise.all([
-        monthlyEarningsQuery, thisMonthQuery, newCoursesThisMonthQuery
+    const [monthlyEnrollments, thisMonth, newCourses] = await Promise.all([
+        monthlyEnrollmentsQuery, thisMonthQuery, newCoursesThisMonthQuery
     ]);
 
     res.json({
@@ -149,11 +132,9 @@ const getInstructor = async (req, res) => {
         pendingCourses: parseInt(courses.rows[0].pending),
         totalEnrollments: parseInt(enrollments.rows[0].count),
         avgRating: parseFloat(ratings.rows[0].avg_rating) || 0,
-        earnings: parseFloat(user.rows[0]?.earnings) || 0,
-        monthlyEarnings: monthlyEarnings.rows.map(r => ({ month: r.month, revenue: parseFloat(r.revenue) })),
+        monthlyEnrollments: monthlyEnrollments.rows.map(r => ({ month: r.month, count: parseInt(r.count) })),
         thisMonth: {
             enrollments: parseInt(thisMonth.rows[0].enrollments),
-            earnings: parseFloat(thisMonth.rows[0].earnings),
             newCourses: parseInt(newCourses.rows[0].count)
         }
     });
@@ -639,7 +620,7 @@ const updatePlatformSettings = async (req, res) => {
 const MAX_IMPORT_ROWS = 500;
 
 // GET /api/stats/departments — SUPER_ADMIN overview of every department with
-// aggregated user, course, enrollment, revenue, and rating data in one query.
+// aggregated user, course, enrollment, and rating data in one query.
 const getDepartmentsStats = async (req, res) => {
     const result = await query(`
         SELECT
@@ -655,7 +636,6 @@ const getDepartmentsStats = async (req, res) => {
             COALESCE(c_agg.published, 0)::int       AS "coursePublished",
             COALESCE(c_agg.pending, 0)::int         AS "coursePending",
             COALESCE(e_agg.enrollments, 0)::int     AS "totalEnrollments",
-            COALESCE(e_agg.revenue, 0)::float       AS "totalRevenue",
             COALESCE(r_agg.avg_rating, 0)::float    AS "avgRating",
             COALESCE(cat_agg.category_count, 0)::int AS "categoryCount"
         FROM departments d
@@ -681,7 +661,7 @@ const getDepartmentsStats = async (req, res) => {
         ) c_agg ON c_agg.department_id = d.id
         LEFT JOIN (
             SELECT cat.department_id,
-                   COUNT(e.id)                                                      AS enrollments,                    0          AS revenue
+                   COUNT(e.id)                                                      AS enrollments
             FROM enrollments e
             JOIN courses c2 ON e.course_id = c2.id
             JOIN categories cat ON c2.category_id = cat.id
@@ -724,8 +704,6 @@ const getAiReport = async (req, res) => {
                 (SELECT COUNT(*) FROM users) as total_users,
                 (SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED') as published_courses,
                 (SELECT COUNT(*) FROM enrollments) as total_enrollments,
-                (SELECT 0) as total_revenue,
-                (SELECT COUNT(*) FROM users WHERE subscription_plan != 'FREE') as premium_subs,
                 (SELECT COUNT(*) FROM courses WHERE status = 'PENDING') as pending_courses,
                 (SELECT COUNT(*) FROM departments) as total_departments
         `),
@@ -763,11 +741,11 @@ const getAiReport = async (req, res) => {
             SELECT d.name,
                    COALESCE(u_agg.users, 0)::int as users,
                    COALESCE(c_agg.courses, 0)::int as courses,
-                   COALESCE(e_agg.enrollments, 0)::int as enrollments,                    0 as revenue
+                   COALESCE(e_agg.enrollments, 0)::int as enrollments
             FROM departments d
             LEFT JOIN (SELECT department_id, COUNT(*) as users FROM users WHERE department_id IS NOT NULL GROUP BY department_id) u_agg ON u_agg.department_id = d.id
             LEFT JOIN (SELECT cat.department_id, COUNT(*) as courses FROM courses c JOIN categories cat ON c.category_id = cat.id WHERE c.status = 'PUBLISHED' AND cat.department_id IS NOT NULL GROUP BY cat.department_id) c_agg ON c_agg.department_id = d.id
-            LEFT JOIN (SELECT cat.department_id, COUNT(e.id) as enrollments, COALESCE(SUM(COALESCE(c2.discount_price, c2.price)), 0) as revenue FROM enrollments e JOIN courses c2 ON e.course_id = c2.id JOIN categories cat ON c2.category_id = cat.id WHERE cat.department_id IS NOT NULL GROUP BY cat.department_id) e_agg ON e_agg.department_id = d.id
+            LEFT JOIN (SELECT cat.department_id, COUNT(e.id) as enrollments FROM enrollments e JOIN courses c2 ON e.course_id = c2.id JOIN categories cat ON c2.category_id = cat.id WHERE cat.department_id IS NOT NULL GROUP BY cat.department_id) e_agg ON e_agg.department_id = d.id
             ORDER BY e_agg.enrollments DESC
         `),
         query(`
@@ -775,7 +753,6 @@ const getAiReport = async (req, res) => {
                 (SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days') as new_users_30d,
                 (SELECT COUNT(*) FROM courses WHERE created_at >= NOW() - INTERVAL '30 days') as new_courses_30d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '30 days') as new_enrollments_30d,
-                (SELECT 0) as revenue_30d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '7 days') as enrollments_7d,
                 (SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '14 days' AND enrolled_at < NOW() - INTERVAL '7 days') as enrollments_prev_7d
         `)
@@ -810,7 +787,6 @@ const getAiReport = async (req, res) => {
                 newUsers: parseInt(growth.new_users_30d),
                 newCourses: parseInt(growth.new_courses_30d),
                 newEnrollments: parseInt(growth.new_enrollments_30d),
-                revenue: parseFloat(growth.revenue_30d),
             }
         },
         platform,
@@ -841,8 +817,7 @@ const getAiReport = async (req, res) => {
             name: d.name,
             users: parseInt(d.users),
             courses: parseInt(d.courses),
-            enrollments: parseInt(d.enrollments),
-            revenue: parseFloat(d.revenue)
+            enrollments: parseInt(d.enrollments)
         })),
         insights: [],
         recommendations: []
@@ -855,25 +830,6 @@ const getAiReport = async (req, res) => {
             title: 'Conversion Rate',
             value: `${Math.round((parseInt(platform.total_enrollments) / parseInt(platform.total_users)) * 100)}%`,
             detail: `${platform.total_enrollments} enrollments from ${platform.total_users} users`
-        });
-    }
-
-    if (platform.total_revenue > 0 && platform.total_enrollments > 0) {
-        report.insights.push({
-            type: 'metric',
-            title: 'Avg Revenue Per Enrollment',
-            value: `₹${Math.round(parseFloat(platform.total_revenue) / parseInt(platform.total_enrollments))}`,
-            detail: `Based on ${platform.total_enrollments} enrollments generating ₹${Math.round(parseFloat(platform.total_revenue)).toLocaleString()}`
-        });
-    }
-
-    if (platform.premium_subs > 0) {
-        const premiumPct = Math.round((parseInt(platform.premium_subs) / parseInt(platform.total_users)) * 100);
-        report.insights.push({
-            type: 'metric',
-            title: 'Premium Conversion',
-            value: `${premiumPct}%`,
-            detail: `${platform.premium_subs} of ${platform.total_users} users on paid plans`
         });
     }
 
@@ -912,7 +868,7 @@ const getAiReport = async (req, res) => {
             type: 'info',
             title: 'Top Department',
             value: topDept.name,
-            detail: `${topDept.enrollments} enrollments, ₹${Math.round(parseFloat(topDept.revenue)).toLocaleString()} revenue — ${Math.round((parseFloat(topDept.revenue) / (parseFloat(platform.total_revenue) || 1)) * 100)}% of platform`
+            detail: `${topDept.enrollments} enrollments — highest performing department`
         });
         report.insights.push({
             type: 'info',
@@ -959,17 +915,6 @@ const getAiReport = async (req, res) => {
                 detail: `Enrollment gap between top and bottom departments is ${enrollmentSpread}. Consider cross-department content initiatives.`
             });
         }
-    }
-
-    const revenuePerUser = platform.total_enrollments > 0
-        ? Math.round(parseFloat(platform.total_revenue) / parseInt(platform.total_users))
-        : 0;
-    if (revenuePerUser < 500) {
-        report.recommendations.push({
-            priority: 'low',
-            title: 'Explore revenue optimization',
-            detail: `Revenue per user is ₹${revenuePerUser}. Consider premium upsells or subscription-tier promotions.`
-        });
     }
 
     if (parseInt(growth.new_enrollments_30d) > 50) {

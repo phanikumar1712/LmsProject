@@ -6,6 +6,7 @@ import { ProgressBar } from '../../components/ui/ProgressBar';
 import { StatCard, StatCardGrid, StatCardSkeleton } from '../../components/ui/StatCard';
 import { PageHeader, SectionHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/Feedback';
+import { CourseThumbnail } from '../../components/ui/CourseThumbnail';
 import { useMultipleAsync } from '../../hooks/useAsyncData';
 import PullToRefresh from '../../components/ui/PullToRefresh';
 
@@ -100,10 +101,10 @@ export default function StudentDashboard() {
                                     className="bg-card border border-border rounded-xl p-4 flex gap-4 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition-all cursor-pointer group"
                                     onClick={() => navigate(`/courses/${e.courseId}/learn`)}
                                 >
-                                    {e.course?.thumbnail ? (
-                                        <div className="w-24 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
-                                            <img src={e.course.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                        </div>
+{e.course?.thumbnail ? (
+                                         <div className="w-24 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
+                                             <CourseThumbnail thumbnail={e.course.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                         </div>
                                     ) : (
                                         <div className="w-24 h-20 rounded-lg bg-muted shrink-0 flex items-center justify-center">
                                             <BookOpen size={24} className="text-muted-foreground/30" />
@@ -193,11 +194,11 @@ export default function StudentDashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {completedCourses.map(e => (
                             <div key={e.id} className="bg-card border border-border rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-sm transition-shadow cursor-pointer">
-                                {e.course?.thumbnail ? (
-                                    <img src={e.course.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 bg-muted" />
-                                ) : (
-                                    <div className="w-16 h-16 rounded-lg bg-muted shrink-0 flex items-center justify-center border border-border">
-                                        <Award size={20} className="text-muted-foreground/30" />
+{e.course?.thumbnail ? (
+                                     <CourseThumbnail thumbnail={e.course.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 bg-muted" />
+                                 ) : (
+                                     <div className="w-16 h-16 rounded-lg bg-muted shrink-0 flex items-center justify-center border border-border">
+                                         <Award size={20} className="text-muted-foreground/30" />
                                     </div>
                                 )}
                                 <div className="flex-1 min-w-0">

@@ -2,17 +2,6 @@
  * Shared constants used across the LMS frontend.
  */
 
-// ---------- Subscription Plans ----------
-export const PLAN_COLORS = {
-    FREE: '#64748b',
-    BASIC: '#8b5cf6',
-    PRO: '#f59e0b',
-    ENTERPRISE: '#06b6d4',
-};
-
-/** Tier order for subscription access checks (must match DB enum) */
-export const PLAN_ORDER = { FREE: 0, BASIC: 1, PRO: 2, ENTERPRISE: 3 };
-
 // ---------- User Roles ----------
 export const ROLES = {
     STUDENT: 'STUDENT',

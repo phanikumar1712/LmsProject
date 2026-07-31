@@ -4,7 +4,6 @@ const QUESTION_TYPES = new Set(['MCQ', 'MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 
 const DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
 const SELECTION_MODES = new Set(['ALL', 'RANDOM', 'BY_DIFFICULTY', 'BY_CATEGORY']);
 const MAX_QUESTIONS = 500;
-const PLAN_RANK = { FREE: 0, BASIC: 1, PRO: 2, ENTERPRISE: 3 };
 
 const cleanText = (value, field, maxLength) => {
     if (typeof value !== 'string' || !value.trim()) throw createError(`${field} is required`, 400);
@@ -231,16 +230,6 @@ const serializeQuiz = (quiz, { includeQuestions = true, includeAnswers = false, 
     };
 };
 
-const hasRequiredPlan = (user, requiredPlan) => {
-    let currentPlan = String(user.subscription_plan || 'FREE').toUpperCase();
-    if (currentPlan !== 'FREE' && user.subscription_expiry) {
-        const expiry = new Date(user.subscription_expiry);
-        expiry.setHours(23, 59, 59, 999);
-        if (expiry < new Date()) currentPlan = 'FREE';
-    }
-    return (PLAN_RANK[currentPlan] ?? 0) >= (PLAN_RANK[String(requiredPlan || 'FREE').toUpperCase()] ?? 0);
-};
-
 const answersMatch = (question, answer) => {
     if (answer === undefined || answer === null) return false;
     if (question.type === 'MCQ_MULTI') {
@@ -255,4 +244,4 @@ const answersMatch = (question, answer) => {
     return String(answer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase();
 };
 
-module.exports = { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch, drawQuestions };
+module.exports = { validateQuizPayload, serializeQuiz, answersMatch, drawQuestions };

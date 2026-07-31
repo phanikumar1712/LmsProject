@@ -27,8 +27,6 @@ const seedCourses = async () => {
                 title: "Complete Web Development Bootcamp 2026",
                 description: "Learn HTML, CSS, JavaScript, React, Node.js, and PostgreSQL from scratch.",
                 short_desc: "Become a Full-Stack Web Developer with just one course.",
-                price: 99.99,
-                discount_price: 19.99,
                 level: "Beginner",
                 language: "English",
                 status: "PUBLISHED"
@@ -37,8 +35,6 @@ const seedCourses = async () => {
                 title: "Advanced React & Next.js Patterns",
                 description: "Master React server components, Next.js 15, and advanced frontend architectures.",
                 short_desc: "Take your React skills to the next level.",
-                price: 89.99,
-                discount_price: null,
                 level: "Advanced",
                 language: "English",
                 status: "PUBLISHED"
@@ -47,8 +43,6 @@ const seedCourses = async () => {
                 title: "Python for Data Science",
                 description: "Learn Pandas, NumPy, Matplotlib, and Scikit-Learn. Start analyzing data like a pro.",
                 short_desc: "Data Science crash course using Python.",
-                price: 79.99,
-                discount_price: 14.99,
                 level: "Intermediate",
                 language: "English",
                 status: "PUBLISHED"
@@ -57,8 +51,6 @@ const seedCourses = async () => {
                 title: "UI/UX Design Masterclass",
                 description: "Learn Figma, design theories, user research, and wireframing.",
                 short_desc: "Design stunning interfaces starting today.",
-                price: 59.99,
-                discount_price: null,
                 level: "Beginner",
                 language: "English",
                 status: "PUBLISHED"
@@ -75,12 +67,12 @@ const seedCourses = async () => {
             const res = await client.query(`
                 INSERT INTO courses (
                     title, description, short_desc, instructor_id, category_id, 
-                    thumbnail, price, discount_price, level, language, status, rating
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    thumbnail, level, language, status, rating
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id
             `, [
                 course.title, course.description, course.short_desc, instructorId, category.id,
-                thumbnail, course.price, course.discount_price, course.level, course.language, course.status, 4.5 + (Math.random() * 0.5)
+                thumbnail, course.level, course.language, course.status, 4.5 + (Math.random() * 0.5)
             ]);
 
             const courseId = res.rows[0].id;

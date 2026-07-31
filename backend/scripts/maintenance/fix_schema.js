@@ -20,23 +20,13 @@ async function fix() {
         try {
             await client.connect();
             await client.query(`
-              DO $$ BEGIN
-                  CREATE TYPE subscription_plan AS ENUM ('FREE', 'BASIC', 'PRO', 'ENTERPRISE');
-              EXCEPTION WHEN duplicate_object THEN null; END $$;
-          `);
-
-            await client.query(`
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS short_desc TEXT DEFAULT '';
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate BOOLEAN DEFAULT true;
-              ALTER TABLE courses ADD COLUMN IF NOT EXISTS required_plan subscription_plan DEFAULT 'FREE';
               
               ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';
               ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
               ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
-              ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_plan subscription_plan NOT NULL DEFAULT 'FREE';
-              ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expiry DATE;
-              ALTER TABLE users ADD COLUMN IF NOT EXISTS earnings DECIMAL(10,2) DEFAULT 0;
           `);
             console.log("✅ Schema updated successfully with missing columns");
             success = true;

@@ -61,7 +61,7 @@ Admins are **scoped to their department**. They only see courses, users, and dat
 ### 📊 Reports & Analytics
 | Feature | Details |
 |---------|---------|
-| `/admin/reports` | Department-level reports (enrollments, revenue, ratings) |
+| `/admin/reports` | Department-level reports (enrollments, ratings) |
 | Export reports as CSV | ✅ |
 
 ### 🎥 Attendance
@@ -82,7 +82,7 @@ Super Admins have **unrestricted access** across the entire platform. They see e
 | Feature | Details |
 |---------|---------|
 | `/super-admin` | Platform-wide dashboard |
-| `/super-admin/analytics` | Revenue trends, user growth, course engagement |
+| `/super-admin/analytics` | User growth, course engagement |
 | `/super-admin/ai-analytics` | AI-powered analytics reports |
 
 ### 🏛️ Department Management
@@ -116,13 +116,6 @@ Super Admins have **unrestricted access** across the entire platform. They see e
 | Force-edit/delete any course | ✅ |
 | Override course status | ✅ |
 | Override instructor/admin decisions | ✅ |
-
-### 💳 Subscription & Billing
-| Feature | Details |
-|---------|---------|
-| `/admin/subscriptions` | Create/Edit/Delete pricing plans |
-| View invoices | ✅ |
-| Handle refunds | ✅ |
 
 ### ⚙️ Platform Settings
 | Feature | Details |
@@ -189,7 +182,6 @@ Super Admins have **unrestricted access** across the entire platform. They see e
 | **Approve/Reject courses** | ✅ | ✅ Override |
 | **Categories** | ✅ Dept | ✅ Any |
 | **Departments** | ❌ | ✅ Create/Edit/Delete |
-| **Subscriptions** | ❌ | ✅ Plans + billing |
 | **Platform Settings** | ❌ | ✅ Full config |
 | **Audit Logs** | ❌ | ✅ View + export |
 | **System Health** | ❌ | ✅ Monitor |

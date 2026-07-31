@@ -20,7 +20,7 @@ const getWishlistIds = async (userId) => {
     return res.rows.map(r => r.course_id);
 };
 
-const userFields = `id, name, email, role, phone, avatar, bio, active, subscription_plan, subscription_expiry, earnings, current_streak, longest_streak, department_id, roll_no, created_at`;
+const userFields = `id, name, email, role, phone, avatar, bio, active, current_streak, longest_streak, department_id, roll_no, created_at`;
 
 // POST /api/auth/register
 const register = async (req, res) => {

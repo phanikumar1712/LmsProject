@@ -69,8 +69,8 @@ export default function InstructorAnalytics() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2 tracking-tight">Analytics & Earnings</h1>
-                <p className="text-muted-foreground font-medium">Deep dive into your revenue and course performance</p>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2 tracking-tight">Analytics</h1>
+                <p className="text-muted-foreground font-medium">Deep dive into your course and student performance</p>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
@@ -118,9 +118,9 @@ export default function InstructorAnalytics() {
                 <div className="bg-card border border-border shadow-sm rounded-2xl p-6">
                     <h2 className="text-foreground font-bold text-lg mb-6 flex items-center gap-2"><Users size={20} className="text-cyan-600" /> Enrollments Over Time</h2>
                     <div className="h-72">
-                        {stats?.monthlyEarnings && stats.monthlyEarnings.length > 0 ? (
+                        {stats?.monthlyEnrollments && stats.monthlyEnrollments.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={stats.monthlyEarnings}>
+                                <AreaChart data={stats.monthlyEnrollments}>
                                     <defs>
                                         <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#0891b2" stopOpacity={0.2} />
@@ -132,7 +132,7 @@ export default function InstructorAnalytics() {
                                     <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     {/* eslint-disable-next-line react-hooks/static-components */}
                                     <Tooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="revenue" name="Students (x10 Proxy)" stroke="#0891b2" strokeWidth={3} fillOpacity={1} fill="url(#colorStudents)" />
+                                    <Area type="monotone" dataKey="count" name="Enrollments" stroke="#0891b2" strokeWidth={3} fillOpacity={1} fill="url(#colorStudents)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (

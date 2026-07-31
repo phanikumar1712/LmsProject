@@ -283,7 +283,7 @@ export default function CreateAdmin() {
                                     </div>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground/60 font-medium mt-3">
-                                    The admin will have full access to all courses and quizzes in this department without needing a subscription.
+                                    The admin will have full access to all courses and quizzes in this department.
                                 </p>
                             </div>
 

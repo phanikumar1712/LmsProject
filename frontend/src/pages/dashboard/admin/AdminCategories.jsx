@@ -4,6 +4,7 @@ import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 import { Plus, Edit2, Trash2, Upload, X, Search, Filter, ChevronDown, RefreshCw, BookOpen, Building2, Hash, Download, LayoutGrid, List, Calendar, ArrowRight, ExternalLink, Eye, CheckCircle, User, TrendingUp, Save } from 'lucide-react';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -918,14 +919,14 @@ export default function AdminCategories() {
                                 <div className="space-y-2">
                                     {detailCourses.map(course => (
                                         <div key={course.id} className="flex items-center gap-4 p-4 bg-muted/20 border border-border rounded-xl hover:bg-muted/40 transition-colors group">
-                                            <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
-                                                {course.thumbnail ? (
-                                                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    course.title?.charAt(0) || '?'
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
+<div className="w-11 h-11 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
+                                                 {course.thumbnail ? (
+                                                     <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover" />
+                                                 ) : (
+                                                     course.title?.charAt(0) || '?'
+                                                 )}
+                                             </div>
+                                             <div className="flex-1 min-w-0">
                                                 <p className="font-bold text-foreground text-sm truncate">{course.title}</p>
                                                 <p className="text-[11px] text-muted-foreground mt-0.5">
                                                     {course.instructorName || 'Unknown'} · {course.level || 'All levels'}
@@ -1020,14 +1021,14 @@ export default function AdminCategories() {
                                 ) : (
                                     searchResults.map(course => (
                                         <div key={course.id} className="flex items-center gap-3 p-3 bg-muted/20 border border-border rounded-xl hover:bg-muted/40 transition-colors">
-                                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-                                                {course.thumbnail ? (
-                                                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    course.title?.charAt(0) || '?'
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
+<div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                                                 {course.thumbnail ? (
+                                                     <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover" />
+                                                 ) : (
+                                                     course.title?.charAt(0) || '?'
+                                                 )}
+                                             </div>
+                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-bold text-foreground truncate">{course.title}</p>
                                                 <p className="text-[11px] text-muted-foreground">{course.instructorName || 'Unknown'} · {course.status}</p>
                                             </div>

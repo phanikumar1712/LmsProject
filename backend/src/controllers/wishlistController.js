@@ -13,7 +13,7 @@ const getWishlist = async (req, res) => {
 
     const result = await query(`
         SELECT w.added_at,
-               c.id, c.title, c.thumbnail, c.price, c.discount_price, c.required_plan,
+               c.id, c.title, c.thumbnail,
                c.rating, c.level, c.enrollment_count, c.review_count, c.duration, c.status,
                u.name as "instructorName", u.avatar as "instructorAvatar",
                cat.name as "categoryName", cat.id as "categoryId"

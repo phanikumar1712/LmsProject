@@ -25,8 +25,6 @@ async function run() {
             siteName: 'EduNexus LMS',
             siteTagline: 'Learn Without Limits',
             supportEmail: 'support@edunexus.com',
-            defaultCurrency: 'INR',
-            instructorRevenueShare: 70,
             maxUploadSizeMB: 500,
             requireApproval: true,
             maintenanceMode: false,

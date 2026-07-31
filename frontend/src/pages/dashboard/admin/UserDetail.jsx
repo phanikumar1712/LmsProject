@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     User, Mail, Shield, Building2, Calendar, Hash, Phone, Award, BookOpen,
-    RotateCcw, Ban, CheckCircle, Trash2, CreditCard, Plus, X, Search,
+    RotateCcw, Ban, CheckCircle, Trash2, Plus, X, Search,
     ChevronLeft, Star, BarChart3, Layers, Trophy, Target, Activity,
     Crown, Swords, Copy, ExternalLink, GraduationCap, Users, Megaphone
 } from 'lucide-react';
+import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 import { usersAPI, coursesAPI, departmentsAPI, enrollmentsAPI, notificationsAPI, statsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -16,15 +17,6 @@ const ROLE_BADGES = {
     ADMIN: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', icon: Shield },
     SUPER_ADMIN: { color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300', icon: Crown },
 };
-
-const PLAN_BADGES = {
-    FREE: { color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
-    BASIC: { color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300' },
-    PRO: { color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300' },
-    ENTERPRISE: { color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300' },
-};
-
-const VALID_PLANS = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
 
 function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
     const colorMap = {
@@ -102,9 +94,6 @@ export default function UserDetail() {
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showAssignCourse, setShowAssignCourse] = useState(false);
-    const [showSubscription, setShowSubscription] = useState(false);
-    const [subscriptionPlan, setSubscriptionPlan] = useState('FREE');
-    const [assigningPlan, setAssigningPlan] = useState(false);
 
     // Course assignment
     const [courseSearch, setCourseSearch] = useState('');
@@ -202,20 +191,6 @@ export default function UserDetail() {
         }
     };
 
-    const handleAssignPlan = async () => {
-        setAssigningPlan(true);
-        try {
-            const updated = await usersAPI.assignPlan(user.id, subscriptionPlan);
-            setUser(prev => ({ ...prev, subscriptionPlan: updated.subscriptionPlan }));
-            toast.success(`Subscription set to ${subscriptionPlan}`);
-            setShowSubscription(false);
-        } catch (err) {
-            toast.error(err.message || 'Failed to assign plan');
-        } finally {
-            setAssigningPlan(false);
-        }
-    };
-
     const handleEnrollCourse = async () => {
         if (!selectedCourseId) { toast.error('Select a course'); return; }
         setEnrolling(true);
@@ -305,25 +280,29 @@ export default function UserDetail() {
 
             {/* ── Profile Header Card ── */}
             <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
-                <div className="h-32 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 relative">
+                <div className="h-36 sm:h-40 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 relative">
                     <div className="absolute inset-0 bg-black/10" />
+                    <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
+                    <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
                 </div>
-                <div className="px-8 pb-8">
+                <div className="px-5 sm:px-10 pb-8">
                     {/* Avatar + basic info */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-end -mt-16 gap-5 mb-6">
-                        <div className="relative">
+                    <div className="relative flex flex-col sm:flex-row items-center sm:items-end gap-5 sm:gap-7 -mt-14 sm:-mt-16">
+                        {/* Avatar */}
+                        <div className="relative flex-shrink-0">
                             {user.avatar ? (
-                                <img src={user.avatar} alt={user.name} className="w-28 h-28 rounded-2xl border-4 border-background object-cover shadow-xl" />
+                                <img src={user.avatar} alt={user.name} className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-4 border-background object-cover shadow-xl" />
                             ) : (
-                                <div className="w-28 h-28 rounded-2xl border-4 border-background bg-muted flex items-center justify-center shadow-xl">
-                                    <User size={44} className="text-muted-foreground" />
+                                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-4 border-background bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center shadow-xl">
+                                    <User size={44} className="text-indigo-400 dark:text-indigo-300" />
                                 </div>
                             )}
                             <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-background ${user.active !== false ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         </div>
-                        <div className="flex-1 sm:pb-1">
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <h1 className="text-2xl font-black text-foreground tracking-tight">{user.name}</h1>
+                        {/* Name / info */}
+                        <div className="flex-1 text-center sm:text-left min-w-0">
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                                <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">{user.name}</h1>
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${ROLE_BADGES[user.role]?.color}`}>
                                     <RoleIcon size={14} />
                                     {user.role?.replace('_', ' ')}
@@ -335,11 +314,12 @@ export default function UserDetail() {
                                     {user.active !== false ? 'Active' : 'Suspended'}
                                 </span>
                             </div>
-                            <p className="text-muted-foreground font-medium mt-1 flex items-center gap-2">
-                                <Mail size={14} />
-                                {user.email}
+                            <p className="text-muted-foreground font-medium mt-1.5 flex items-center justify-center sm:justify-start gap-2 truncate">
+                                <Mail size={14} className="flex-shrink-0" />
+                                <span className="truncate">{user.email}</span>
                             </p>
                         </div>
+                        {/* Actions */}
                         <div className="flex gap-2 sm:pb-1">
                             <button onClick={() => navigate(isInstructor ? '/instructor/students' : '/admin/users')} className="px-4 py-2.5 rounded-xl border border-border text-sm font-bold hover:bg-muted transition-colors">
                                 Back
@@ -385,14 +365,6 @@ export default function UserDetail() {
                                 <RotateCcw size={14} /> Reset Password
                             </button>
                         )}
-                        {isSuperAdmin() && (
-                            <button
-                                onClick={() => { setSubscriptionPlan(user.subscriptionPlan || 'FREE'); setShowSubscription(true); }}
-                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-700 transition-colors"
-                            >
-                                <CreditCard size={14} /> Subscription
-                            </button>
-                        )}
                         {canManage && (
                             <button
                                 onClick={() => setShowAssignCourse(true)}
@@ -413,13 +385,11 @@ export default function UserDetail() {
                     </div>
 
                     {/* Detail grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-1 pt-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-2 pt-6">
                         <DetailRow icon={Building2} label="Department" value={user.departmentName || '—'} />
                         <DetailRow icon={Hash} label="Roll No" value={user.rollNo || '—'} />
                         <DetailRow icon={Phone} label="Phone" value={user.phone || '—'} />
                         <DetailRow icon={Calendar} label="Joined" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'} />
-                        <DetailRow icon={CreditCard} label="Subscription" value={user.subscriptionPlan || 'FREE'} />
-                        <DetailRow icon={Award} label="Subscription Expiry" value={user.subscriptionExpiry ? new Date(user.subscriptionExpiry).toLocaleDateString() : '—'} />
                         <DetailRow icon={Target} label="Current Streak" value={`${user.currentStreak || 0} days`} />
                         <DetailRow icon={Trophy} label="Longest Streak" value={`${user.longestStreak || 0} days`} />
                     </div>
@@ -620,12 +590,12 @@ export default function UserDetail() {
                                 <div key={enrollment.id || enrollment.courseId} className="px-6 py-4 hover:bg-muted/30 transition-colors">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            {enrollment.course?.thumbnail ? (
-                                                <img src={enrollment.course.thumbnail} alt="" className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
-                                            ) : (
-                                                <div className="w-12 h-9 rounded-lg bg-muted border border-border flex items-center justify-center flex-shrink-0">
-                                                    <BookOpen size={16} className="text-muted-foreground" />
-                                                </div>
+{enrollment.course?.thumbnail ? (
+                                                 <CourseThumbnail thumbnail={enrollment.course.thumbnail} title={enrollment.course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                             ) : (
+                                                 <div className="w-12 h-9 rounded-lg bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                                                     <BookOpen size={16} className="text-muted-foreground" />
+                                                 </div>
                                             )}
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-foreground truncate">{enrollment.course?.title || enrollment.title || 'Untitled'}</p>
@@ -838,49 +808,6 @@ export default function UserDetail() {
                                     {enrolling ? 'Enrolling...' : 'Enroll'}
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Subscription Modal ── */}
-            {showSubscription && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
-                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
-                                <CreditCard size={20} className="text-blue-600" /> Assign Subscription
-                            </h3>
-                            <button onClick={() => setShowSubscription(false)}
-                                className="p-2 hover:bg-muted rounded-full transition-colors">
-                                <X size={20} className="text-muted-foreground" />
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-5">
-                            <p className="text-sm text-muted-foreground">
-                                Current plan: <strong className="text-foreground">{user.subscriptionPlan || 'FREE'}</strong>
-                                {user.subscriptionExpiry && ` · Expires: ${new Date(user.subscriptionExpiry).toLocaleDateString()}`}
-                            </p>
-                            <div className="grid grid-cols-2 gap-3">
-                                {VALID_PLANS.map(plan => (
-                                    <button key={plan} onClick={() => setSubscriptionPlan(plan)}
-                                        className={`p-4 rounded-2xl border-2 text-left transition-all ${subscriptionPlan === plan
-                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-md'
-                                            : 'border-border hover:border-muted-foreground/25 bg-card'}`}
-                                    >
-                                        <p className={`text-sm font-black uppercase tracking-wider ${PLAN_BADGES[plan]?.color || ''}`}>
-                                            {plan}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            {plan === 'FREE' ? 'Basic access' : plan === 'BASIC' ? 'Standard features' : plan === 'PRO' ? 'Advanced features' : 'Full platform access'}
-                                        </p>
-                                    </button>
-                                ))}
-                            </div>
-                            <button onClick={handleAssignPlan} disabled={assigningPlan}
-                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-colors">
-                                {assigningPlan ? 'Assigning...' : `Set to ${subscriptionPlan}`}
-                            </button>
                         </div>
                     </div>
                 </div>

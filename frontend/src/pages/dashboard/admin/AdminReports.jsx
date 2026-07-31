@@ -68,7 +68,7 @@ export default function AdminReports() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Platform Analytics</h1>
-                    <p className="text-muted-foreground font-medium mt-1">Deep dive into course performance and revenue metrics</p>
+                    <p className="text-muted-foreground font-medium mt-1">Deep dive into course performance and engagement metrics</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
                     <FilterSelect value={period} onChange={setPeriod}>
@@ -127,25 +127,6 @@ export default function AdminReports() {
                                 <p className="text-sm font-medium">No enrollment data</p>
                             </div>
                         )}
-                    </div>
-                </div>
-
-                {/* Revenue Breakdown */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <TrendingUp size={20} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-foreground">Revenue Performance</h3>
-                            <p className="text-xs text-muted-foreground/60 font-bold uppercase tracking-wider">Currency in INR (₹)</p>
-                        </div>
-                    </div>
-                    <div className="h-64">
-                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 bg-muted/40/50 rounded-xl border border-dashed border-border">
-                            <TrendingUp size={32} className="opacity-20 mb-2" />
-                            <p className="text-sm font-medium">Enrollment reports coming soon</p>
-                        </div>
                     </div>
                 </div>
 

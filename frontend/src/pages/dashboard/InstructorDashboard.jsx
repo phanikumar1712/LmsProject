@@ -8,6 +8,7 @@ import { statsAPI, coursesAPI } from '../../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RatingDisplay } from '../../components/ui/RatingStars';
 import { StatCard, StatCardGrid, StatCardSkeleton } from '../../components/ui/StatCard';
+import { CourseThumbnail } from '../../components/ui/CourseThumbnail';
 import { PageHeader, SectionHeader } from '../../components/ui/PageHeader';
 import { Card, CardHeader, MetricRow } from '../../components/ui/Card';
 import { ChartTooltip, ChartCard } from '../../components/ui/ChartComponents';
@@ -62,9 +63,9 @@ export default function InstructorDashboard() {
                     title="Monthly Enrollments"
                     className="lg:col-span-2"
                 >
-                    {stats?.monthlyEarnings && stats.monthlyEarnings.length > 0 ? (
+                    {stats?.monthlyEnrollments && stats.monthlyEnrollments.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={stats.monthlyEarnings} margin={CHART_MARGIN}>
+                            <AreaChart data={stats.monthlyEnrollments} margin={CHART_MARGIN}>
                                 <defs>
                                     <linearGradient id="enrollGrad" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#0891b2" stopOpacity={0.2} />
@@ -75,7 +76,7 @@ export default function InstructorDashboard() {
                                 <XAxis dataKey="month" tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} dy={10} />
                                 <YAxis tick={CHART_AXIS_STYLE} axisLine={false} tickLine={false} />
                                 <Tooltip content={<ChartTooltip />} />
-                                <Area type="monotone" dataKey="revenue" stroke="#0891b2" strokeWidth={3} fill="url(#enrollGrad)" activeDot={{ r: 6, fill: '#0891b2', stroke: '#fff', strokeWidth: 2 }} />
+                                <Area type="monotone" dataKey="count" name="Enrollments" stroke="#0891b2" strokeWidth={3} fill="url(#enrollGrad)" activeDot={{ r: 6, fill: '#0891b2', stroke: '#fff', strokeWidth: 2 }} />
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
@@ -143,7 +144,7 @@ export default function InstructorDashboard() {
                         [1, 2, 3, 4].map(i => <div key={i} className="bg-card border border-border rounded-2xl h-[100px] animate-pulse" />)
                     ) : courses?.slice(0, 4).map(course => (
                         <div key={course.id} className="bg-card border border-border rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow group">
-                            <img src={course.thumbnail} alt="" className="w-16 h-12 sm:w-20 sm:h-16 rounded-lg object-cover border border-border flex-shrink-0" />
+                            <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-16 h-12 sm:w-20 sm:h-16 rounded-lg object-cover border border-border flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground font-bold text-[15px] truncate group-hover:text-indigo-600 transition-colors">{course.title}</p>
                                 <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">

@@ -37,7 +37,6 @@ import StudentCourses from './pages/dashboard/student/StudentCourses';
 import StudentWishlist from './pages/dashboard/student/StudentWishlist';
 import StudentQuizzes from './pages/dashboard/student/StudentQuizzes';
 import StudentCertificates from './pages/dashboard/student/StudentCertificates';
-import StudentSubscription from './pages/dashboard/student/StudentSubscription';
 import CourseLearningPlayer from './pages/dashboard/student/CourseLearningPlayer';
 import SuperAdminAnalytics from './pages/dashboard/superadmin/SuperAdminAnalytics';
 import AuditLogs from './pages/dashboard/superadmin/AuditLogs';
@@ -50,7 +49,6 @@ import CategoryOverview from './pages/dashboard/superadmin/CategoryOverview';
 import CategoryDetail from './pages/dashboard/superadmin/CategoryDetail';
 import CreateAdmin from './pages/dashboard/superadmin/CreateAdmin';
 import AIAnalytics from './pages/dashboard/superadmin/AIAnalytics';
-import SubscriptionPlans from './pages/dashboard/superadmin/SubscriptionPlans';
 import AdminCategories from './pages/dashboard/admin/AdminCategories';
 import ModerateReviews from './pages/dashboard/admin/ModerateReviews';
 import AdminReports from './pages/dashboard/admin/AdminReports';
@@ -117,7 +115,6 @@ export default function App() {
             <Route path="/student/wishlist" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentWishlist /></ProtectedRoute>} />
             <Route path="/student/quizzes" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentQuizzes /></ProtectedRoute>} />
             <Route path="/student/certificates" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentCertificates /></ProtectedRoute>} />
-            <Route path="/student/subscription" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubscription /></ProtectedRoute>} />
             <Route path="/courses/:courseId/learn" element={<ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><CourseLearningPlayer /></ProtectedRoute>} />
 
             {/* Instructor */}
@@ -140,7 +137,6 @@ export default function App() {
             <Route path="/admin/categories" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminCategories /></ProtectedRoute>} />
             <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><ModerateReviews /></ProtectedRoute>} />
             <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminReports /></ProtectedRoute>} />
-            <Route path="/admin/subscriptions" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><SubscriptionPlans /></ProtectedRoute>} />
             <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminAnnouncements /></ProtectedRoute>} />
             <Route path="/admin/bulk-enroll" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminBulkEnrollment /></ProtectedRoute>} />
             <Route path="/admin/student-progress" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminStudentProgress /></ProtectedRoute>} />

@@ -1,7 +1,7 @@
 const { query, getClient } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapQuizAttempt } = require('../utils/formatters');
-const { validateQuizPayload, serializeQuiz, hasRequiredPlan, answersMatch, drawQuestions } = require('../utils/quiz');
+const { validateQuizPayload, serializeQuiz, answersMatch, drawQuestions } = require('../utils/quiz');
 
 const MAX_ATTEMPTS_PER_DAY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,7 +15,7 @@ const requireUuid = (value, field = 'id') => {
 const loadCourse = async (courseId) => {
     requireUuid(courseId, 'courseId');
     const result = await query(
-        'SELECT id, instructor_id, status, required_plan FROM courses WHERE id = $1',
+        'SELECT id, instructor_id, status FROM courses WHERE id = $1',
         [courseId]
     );
     if (!result.rows.length) throw createError('Course not found', 404);
@@ -25,7 +25,7 @@ const loadCourse = async (courseId) => {
 const loadQuiz = async (id) => {
     requireUuid(id, 'quiz id');
     const result = await query(`
-        SELECT q.*, c.instructor_id, c.status AS course_status, c.required_plan
+        SELECT q.*, c.instructor_id, c.status AS course_status
         FROM quizzes q
         JOIN courses c ON c.id = q.course_id
         WHERE q.id = $1 OR q.lesson_id = $1
@@ -45,16 +45,6 @@ const assertCourseAccess = async (course, user) => {
         throw createError('Course is not published', 403);
     }
     const courseId = course.course_id || course.id;
-    if (!hasRequiredPlan(user, course.required_plan)) {
-        const explicitAccess = await query(`
-            SELECT 1
-            FROM subscription_plan_courses spc
-            JOIN subscription_plans sp ON sp.id = spc.plan_id
-            WHERE spc.course_id = $1 AND UPPER(sp.name) = UPPER($2)
-            LIMIT 1
-        `, [courseId, user.subscription_plan || 'FREE']);
-        if (!explicitAccess.rows.length) throw createError('Subscription upgrade required', 403);
-    }
     const enrollment = await query(
         'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
         [user.id, courseId]
