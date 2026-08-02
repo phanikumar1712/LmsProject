@@ -164,4 +164,24 @@
   .gradient-btn {
     @apply bg-primary text-primary-foreground shadow hover:bg-primary/90 transition-all rounded-md px-4 py-2 text-sm font-medium;
   }
+
+  /* Slim scrollbar used in sidebar nav, mobile menus and dropdown panels */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: var(--color-muted-foreground);
+  }
 }

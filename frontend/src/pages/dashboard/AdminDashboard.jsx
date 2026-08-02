@@ -1,6 +1,6 @@
 import {
     Users, BookOpen, TrendingUp,
-    ShieldCheck, AlertTriangle, ChevronRight, Activity
+    ShieldCheck, AlertTriangle, ChevronRight, Activity, Gauge, GraduationCap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,11 +25,16 @@ export default function AdminDashboard() {
         () => statsAPI.getPlatform(),
         () => (isSuperAdmin ? statsAPI.getAuditLogs() : Promise.resolve([])),
         () => usersAPI.getInstructorRequests().catch(() => []),
+        // Department-scoped admins get their own dept's usage vs limits for the
+        // capacity visuals below. SUPER_ADMIN sees every dept — not meaningful
+        // on this dashboard, so skip the request entirely.
+        () => (isSuperAdmin ? Promise.resolve(null) : statsAPI.getAdminOverview().catch(() => null)),
     ], [isSuperAdmin]);
 
     const stats = results[0] || null;
     const auditLogs = results[1] || [];
     const instructorRequests = results[2] || [];
+    const deptCapacity = results[3]?.data?.[0] || null;
     const navigate = useNavigate();
 
     const statCards = stats ? [
@@ -41,7 +46,7 @@ export default function AdminDashboard() {
 
     return (
         <PullToRefresh onRefresh={reload}>
-        <div className="space-y-8 max-w-7xl w-full">
+        <div className="space-y-6 sm:space-y-8 max-w-7xl w-full mx-auto px-0">
             <PageHeader
                 border
                 title={
@@ -70,9 +75,33 @@ export default function AdminDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+            {/* Department capacity — shown to department-scoped admins when their
+                dept is at/over its student or course quota. */}
+            {deptCapacity && (deptCapacity.studentCount >= deptCapacity.maxStudents || deptCapacity.courseCount >= deptCapacity.maxCourses) && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 sm:p-5 flex items-start gap-4 shadow-sm">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-bold text-amber-800 dark:text-amber-200">Department limit reached</p>
+                        <p className="text-sm font-medium text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                            {deptCapacity.departmentName} is at its{' '}
+                            {deptCapacity.studentCount >= deptCapacity.maxStudents ? `student limit (${deptCapacity.studentCount}/${deptCapacity.maxStudents})` : `course limit (${deptCapacity.courseCount}/${deptCapacity.maxCourses})`}.
+                            New students/course approvals are blocked until a Super Admin raises the limit.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => navigate('/admin/announcements')}
+                        className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white transition-colors shadow-sm"
+                    >
+                        Contact Super Admin
+                    </button>
+                </div>
+            )}
+
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+                <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
                         {/* Roles Pie */}
                         <Card onClick={() => navigate('/admin/users')} title="View all users">
                             <CardHeader title="Users by Role" />
@@ -121,7 +150,44 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+                <div className="space-y-4 sm:space-y-6">
+                    {/* Department Capacity */}
+                    {deptCapacity && !isSuperAdmin && (
+                        <Card>
+                            <CardHeader title="Department Capacity" icon={<Gauge size={18} className="text-cyan-500" />} />
+                            <div className="space-y-4">
+                                {[
+                                    { label: 'Students', used: deptCapacity.studentCount, max: deptCapacity.maxStudents, over: deptCapacity.studentCount >= deptCapacity.maxStudents },
+                                    { label: 'Courses', used: deptCapacity.courseCount, max: deptCapacity.maxCourses, over: deptCapacity.courseCount >= deptCapacity.maxCourses },
+                                ].map(bar => {
+                                    const pct = bar.max > 0 ? Math.min(100, Math.round((bar.used / bar.max) * 100)) : 0;
+                                    return (
+                                        <div key={bar.label}>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                                                    {bar.label === 'Students' ? <GraduationCap size={14} className="text-cyan-500" /> : <BookOpen size={14} className="text-cyan-500" />}
+                                                    {bar.label}
+                                                </span>
+                                                <span className={`text-sm font-bold ${bar.over ? 'text-rose-600' : 'text-muted-foreground'}`}>
+                                                    {bar.used}/{bar.max}
+                                                </span>
+                                            </div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all ${bar.over ? 'bg-rose-500' : 'bg-cyan-500'}`}
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <p className="text-[11px] font-medium text-muted-foreground pt-1">
+                                    Reach the limit and approvals/student additions are blocked until a Super Admin raises it.
+                                </p>
+                            </div>
+                        </Card>
+                    )}
+
                     {/* Action Required */}
                     <Card accentColor="#f59e0b">
                         <CardHeader title="Action Required" icon={<AlertTriangle size={18} className="text-amber-500" />} className="pl-3" />

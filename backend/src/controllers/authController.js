@@ -5,6 +5,7 @@ const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser } = require('../utils/formatters');
 const { sendOTPEmail } = require('../utils/mail');
+const { getDeptCapacity, notifyLimitReached } = require('../utils/limits');
 
 // Constant-time comparison to prevent timing attacks on OTP verification
 const timingSafeEqual = (a, b) => {
@@ -54,6 +55,19 @@ const register = async (req, res) => {
             [normRollNo, deptId]
         );
         if (dupRoll.rows.length) throw createError('This roll number is already registered in your department', 409);
+    }
+
+    // Department student-limit enforcement: block student signups for a
+    // department that has reached its max_students quota.
+    if (userRole === 'STUDENT' && deptId) {
+        const capacity = await getDeptCapacity(deptId);
+        if (capacity.studentsAtLimit) {
+            await notifyLimitReached(deptId, 'students');
+            throw createError(
+                `Student limit reached for this department (${capacity.studentCount}/${capacity.maxStudents}). Please contact the department admin.`,
+                409
+            );
+        }
     }
 
     const hashed = await bcrypt.hash(password, 12);
@@ -264,10 +278,12 @@ const resetPasswordByEmail = async (req, res) => {
 // POST /api/auth/demo
 const demoLogin = async (req, res) => {
     const { role = 'STUDENT' } = req.body;
+    // Seeded department accounts (the legacy student@demo.com / instructor@demo.com /
+    // admin@demo.com accounts were removed from the seed data — they no longer exist).
     const demoEmails = {
-        STUDENT: 'student@demo.com',
-        INSTRUCTOR: 'instructor@demo.com',
-        ADMIN: 'admin@demo.com',
+        STUDENT: 'cse.student1@demo.com',
+        INSTRUCTOR: 'cse.instructor@demo.com',
+        ADMIN: 'cse.admin@demo.com',
         SUPER_ADMIN: 'superadmin@lms.com',
     };
     const email = demoEmails[role.toUpperCase()];
@@ -277,6 +293,8 @@ const demoLogin = async (req, res) => {
     if (!result.rows.length) throw createError('Demo user not found', 404);
 
     const user = result.rows[0];
+    if (!user.active) throw createError('Account has been suspended', 403);
+
     const token = generateToken(user.id, user.role);
     const safeUser = mapUser(user);
     safeUser.wishlist = await getWishlistIds(user.id);

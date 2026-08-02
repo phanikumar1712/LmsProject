@@ -182,14 +182,21 @@ const getAuditLogs = async (req, res) => {
     res.json(formatted);
 };
 
-// GET /api/stats/admins — SUPER_ADMIN per-department overview.
-// Limits are now set per-department (not per-admin). All admins in a department
+// GET /api/stats/admins — per-department overview with usage vs limits.
+// SUPER_ADMIN sees every department; a department-scoped ADMIN sees ONLY their
+// own department (so the admin dashboard can show limit usage visuals).
+// Limits are set per-department (not per-admin); all admins in a department
 // share the same quota. Falls back to platform global defaults.
 const getAdminOverview = async (req, res) => {
     const settingsRes = await query("SELECT value FROM platform_settings WHERE key = 'global'");
     const settings = settingsRes.rows[0]?.value || {};
     const defaultMaxStudents = Number(settings.defaultMaxStudentsPerAdmin ?? 500);
     const defaultMaxCourses = Number(settings.defaultMaxCoursesPerAdmin ?? 100);
+
+    // Department-scoped admins see only their own department's usage.
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const deptFilter = scoped ? 'WHERE d.id = $1' : '';
+    const values = scoped ? [departmentId] : [];
 
     const result = await query(`
         SELECT
@@ -219,8 +226,9 @@ const getAdminOverview = async (req, res) => {
               AND cat.department_id IS NOT NULL
             GROUP BY cat.department_id
         ) cc ON cc.department_id = d.id
+        ${deptFilter}
         ORDER BY d.name ASC
-    `);
+    `, values);
 
     const data = result.rows.map(r => {
         const maxStudents = r.maxStudentsOverride ?? defaultMaxStudents;

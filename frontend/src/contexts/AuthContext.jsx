@@ -73,6 +73,15 @@ export function AuthProvider({ children }) {
         return safeUser;
     };
 
+    const demoLogin = async (role = 'STUDENT') => {
+        const { user, token } = await authAPI.loginWithDemo(role);
+        const safeUser = mapUser(user);
+        localStorage.setItem('lms_token', token);
+        dispatch({ type: 'SET_USER', payload: { user: safeUser, token } });
+        toast.success(`Welcome back, ${safeUser.name}! 👋`);
+        return safeUser;
+    };
+
     const logout = () => {
         localStorage.removeItem('lms_token');
         dispatch({ type: 'LOGOUT' });
@@ -92,7 +101,7 @@ export function AuthProvider({ children }) {
     return (
         <AuthContext.Provider value={{
             ...state,
-            login, register, logout, updateUser,
+            login, register, demoLogin, logout, updateUser,
             hasRole, isAdmin, isSuperAdmin, isInstructor, isStudent,
         }}>
             {children}

@@ -11,8 +11,15 @@ const ROLE_HOMES = {
     ADMIN: '/admin', SUPER_ADMIN: '/super-admin',
 };
 
+const DEMO_ROLES = [
+    { role: 'STUDENT', label: 'Student', emoji: '🎓' },
+    { role: 'INSTRUCTOR', label: 'Instructor', emoji: '👨‍🏫' },
+    { role: 'ADMIN', label: 'Admin', emoji: '🛡️' },
+    { role: 'SUPER_ADMIN', label: 'Super Admin', emoji: '👑' },
+];
+
 export default function LoginPage() {
-    const { login } = useAuth();
+    const { login, demoLogin } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const from = location.state?.from || '/';
@@ -412,10 +419,45 @@ export default function LoginPage() {
                     </AnimatePresence>
 
                     {view === 'login' && (
-                        <p className="text-center text-muted-foreground text-sm mt-6">
-                            Don't have an account?{' '}
-                            <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-bold">Create one free</Link>
-                        </p>
+                        <>
+                            {/* Demo quick-login */}
+                            <div className="mt-6 pt-6 border-t border-border">
+                                <p className="text-center text-[11px] font-black uppercase tracking-widest text-muted-foreground/60 mb-3">
+                                    Quick Demo Login
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {DEMO_ROLES.map(({ role, label, emoji }) => (
+                                        <button
+                                            key={role}
+                                            type="button"
+                                            disabled={loading}
+                                            onClick={async () => {
+                                                setLoading(true); setError('');
+                                                try {
+                                                    const user = await demoLogin(role);
+                                                    navigate(ROLE_HOMES[user.role] || from, { replace: true });
+                                                } catch (err) {
+                                                    setError(err.message || 'Demo login failed');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted/40 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-border hover:border-indigo-200 transition-all text-xs font-bold text-foreground/80 hover:text-indigo-700 disabled:opacity-50"
+                                        >
+                                            <span>{emoji}</span>
+                                            <span>{label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-center text-[11px] text-muted-foreground/50 font-medium mt-3">
+                                    One click, no password needed.
+                                </p>
+                            </div>
+                            <p className="text-center text-muted-foreground text-sm mt-5">
+                                Don't have an account?{' '}
+                                <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-bold">Create one free</Link>
+                            </p>
+                        </>
                     )}
                 </div>
             </div>

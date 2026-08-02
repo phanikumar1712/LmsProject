@@ -2,6 +2,7 @@ const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapUser, mapEnrollment, mapInstructorRequest } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
+const { getDeptCapacity, notifyLimitReached } = require('../utils/limits');
 
 const safeUserFields = `id, name, email, role, phone, avatar, bio, active, department_id, roll_no, created_at`;
 
@@ -481,6 +482,20 @@ const createUserRecord = async ({ name, email, phone, departmentId, rollNo, pass
         if (dupRoll.rows.length) throw createError('Roll number is already taken in this department', 409);
     }
 
+    // Department student-limit enforcement: adding a STUDENT to a department
+    // that has reached its max_students quota is blocked, and the dept admins +
+    // super admins are notified for a limit-review discussion.
+    if (role === 'STUDENT' && departmentId) {
+        const capacity = await getDeptCapacity(departmentId);
+        if (capacity.studentsAtLimit) {
+            await notifyLimitReached(departmentId, 'students', capacity);
+            throw createError(
+                `Student limit reached for this department (${capacity.studentCount}/${capacity.maxStudents}). Ask the Super Admin to raise the limit.`,
+                409
+            );
+        }
+    }
+
     const tempPassword = password && password.length >= 8 ? password : crypto.randomBytes(6).toString('hex');
     const hashed = await bcrypt.hash(tempPassword, 12);
     const result = await query(
@@ -711,6 +726,33 @@ const importStudents = async (req, res) => {
 
     const departmentId = resolveTargetDepartment(req);
     const departmentName = await resolveDepartmentName(departmentId);
+
+    // Fail fast when the target department is already at its student limit —
+    // avoids running the (up to 500-row) loop only to reject every row.
+    let importCapacity = null;
+    if (departmentId) {
+        importCapacity = await getDeptCapacity(departmentId);
+        if (importCapacity.studentsAtLimit) {
+            await notifyLimitReached(departmentId, 'students', importCapacity);
+            const results = rows.map(row => {
+                const pickRow = (key) => {
+                    const found = Object.keys(row).find(k => k.trim().toLowerCase() === key);
+                    return found ? row[found] : '';
+                };
+                return {
+                    email: String(pickRow('email') || '').trim().toLowerCase(),
+                    name: pickRow('name'),
+                    rollNo: pickRow('roll_no') || pickRow('roll no') || pickRow('rollnumber') || '',
+                    departmentId,
+                    departmentName,
+                    status: 'error',
+                    error: `Student limit reached for this department (${importCapacity.studentCount}/${importCapacity.maxStudents}). Ask the Super Admin to raise the limit.`,
+                };
+            });
+            return res.status(201).json({ total: rows.length, created: 0, failed: rows.length, departmentId, departmentName, results });
+        }
+    }
+
     // Normalize header keys to lowercase for lookup.
     const pick = (row, key) => {
         const found = Object.keys(row).find(k => k.trim().toLowerCase() === key);

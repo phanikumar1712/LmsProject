@@ -16,7 +16,7 @@ export function Card({ children, className = '', noPadding = false, accentColor,
             onClick={onClick}
             title={title}
             type={onClick ? 'button' : undefined}
-            className={`bg-card border border-border rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-6'} ${interactive} ${className}`}
+            className={`bg-card border border-border rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-5 sm:p-6'} ${interactive} ${className}`}
         >
             {accentColor && (
                 <div
@@ -34,7 +34,7 @@ export function Card({ children, className = '', noPadding = false, accentColor,
  */
 export function CardHeader({ title, icon, right, className = '' }) {
     return (
-        <div className={`flex items-center justify-between mb-6 ${className}`}>
+        <div className={`flex items-center justify-between mb-4 sm:mb-6 ${className}`}>
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 {icon}
                 {title}

@@ -33,11 +33,11 @@ export function ChartTooltip({ active, payload, label, prefix = '', suffix = '' 
  * @param {React.ReactNode} children - The ResponsiveContainer / chart
  * @param {string} [className]
  */
-export function ChartCard({ title, badge, height = 'h-[260px]', children, className = '' }) {
+export function ChartCard({ title, badge, height = 'h-[240px] sm:h-[260px]', children, className = '' }) {
     return (
-        <div className={`bg-card border border-border rounded-2xl p-6 shadow-sm ${className}`}>
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-foreground font-bold text-lg">{title}</h3>
+        <div className={`bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-sm ${className}`}>
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h3 className="text-foreground font-bold text-base sm:text-lg">{title}</h3>
                 {badge}
             </div>
             <div className={height}>{children}</div>

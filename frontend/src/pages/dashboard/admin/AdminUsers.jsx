@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Ban, Trash2, Upload, X, Building2, Download, UserPlus, RotateCcw, Copy, GraduationCap, Users, Shield, Crown, Lock, ArrowLeftRight } from 'lucide-react';
-import { usersAPI, departmentsAPI } from '../../../services/api';
+import { usersAPI, departmentsAPI, statsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -22,6 +22,13 @@ export default function AdminUsers() {
     );
     const { data: requests, loading: loadingRequests, reload: reloadRequests } = useAsyncData(() => usersAPI.getInstructorRequests(), []);
     const { data: departments } = useAsyncData(() => departmentsAPI.list(), []);
+    // Department-scoped admin: current dept usage vs student quota (banner).
+    const { data: adminOverview } = useAsyncData(
+        () => (isSuperAdmin() ? Promise.resolve(null) : statsAPI.getAdminOverview().catch(() => null)),
+        [isSuperAdmin]
+    );
+    const deptCapacity = isSuperAdmin() ? null : (adminOverview?.data?.[0] || null);
+    const studentLimitReached = deptCapacity ? deptCapacity.studentCount >= deptCapacity.maxStudents : false;
 
     // Independent fetch for the Role Changes tab — deliberately NOT derived from
     // the All Users tab's filters/search, so a stray role/status filter or search
@@ -295,6 +302,20 @@ export default function AdminUsers() {
                     </div>
                 }
             />
+
+            {studentLimitReached && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center flex-shrink-0">
+                        <GraduationCap size={18} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-bold text-amber-800 dark:text-amber-200 text-sm">Student limit reached ({deptCapacity.studentCount}/{deptCapacity.maxStudents})</p>
+                        <p className="text-xs font-medium text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                            Adding or importing new students into {deptCapacity.departmentName} is blocked until a Super Admin raises the limit.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="flex border-b border-border gap-6 overflow-x-auto">
                 <button

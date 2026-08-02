@@ -40,7 +40,7 @@ export default function StudentDashboard() {
 
     return (
         <PullToRefresh onRefresh={reload}>
-        <div className="space-y-8 max-w-6xl w-full">
+        <div className="space-y-6 sm:space-y-8 max-w-6xl w-full mx-auto px-0">
             {/* Welcome Header */}
             <PageHeader
                 title={`Welcome back, ${user?.name?.split(' ')[0] || 'Student'}! 👋`}
@@ -68,7 +68,7 @@ export default function StudentDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
                 {/* Continue Learning */}
                 <div className="lg:col-span-2">
                     <SectionHeader
@@ -102,17 +102,17 @@ export default function StudentDashboard() {
                                     onClick={() => navigate(`/courses/${e.courseId}/learn`)}
                                 >
 {e.course?.thumbnail ? (
-                                         <div className="w-24 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
+                                         <div className="w-20 h-16 sm:w-24 sm:h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
                                              <CourseThumbnail thumbnail={e.course.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                          </div>
                                     ) : (
-                                        <div className="w-24 h-20 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+                                        <div className="w-20 h-16 sm:w-24 sm:h-20 rounded-lg bg-muted shrink-0 flex items-center justify-center">
                                             <BookOpen size={24} className="text-muted-foreground/30" />
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                        <p className="text-foreground font-bold text-base truncate mb-1 group-hover:text-indigo-600 transition-colors">{e.course?.title}</p>
-                                        <p className="text-muted-foreground text-sm mb-3 truncate">{e.course?.instructorName}</p>
+                                        <p className="text-foreground font-bold text-sm sm:text-base truncate mb-1 group-hover:text-indigo-600 transition-colors">{e.course?.title}</p>
+                                        <p className="text-muted-foreground text-xs sm:text-sm mb-3 truncate">{e.course?.instructorName}</p>
                                         <div className="flex items-center gap-3">
                                             <div className="flex-1"><ProgressBar value={e.progress} /></div>
                                             <span className="text-xs font-bold text-foreground">{e.progress}%</span>
@@ -191,7 +191,7 @@ export default function StudentDashboard() {
                             </Link>
                         }
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5">
                         {completedCourses.map(e => (
                             <div key={e.id} className="bg-card border border-border rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-sm transition-shadow cursor-pointer">
 {e.course?.thumbnail ? (
@@ -201,8 +201,8 @@ export default function StudentDashboard() {
                                          <Award size={20} className="text-muted-foreground/30" />
                                     </div>
                                 )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-foreground text-sm font-bold truncate mb-1">{e.course?.title}</p>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-foreground text-sm font-bold truncate mb-1.5">{e.course?.title}</p>
                                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-[11px] font-bold uppercase tracking-wide">
                                         <Award size={12} /> Completed
                                     </div>

@@ -27,8 +27,13 @@ const list = async (req, res) => {
         values.push('INSTRUCTOR');
         values.push(req.user.department_id || null);
     } else if (scoped) {
-        where = 'WHERE a.department_id = $1';
+        // Department admins see their own dept's announcements PLUS platform-wide
+        // announcements the SUPER_ADMIN targeted at ADMINs (department_id NULL),
+        // so an admin-targeted broadcast is actually visible when they click
+        // through from the notification.
+        where = 'WHERE (a.department_id = $1 OR (a.department_id IS NULL AND $2 = ANY(a.target_roles)))';
         values.push(departmentId);
+        values.push('ADMIN');
     }
 
     const result = await query(`
@@ -51,7 +56,13 @@ const list = async (req, res) => {
 
 // POST /api/announcements — create announcement
 const create = async (req, res) => {
-    const { title, content, priority = 'normal', pinned = false, targetRoles = ['STUDENT', 'INSTRUCTOR'] } = req.body;
+    const {
+        title, content, priority = 'normal', pinned = false,
+        targetRoles = ['STUDENT', 'INSTRUCTOR'],
+        // SUPER_ADMIN may target specific department admins (or admins of
+        // specific departments) instead of broadcasting to all matching roles.
+        departmentIds,
+    } = req.body;
     if (!title || !content) throw createError('Title and content are required', 400);
 
     const { scoped, departmentId } = getDepartmentScope(req);
@@ -63,16 +74,26 @@ const create = async (req, res) => {
     `, [scoped ? departmentId : null, req.user.id, title, content, priority, pinned, targetRoles]);
 
     // Create notifications for target users. Department-scoped admins notify
-    // their department; global admins/super-admins notify all matching roles.
-    const targetUsers = scoped
-        ? await query(
+    // their department; SUPER_ADMIN may narrow to admins of specific
+    // departments (departmentIds) or broadcast to all matching roles.
+    const validTargets = Array.isArray(targetRoles) && targetRoles.length ? targetRoles : ['STUDENT', 'INSTRUCTOR'];
+    let targetUsers;
+    if (scoped) {
+        targetUsers = await query(
             'SELECT id FROM users WHERE department_id = $1 AND role = ANY($2) AND active = true',
-            [departmentId, targetRoles]
-        )
-        : await query(
-            'SELECT id FROM users WHERE role = ANY($1) AND active = true',
-            [targetRoles]
+            [departmentId, validTargets]
         );
+    } else if (Array.isArray(departmentIds) && departmentIds.length) {
+        targetUsers = await query(
+            'SELECT id FROM users WHERE department_id = ANY($1::uuid[]) AND role = ANY($2) AND active = true',
+            [departmentIds, validTargets]
+        );
+    } else {
+        targetUsers = await query(
+            'SELECT id FROM users WHERE role = ANY($1) AND active = true',
+            [validTargets]
+        );
+    }
     const announcementLink = `/announcements?focus=${result.rows[0].id}`;
     for (const user of targetUsers.rows) {
         await query(

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Trash2, Edit2, FileText, X, Save, Search } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Trash2, Edit2, FileText, X, Save, Search, Lock } from 'lucide-react';
 import { coursesAPI, statsAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -30,6 +30,14 @@ export default function AdminCourses() {
     if (departmentFilter !== 'ALL') apiFilters.departmentId = departmentFilter;
     const { data, loading, reload } = useAsyncData(() => coursesAPI.getAll(apiFilters), [departmentFilter]);
     const { data: categories } = useAsyncData(() => statsAPI.getCategories(), []);
+    // Department-scoped admin: current dept usage vs course quota (for the limit
+    // banner + disabled Approve). SUPER_ADMIN manages all depts — no banner.
+    const { data: adminOverview } = useAsyncData(
+        () => (isSuperAdmin() ? Promise.resolve(null) : statsAPI.getAdminOverview().catch(() => null)),
+        [isSuperAdmin]
+    );
+    const deptCapacity = isSuperAdmin() ? null : (adminOverview?.data?.[0] || null);
+    const courseLimitReached = deptCapacity ? deptCapacity.courseCount >= deptCapacity.maxCourses : false;
     const courses = data ?? [];
 
     const [editingCourse, setEditingCourse] = useState(null);
@@ -42,8 +50,9 @@ export default function AdminCourses() {
             await coursesAPI.approve(courseId);
             reload();
             toast.success('Course approved and published!');
-        } catch {
-            toast.error('Failed to approve course');
+        } catch (err) {
+            // Surface backend limit/scope errors (e.g. course limit reached).
+            toast.error(err.message || 'Failed to approve course');
         }
     };
 
@@ -166,6 +175,20 @@ export default function AdminCourses() {
                 }
             />
 
+            {courseLimitReached && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center flex-shrink-0">
+                        <Lock size={18} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-bold text-amber-800 dark:text-amber-200 text-sm">Course limit reached ({deptCapacity.courseCount}/{deptCapacity.maxCourses})</p>
+                        <p className="text-xs font-medium text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                            Approving new courses is blocked until a Super Admin raises the limit for {deptCapacity.departmentName}.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-card border border-border shadow-sm rounded-2xl p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col gap-4 mb-8">
                     <div className="flex flex-wrap gap-3">
@@ -284,8 +307,13 @@ export default function AdminCourses() {
                                     {/* Approve/Reject for PENDING */}
                                     {course.status === 'PENDING' && (
                                         <div className="flex flex-col gap-2 w-full mt-1">
-                                            <button onClick={() => handleApprove(course.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] py-2 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm">
-                                                <CheckCircle size={14} /> Approve
+                                            <button
+                                                onClick={() => handleApprove(course.id)}
+                                                disabled={courseLimitReached}
+                                                title={courseLimitReached ? 'Course limit reached — ask a Super Admin to raise it' : undefined}
+                                                className={`${courseLimitReached ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-[12px] py-2 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm`}
+                                            >
+                                                {courseLimitReached ? <Lock size={14} /> : <CheckCircle size={14} />} Approve
                                             </button>
                                             <button onClick={() => handleReject(course.id)} className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm">
                                                 <XCircle size={14} /> Reject

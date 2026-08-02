@@ -29,7 +29,7 @@ export default function SuperAdminAnalytics() {
     );
 
     return (
-        <div className="space-y-8 max-w-7xl mx-auto pb-12">
+        <div className="space-y-6 sm:space-y-8 max-w-7xl w-full mx-auto px-0 pb-12">
             <PageHeader
                 title="Super Admin Analytics"
                 subtitle="High-level overview of platform health and performance"
@@ -40,7 +40,7 @@ export default function SuperAdminAnalytics() {
             </StatCardGrid>
 
             {/* Enrollment + Student Charts */}
-            <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
                 <ChartCard title="Monthly Enrollments">
                     {stats?.enrollmentsByMonth?.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -92,7 +92,7 @@ export default function SuperAdminAnalytics() {
             </div>
 
             {/* Users by Role + Categories */}
-            <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
                 <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm">
                     <h3 className="text-foreground font-bold text-lg mb-6">Users by Role</h3>
                     {stats?.usersByRole?.length > 0 ? (

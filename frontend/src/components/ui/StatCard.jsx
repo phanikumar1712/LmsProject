@@ -32,7 +32,7 @@ export function StatCard({
         <Tag
             onClick={onClick}
             type={onClick ? 'button' : undefined}
-            className={`bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group ${interactive} ${className}`}
+            className={`bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group ${interactive} ${className}`}
         >
             <div className="absolute top-0 right-0 p-6 sm:p-8 opacity-[0.03] dark:opacity-[0.07] pointer-events-none group-hover:scale-110 transition-transform duration-500">
                 <Icon size={80} />
@@ -70,13 +70,13 @@ export function StatCard({
  */
 export function StatCardGrid({ children, cols = 4, className = '' }) {
     const colClass = {
-        2: 'grid-cols-2',
-        3: 'grid-cols-2 sm:grid-cols-3',
+        2: 'grid-cols-1 sm:grid-cols-2',
+        3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
         4: 'grid-cols-2 lg:grid-cols-4',
     }[cols] ?? 'grid-cols-2 lg:grid-cols-4';
 
     return (
-        <div className={`grid ${colClass} gap-6 ${className}`}>
+        <div className={`grid ${colClass} gap-3 sm:gap-4 lg:gap-5 ${className}`}>
             {children}
         </div>
     );
@@ -85,9 +85,9 @@ export function StatCardGrid({ children, cols = 4, className = '' }) {
 /** Skeleton placeholders while stats load */
 export function StatCardSkeleton({ count = 4 }) {
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
             {Array.from({ length: count }).map((_, i) => (
-                <div key={i} className="bg-card border border-border rounded-2xl h-[120px] animate-pulse" />
+                <div key={i} className="bg-card border border-border rounded-2xl h-[104px] sm:h-[120px] animate-pulse" />
             ))}
         </div>
     );

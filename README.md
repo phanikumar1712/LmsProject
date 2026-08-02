@@ -280,6 +280,8 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 ### 👩‍🏫 Instructor Portal
 - Create & manage courses with sections and lessons
 - **Quiz builder** with CSV/Excel question import, random selection modes (ALL / RANDOM / BY_DIFFICULTY / BY_CATEGORY)
+- **Assessments tab**: create graded exams with max-attempt limits, per-category/difficulty question selection, and auto-grading
+- **Assessment Reports**: student rankings, per-category score breakdown charts, CSV export, and full answer-vs-correct review pages
 - **Anti-cheat quiz system**: fullscreen enforcement, tab-switch detection, daily attempt limits, developer-tools blocking
 - View enrolled students and progress
 - Analytics dashboard (enrollments, ratings)
@@ -289,12 +291,15 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - Browse and enroll in courses (all **completely free**)
 - Video player with lesson tracking and progress bar
 - **Anti-cheat quiz system** (fullscreen mode, 3 violations = auto-submit)
+- **Write Exam** tab: take instructor assessments with configurable attempts & selection modes
+- **My Results** tab: full attempt history with per-question answers, scores, and printable reports
 - Wishlist management
 - **Certificates** on course completion
 - **Learning streaks** (current + longest)
 - **Discussion forums** per course/lesson
 
 ### 🛡️ Admin Dashboard (Department-Scoped)
+- **Department limit enforcement**: capacity card with progress bars; course approval & student imports blocked with a clear message when the department limit is reached (admins & super admins get notified)
 - User management: view, create, suspend, reset passwords for dept students & instructors
 - **Bulk import** instructors and students from CSV/Excel
 - **Course moderation**: approve, reject, send back to draft with notes
@@ -310,15 +315,15 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - Reports export (CSV)
 
 ### 👑 Super Admin (Platform-Wide)
-- **Department Management**: Create, edit, delete departments
-- **Admin Management**: Create admins, assign departments, set per-admin quotas
+- **Department Management**: Create, edit, delete departments + set per-department **student & course limits**
+- **Admin Management**: Create admins, assign multiple departments (first = primary), promote/demote with password authorization
 - **User Management**: Full access to all roles, promote to Admin/Super Admin, bulk import into any department
 - **Course Oversight**: View all courses across all departments, force-edit or delete any course, override instructor/admin decisions
 - **Platform Settings**: Branding (logo, colors, platform name), email/SMTP config, SSO/login config, terms & policies
-- **Analytics & Reports**: Platform-wide analytics, **AI-powered reports**, CSV export
+- **Analytics & Reports**: Platform-wide analytics, **AI-powered reports**, per-department limit usage overview, CSV export
 - **Audit Logs**: View every action by every user, filter by user/action/date, CSV export (DPDP Act compliance)
 - **System Health**: Server/uptime monitoring, DB status, memory usage, service health dashboard
-- **Announcements**: Broadcast to all users or specific roles platform-wide
+- **Announcements**: Broadcast to **admins only** (or specific departments via filter), or all users/roles platform-wide
 - **Force Logout**: Terminate any user session
 - **2FA Enforcement**: Enable/require two-factor authentication platform-wide
 - **Academic Sessions**: Create/edit/delete academic sessions per department
@@ -366,7 +371,9 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 After running the database migration, the following demo accounts are created automatically.
 **All non-SuperAdmin accounts use password: `demo123`**
 
-> 💡 **Tip:** You can also use the **"Demo Login"** button on the login page — just select your role and click, no password needed!
+> 👑 The **Super Admin** account is seeded with the display name **"Super Admin"** — a proper name, not a placeholder. If your database was created by an older seed (which used a placeholder like `Test`), re-running `npm run migrate` automatically corrects the name to `Super Admin` (the password is never touched).
+
+> 💡 **Tip:** Use the **"Quick Demo Login"** buttons on the login page — one click per role (Student / Instructor / Admin / Super Admin), no password needed! Demo login maps to: `cse.student1@demo.com`, `cse.instructor@demo.com`, `cse.admin@demo.com`, `superadmin@lms.com`.
 
 #### 🌐 Platform-Wide Roles
 
@@ -511,6 +518,10 @@ npm run dev        # http://localhost:5173
 | POST | `/api/users/instructors/import` | Admin+ | Bulk import instructors |
 | POST | `/api/users/students/import` | Admin+ | Bulk import students |
 | POST | `/api/users/invite-admin` | SuperAdmin | Create admin |
+| PUT | `/api/users/:id/departments` | SuperAdmin | Assign admin to departments |
+| GET | `/api/users/:id/departments` | SuperAdmin | Get admin's departments |
+| GET | `/api/users/instructors/template` | Admin+ | Download instructor import template |
+| GET | `/api/users/students/template` | Admin+ | Download student import template |
 | POST | `/api/users/instructor-request` | Student | Apply to be instructor |
 | GET | `/api/users/instructor-requests` | Admin+ | View applications |
 | PUT | `/api/users/instructor-requests/:id/approve` | Admin+ | Approve/reject |
@@ -521,8 +532,8 @@ npm run dev        # http://localhost:5173
 | GET | `/api/stats/platform` | Admin+ | Platform analytics |
 | GET | `/api/stats/instructor/:id` | Auth | Instructor analytics |
 | GET | `/api/stats/public` | Public | Public platform stats |
-| GET | `/api/stats/departments` | SuperAdmin | Department comparison |
-| GET | `/api/stats/admins` | SuperAdmin | Per-admin overview |
+| GET | GET | `/api/stats/departments` | SuperAdmin | Department comparison |
+| GET | `/api/stats/admins` | Admin+ | Per-department usage vs limits (scoped for dept admins) |
 | GET | `/api/stats/system-health` | SuperAdmin | System monitoring |
 | GET | `/api/stats/audit-logs` | Admin+ | Audit trail (scoped) |
 | GET | `/api/stats/settings` | SuperAdmin | Platform settings |
@@ -558,7 +569,10 @@ npm run dev          # Start with hot reload (nodemon)
 npm start            # Start production server
 npm run migrate      # Run DB migrations (seeds default data + demo accounts)
 npm test             # Run API flow tests
-npm run test:unit    # Run unit tests (5 quiz-utils tests)
+npm run test:unit    # Run unit tests (quiz, users, courses-limits — 27 tests)
+node tests/e2e_department_isolation.js   # Department isolation E2E (23 checks)
+node tests/e2e_assessment_flow.js        # Assessment create → take → report flow
+node tests/e2e_quiz_notif.js             # Quiz + notification flow
 
 # Frontend
 npm run dev          # Start Vite dev server
@@ -609,9 +623,23 @@ The following end-to-end flows have been verified via automated API testing:
 
 ### Notification Flow
 - ✅ Admin can create department announcements targeting specific roles
+- ✅ Super Admin can target **admins only** (all departments or a specific department filter) — students/instructors never see them
 - ✅ Students receive real-time notification on announcement creation
 - ✅ Students can view, read, and mark notifications as read
 - ✅ Admin can view read receipts per announcement
+
+### Department Limits
+- ✅ Super Admin sets per-department student/course limits (with platform-wide defaults)
+- ✅ Course approval blocked with `409` when the department course limit is reached
+- ✅ Student signups & imports blocked when the department student limit is reached
+- ✅ Department admins + all super admins receive a notification when a limit is reached (24h deduped)
+- ✅ Admin dashboard shows live capacity progress bars and over-limit warnings
+
+### Assessment Flow
+- ✅ Instructor creates assessment with max-attempt limit & question selection mode (ALL / RANDOM / BY_DIFFICULTY / BY_CATEGORY)
+- ✅ Enrolled students are notified and can take the exam from the **Write Exam** tab
+- ✅ Concurrent-start race is prevented (advisory lock) so attempts can never exceed the cap
+- ✅ Instructor sees rankings, per-category breakdown charts, CSV export, and per-student answer reports
 
 ### Authentication & Authorization
 - ✅ All 4 roles (Student, Instructor, Admin, Super Admin) login successfully

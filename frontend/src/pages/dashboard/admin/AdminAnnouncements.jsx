@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info, EyeOff, CheckCircle, Calendar, User, Clock } from 'lucide-react';
+import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info, EyeOff, CheckCircle, Calendar, User, Clock, Building2, ShieldCheck } from 'lucide-react';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const getToken = () => localStorage.getItem('lms_token');
@@ -22,10 +23,12 @@ const http = async (method, path, body = null) => {
 };
 
 export default function AdminAnnouncements() {
+    const { isSuperAdmin } = useAuth();
     const [showCreate, setShowCreate] = useState(false);
-    const [form, setForm] = useState({ title: '', content: '', priority: 'normal', pinned: false, targetRoles: ['STUDENT', 'INSTRUCTOR'] });
+    const [form, setForm] = useState({ title: '', content: '', priority: 'normal', pinned: false, targetRoles: ['STUDENT', 'INSTRUCTOR'], departmentIds: [] });
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState(null);
+    const { data: departments } = useAsyncData(() => (isSuperAdmin() ? http('GET', '/departments/public') : Promise.resolve([])), [isSuperAdmin]);
 
     // Read receipts modal state
     const [readsModal, setReadsModal] = useState(null); // announcement object
@@ -48,7 +51,7 @@ export default function AdminAnnouncements() {
             }
             setShowCreate(false);
             setEditing(null);
-            setForm({ title: '', content: '', priority: 'normal', pinned: false, targetRoles: ['STUDENT', 'INSTRUCTOR'] });
+            setForm({ title: '', content: '', priority: 'normal', pinned: false, targetRoles: ['STUDENT', 'INSTRUCTOR'], departmentIds: [] });
             reload();
         } catch (err) {
             toast.error(err.message);
@@ -189,7 +192,7 @@ export default function AdminAnnouncements() {
                                     <button
                                         onClick={() => {
                                             setEditing(ann);
-                                            setForm({ title: ann.title, content: ann.content, priority: ann.priority, pinned: ann.pinned, targetRoles: ann.target_roles });
+                                            setForm({ title: ann.title, content: ann.content, priority: ann.priority, pinned: ann.pinned, targetRoles: ann.target_roles || [], departmentIds: [] });
                                             setShowCreate(true);
                                         }}
                                         className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
@@ -262,15 +265,56 @@ export default function AdminAnnouncements() {
                                     <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1.5 block">Target</label>
                                     <select
                                         value={form.targetRoles.join(',')}
-                                        onChange={e => setForm(p => ({ ...p, targetRoles: e.target.value.split(',').filter(Boolean) }))}
+                                        onChange={e => setForm(p => ({ ...p, targetRoles: e.target.value.split(',').filter(Boolean), departmentIds: [] }))}
                                         className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
                                     >
                                         <option value="STUDENT,INSTRUCTOR">Students & Instructors</option>
                                         <option value="STUDENT">Students Only</option>
                                         <option value="INSTRUCTOR">Instructors Only</option>
+                                        {isSuperAdmin() && (
+                                            <>
+                                                <option value="ADMIN">Department Admins Only</option>
+                                                <option value="ADMIN,SUPER_ADMIN">All Admins (incl. Super Admin)</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                             </div>
+                            {isSuperAdmin() && form.targetRoles.includes('ADMIN') && (
+                                <div>
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+                                        <Building2 size={12} /> Target specific department admins
+                                    </label>
+                                    <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto bg-muted/30 border border-border rounded-xl p-3">
+                                        {(departments || []).map(d => {
+                                            const checked = form.departmentIds.includes(d.id);
+                                            return (
+                                                <button
+                                                    key={d.id}
+                                                    type="button"
+                                                    onClick={() => setForm(p => ({
+                                                        ...p,
+                                                        departmentIds: checked
+                                                            ? p.departmentIds.filter(x => x !== d.id)
+                                                            : [...p.departmentIds, d.id],
+                                                    }))}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${checked ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-card text-muted-foreground border-border hover:bg-muted'}`}
+                                                >
+                                                    {d.icon || '🏛️'} {d.name}
+                                                </button>
+                                            );
+                                        })}
+                                        {(!departments || departments.length === 0) && (
+                                            <span className="text-xs text-muted-foreground">No departments available</span>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                        {form.departmentIds.length > 0
+                                            ? `Only admins of the ${form.departmentIds.length} selected department(s) will be notified.`
+                                            : 'No filter — admins of all departments will be notified.'}
+                                    </p>
+                                </div>
+                            )}
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input
                                     type="checkbox"

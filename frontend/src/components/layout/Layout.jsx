@@ -101,7 +101,7 @@ export function DashboardLayout() {
                 onTouchEnd={edgeSwipe.handleTouchEnd}
                 className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'md:ml-16' : 'md:ml-64'}`}
             >
-                <div className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
+                <div className="p-4 sm:p-5 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={location.pathname}

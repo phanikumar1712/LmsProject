@@ -10,13 +10,13 @@
 export function PageHeader({ title, subtitle, action, border = false, className = '' }) {
     return (
         <div
-            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${border ? 'border-b border-border pb-6' : ''} ${className}`}
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${border ? 'border-b border-border pb-5' : ''} ${className}`}
         >
-            <div>
-                <h1 className="text-3xl font-extrabold text-foreground tracking-tight">{title}</h1>
-                {subtitle && <p className="text-muted-foreground mt-1 font-medium">{subtitle}</p>}
+            <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight leading-tight">{title}</h1>
+                {subtitle && <p className="text-muted-foreground mt-1 font-medium text-sm sm:text-base">{subtitle}</p>}
             </div>
-            {action && <div className="flex items-center gap-4">{action}</div>}
+            {action && <div className="flex items-center gap-4 shrink-0 flex-wrap">{action}</div>}
         </div>
     );
 }

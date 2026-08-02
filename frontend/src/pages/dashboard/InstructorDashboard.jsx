@@ -37,7 +37,7 @@ export default function InstructorDashboard() {
 
     return (
         <PullToRefresh onRefresh={reload}>
-        <div className="space-y-8 max-w-6xl">
+        <div className="space-y-6 sm:space-y-8 max-w-6xl w-full mx-auto px-0">
             <PageHeader
                 title="Instructor Dashboard"
                 subtitle="Track your courses and student performance"
@@ -57,7 +57,7 @@ export default function InstructorDashboard() {
                 </StatCardGrid>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
                 {/* Enrollments Chart */}
                 <ChartCard
                     title="Monthly Enrollments"
@@ -139,12 +139,12 @@ export default function InstructorDashboard() {
                         </Link>
                     }
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5">
                     {loading ? (
                         [1, 2, 3, 4].map(i => <div key={i} className="bg-card border border-border rounded-2xl h-[100px] animate-pulse" />)
                     ) : courses?.slice(0, 4).map(course => (
                         <div key={course.id} className="bg-card border border-border rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow group">
-                            <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-16 h-12 sm:w-20 sm:h-16 rounded-lg object-cover border border-border flex-shrink-0" />
+                            <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-14 h-12 sm:w-20 sm:h-16 rounded-lg object-cover border border-border flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-foreground font-bold text-[15px] truncate group-hover:text-indigo-600 transition-colors">{course.title}</p>
                                 <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">

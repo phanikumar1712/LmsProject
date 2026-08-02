@@ -845,13 +845,11 @@ const createTables = async () => {
         `);
 
         // ── SEED SUPER ADMIN ──────────────────────────────────────────────────
-        const bcrypt = require('bcryptjs');
-        const superAdminPass = await bcrypt.hash('superadmin', 12);
-        await client.query(`
-            INSERT INTO users(name, email, password, role, avatar)
-        VALUES('Super Admin', 'superadmin@lms.com', $1, 'SUPER_ADMIN', '')
-            ON CONFLICT(email) DO NOTHING;
-        `, [superAdminPass]);
+        // Upserted in a standalone module so it's unit-testable without running
+        // the whole migration. Name is 'Super Admin' (not a placeholder like
+        // 'Test'); DO UPDATE fixes existing DBs on the next migrate run.
+        const { seedSuperAdmin } = require('./seedSuperAdmin');
+        await seedSuperAdmin(client);
 
         // ── CLEANUP: Remove dummy / departmentless users ──────────────────────
         // Delete any existing STUDENT or INSTRUCTOR that has no department_id.
@@ -875,6 +873,7 @@ const createTables = async () => {
         // ── SEED USERS PER DEPARTMENT ─────────────────────────────────────────
         // Each academic department gets its own admin, instructor, and students.
         // All share the same demo password for easy testing.
+        const bcrypt = require('bcryptjs');
         const demoPass = await bcrypt.hash('demo123', 12);
 
         const deptUsers = {

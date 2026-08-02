@@ -2,6 +2,7 @@ const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapCourse } = require('../utils/formatters');
 const { getDepartmentScope } = require('../utils/scope');
+const { getDeptCapacity, notifyLimitReached } = require('../utils/limits');
 
 const courseFields = `
     c.id, c.title, c.description, c.short_desc, c.thumbnail,
@@ -451,9 +452,39 @@ const update = async (req, res) => {
     res.json(mapCourse(result.rows[0]));
 };
 
+// Resolve the department a course belongs to: its category's department, or the
+// instructor's department when the course is uncategorized. Returns null when
+// neither exists (globally-scoped course).
+const resolveCourseDepartment = async (courseId) => {
+    const r = await query(`
+        SELECT COALESCE(cat.department_id, u.department_id) AS department_id
+        FROM courses c
+        JOIN users u ON c.instructor_id = u.id
+        LEFT JOIN categories cat ON c.category_id = cat.id
+        WHERE c.id = $1
+    `, [courseId]);
+    return r.rows.length ? r.rows[0].department_id : null;
+};
+
 // PUT /api/courses/:id/approve
 const approve = async (req, res) => {
     await assertCourseInScope(req, req.params.id);
+
+    // Department course-limit enforcement: if the department has already reached
+    // its max_courses quota, block the approval and notify the dept admins + a
+    // super admin for a limit-review discussion.
+    const departmentId = await resolveCourseDepartment(req.params.id);
+    if (departmentId) {
+        const capacity = await getDeptCapacity(departmentId);
+        if (capacity.coursesAtLimit) {
+            await notifyLimitReached(departmentId, 'courses');
+            throw createError(
+                `Course limit reached for this department (${capacity.courseCount}/${capacity.maxCourses}). Ask the Super Admin to raise the limit.`,
+                409
+            );
+        }
+    }
+
     const result = await query(
         `UPDATE courses SET status = 'PUBLISHED', review_note = '', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
         [req.params.id]

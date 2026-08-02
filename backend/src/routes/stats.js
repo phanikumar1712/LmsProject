@@ -10,7 +10,9 @@ router.get('/public', asyncHandler(ctrl.getPublicStats));
 router.get('/platform', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getPlatform));
 router.get('/instructor/:instructorId', authenticate, asyncHandler(ctrl.getInstructor));
 router.get('/audit-logs', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAuditLogs));
-router.get('/admins', authenticate, authorize('SUPER_ADMIN'), asyncHandler(ctrl.getAdminOverview));
+// Department admins see only their own department's usage vs limits (scoped in
+// the controller); SUPER_ADMIN sees all departments.
+router.get('/admins', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getAdminOverview));
 router.get('/student/streak', authenticate, authorize('STUDENT'), asyncHandler(ctrl.getStudentStreak));
 router.get('/students/progress', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyncHandler(ctrl.getStudentProgress));
 router.get('/categories', optionalAuth, asyncHandler(ctrl.getCategories));
