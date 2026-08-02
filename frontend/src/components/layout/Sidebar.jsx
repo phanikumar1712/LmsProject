@@ -4,7 +4,6 @@ import {
     ShieldCheck, Layers, GraduationCap, PlusCircle, Star, Activity, Database,
     ChevronLeft, LogOut, ClipboardList, MessageSquare, BarChart3, Heart, User,
     Building2, Zap, Megaphone, UserPlus, TrendingUp,
-    HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -12,7 +11,8 @@ const STUDENT_NAV = [
     { to: '/student', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/student/courses', icon: BookOpen, label: 'My Courses' },
     { to: '/student/wishlist', icon: Heart, label: 'Wishlist' },
-    { to: '/student/quizzes', icon: ClipboardList, label: 'My Quizzes' },
+    { to: '/student/exams', icon: ClipboardList, label: 'Write Exam' },
+    { to: '/student/quizzes', icon: BarChart3, label: 'My Results' },
     { to: '/student/certificates', icon: Award, label: 'Certificates' },
     { to: '/announcements', icon: Megaphone, label: 'Announcements' },
     { to: '/courses', icon: GraduationCap, label: 'Browse Courses' },
@@ -26,7 +26,7 @@ const INSTRUCTOR_NAV = [
     { to: '/instructor/students', icon: Users, label: 'Students' },
     { to: '/instructor/reviews', icon: Star, label: 'Reviews' },
     { to: '/instructor/analytics', icon: BarChart2, label: 'Analytics' },
-    { to: '/instructor/quiz-builder', icon: HelpCircle, label: 'Quiz Builder' },
+    { to: '/instructor/assessments', icon: ClipboardList, label: 'Assessments' },
     { to: '/announcements', icon: Megaphone, label: 'Announcements' },
 ];
 

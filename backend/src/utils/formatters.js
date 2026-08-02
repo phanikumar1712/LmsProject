@@ -38,6 +38,7 @@ const mapCourse = (c) => ({
     category: c.categoryName,
     categoryId: c.categoryId,
     categoryIcon: c.categoryIcon,
+    reviewNote: c.review_note ?? c.reviewNote ?? null,
     departmentId: c.departmentId,
     departmentName: c.departmentName,
     instructorBio: c.instructorBio,

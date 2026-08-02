@@ -60,3 +60,59 @@ test('multi-select grading rejects extra choices beyond correct set', () => {
     assert.equal(answersMatch(question, ['B', 'A']), true);
     assert.equal(answersMatch(question, ['A', 'B', 'C']), false);
 });
+
+test('maxAttempts defaults to 0 (unlimited) and accepts explicit valid limits', () => {
+    const base = (overrides = {}) => validateQuizPayload({
+        title: 'Attempts',
+        questions: [{ id: 'q1', type: 'MCQ_SINGLE', text: 'Pick', options: ['A', 'B'], correctAnswer: 'A' }],
+        ...overrides,
+    });
+
+    // Omitted → 0 (unlimited)
+    assert.equal(base().maxAttempts, 0);
+    // Explicit 0 → unlimited
+    assert.equal(base({ maxAttempts: 0 }).maxAttempts, 0);
+    // Explicit limits are preserved
+    assert.equal(base({ maxAttempts: 1 }).maxAttempts, 1);
+    assert.equal(base({ maxAttempts: 3 }).maxAttempts, 3);
+    assert.equal(base({ maxAttempts: 100 }).maxAttempts, 100);
+});
+
+test('maxAttempts rejects negative, oversized, and non-integer values', () => {
+    const base = (overrides = {}) => validateQuizPayload({
+        title: 'Attempts',
+        questions: [{ id: 'q1', type: 'MCQ_SINGLE', text: 'Pick', options: ['A', 'B'], correctAnswer: 'A' }],
+        ...overrides,
+    });
+
+    assert.throws(() => base({ maxAttempts: -1 }), /maxAttempts/);
+    assert.throws(() => base({ maxAttempts: 101 }), /maxAttempts/);
+    assert.throws(() => base({ maxAttempts: 1.5 }), /maxAttempts/);
+    assert.throws(() => base({ maxAttempts: 'three' }), /maxAttempts/);
+});
+
+test('serializeQuiz exposes maxAttempts and falls back to 0 for legacy quizzes', () => {
+    const withLimit = serializeQuiz({
+        id: 'quiz-id',
+        course_id: 'course-id',
+        title: 'Quiz',
+        description: '',
+        passing_score: 70,
+        time_limit: 30,
+        max_attempts: 3,
+        questions: [],
+    });
+    assert.equal(withLimit.maxAttempts, 3);
+
+    // Legacy rows (no max_attempts column value) → 0 = unlimited
+    const legacy = serializeQuiz({
+        id: 'quiz-id',
+        course_id: 'course-id',
+        title: 'Quiz',
+        description: '',
+        passing_score: 70,
+        time_limit: 30,
+        questions: [],
+    });
+    assert.equal(legacy.maxAttempts, 0);
+});

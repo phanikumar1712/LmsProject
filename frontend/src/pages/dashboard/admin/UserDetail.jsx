@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     User, Mail, Shield, Building2, Calendar, Hash, Phone, Award, BookOpen,
@@ -107,19 +107,39 @@ export default function UserDetail() {
     const [notifyMessage, setNotifyMessage] = useState('');
     const [sendingNotify, setSendingNotify] = useState(false);
 
+    // Role change modal — password-gated (admin must re-enter their password)
+    const [roleChangeTarget, setRoleChangeTarget] = useState(null); // new role string
+    const [roleChangePassword, setRoleChangePassword] = useState('');
+    const [roleChanging, setRoleChanging] = useState(false);
+
+    // Tracks the pending auto-back navigation so a successful "Try Again" retry
+    // (or unmount) cancels the timer instead of being yanked back to the list.
+    const backTimerRef = useRef(null);
+    useEffect(() => () => clearTimeout(backTimerRef.current), []);
+
     const fetchUser = useCallback(async () => {
+        clearTimeout(backTimerRef.current);
         setLoading(true);
         setError(null);
         try {
             const res = await usersAPI.getById(id);
             setUser(res.data);
         } catch (err) {
-            setError(err.message || 'Failed to load user');
-            toast.error(err.message || 'Failed to load user details');
+            const msg = err.message || 'Failed to load user';
+            setError(msg);
+            toast.error(msg);
+            // If the user no longer exists (e.g. deleted from a stale list), return
+            // to the list instead of leaving the admin stranded on a dead page.
+            if (/not found|outside your department|insufficient|enrolled in your courses/i.test(msg)) {
+                backTimerRef.current = setTimeout(
+                    () => navigate(isInstructor ? '/instructor/students' : '/admin/users'),
+                    1800
+                );
+            }
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [id, isInstructor, navigate]);
 
     const fetchCourses = useCallback(async () => {
         if (!showAssignCourse) return;
@@ -143,12 +163,28 @@ export default function UserDetail() {
             toast.error('Only Super Admin can assign admin roles');
             return;
         }
+        // Open the password-gated modal instead of changing the role directly
+        setRoleChangeTarget(newRole);
+        setRoleChangePassword('');
+    };
+
+    const confirmRoleChange = async () => {
+        if (!roleChangeTarget) return;
+        if (!roleChangePassword) {
+            toast.error('Enter your password to authorize the role change');
+            return;
+        }
+        setRoleChanging(true);
         try {
-            const updated = await usersAPI.updateRole(user.id, newRole);
+            const updated = await usersAPI.updateRole(user.id, roleChangeTarget, '', roleChangePassword);
             setUser(prev => ({ ...prev, role: updated.role }));
-            toast.success(`Role updated to ${newRole.replace('_', ' ')}`);
+            toast.success(`Role updated to ${roleChangeTarget.replace('_', ' ')}`);
+            setRoleChangeTarget(null);
+            setRoleChangePassword('');
         } catch (err) {
             toast.error(err.message || 'Failed to update role');
+        } finally {
+            setRoleChanging(false);
         }
     };
 
@@ -244,11 +280,14 @@ export default function UserDetail() {
                     </div>
                     <h3 className="text-xl font-bold text-foreground">Failed to Load User</h3>
                     <p className="text-muted-foreground text-sm">{error}</p>
+                    <p className="text-xs text-muted-foreground/60 bg-muted/40 border border-border rounded-xl px-4 py-2">
+                        This can happen if the user was deleted or is outside your department scope.
+                    </p>
                     <div className="flex gap-3 justify-center pt-2">
                         <button onClick={fetchUser} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors">
                             Try Again
                         </button>
-                        <button onClick={() => navigate('/admin/users')} className="px-6 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                        <button onClick={() => navigate(isInstructor ? '/instructor/students' : '/admin/users')} className="px-6 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted transition-colors">
                             Back to Users
                         </button>
                     </div>
@@ -806,6 +845,52 @@ export default function UserDetail() {
                                 <button onClick={handleEnrollCourse} disabled={!selectedCourseId || enrolling}
                                     className="flex-1 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-colors">
                                     {enrolling ? 'Enrolling...' : 'Enroll'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Role Change Modal (password-gated) ── */}
+            {roleChangeTarget && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <Shield size={18} className="text-amber-600" /> Confirm Role Change
+                            </h3>
+                            <button onClick={() => setRoleChangeTarget(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                                Change <strong className="text-foreground">{user.name}</strong>'s role from{' '}
+                                <strong className="text-foreground">{user.role.replace('_', ' ')}</strong> to{' '}
+                                <strong className="text-amber-600">{roleChangeTarget.replace('_', ' ')}</strong>?
+                            </p>
+                            <div>
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1 block">
+                                    Your admin password <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    value={roleChangePassword}
+                                    onChange={e => setRoleChangePassword(e.target.value)}
+                                    placeholder="Enter your password to authorize"
+                                    autoFocus
+                                    className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm font-medium"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-1">
+                                <button onClick={() => setRoleChangeTarget(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                                    Cancel
+                                </button>
+                                <button onClick={confirmRoleChange} disabled={roleChanging}
+                                    className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-colors">
+                                    {roleChanging ? 'Changing...' : 'Confirm Change'}
                                 </button>
                             </div>
                         </div>

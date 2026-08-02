@@ -19,7 +19,7 @@ const SELECTION_MODES = [
     { value: 'BY_CATEGORY', label: 'By Category' },
 ];
 
-export default function InstructorQuizBuilder() {
+export default function InstructorQuizBuilder({ redirectTo = '/instructor/courses', onCreated }) {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
@@ -27,7 +27,7 @@ export default function InstructorQuizBuilder() {
     const [importing, setImporting] = useState(false);
 
     const [quizInfo, setQuizInfo] = useState({
-        courseId: '', title: '', instructions: '', timeLimit: 30, passingScore: 80
+        courseId: '', title: '', instructions: '', timeLimit: 30, passingScore: 80, maxAttempts: 0
     });
 
     // Selection config for random question drawing
@@ -196,6 +196,7 @@ export default function InstructorQuizBuilder() {
                 instructions: quizInfo.instructions,
                 timeLimit: parseInt(quizInfo.timeLimit),
                 passingScore: parseInt(quizInfo.passingScore),
+                maxAttempts: parseInt(quizInfo.maxAttempts) || 0,
                 selectionConfig: buildSelectionConfig(),
                 questions: questions.map(q => ({
                     id: q.id,
@@ -210,8 +211,9 @@ export default function InstructorQuizBuilder() {
                                 : null
                 }))
             });
-            toast.success('Quiz generated and published perfectly!');
-            navigate('/instructor/courses');
+            toast.success('Assessment created and students notified!');
+            if (onCreated) onCreated(result);
+            else navigate(redirectTo);
         } catch (err) {
             toast.error('Failed to create quiz: ' + err.message);
         } finally {
@@ -274,6 +276,23 @@ export default function InstructorQuizBuilder() {
                     <div>
                         <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Passing Score (%)</label>
                         <input type="number" name="passingScore" value={quizInfo.passingScore} onChange={handleInfoChange} className={InputClass} min="1" max="100" />
+                    </div>
+                    <div>
+                        <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Max Attempts</label>
+                        <input
+                            type="number"
+                            name="maxAttempts"
+                            value={quizInfo.maxAttempts}
+                            onChange={handleInfoChange}
+                            className={InputClass}
+                            min="0"
+                            max="100"
+                            placeholder="0 = unlimited"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5 font-medium leading-relaxed">
+                            Limit how many times each student can take this exam. <span className="font-bold text-indigo-600">0</span> means unlimited.
+                            <span className="block mt-0.5 text-muted-foreground/80">Note: unlimited quizzes still respect a safety net of <span className="font-semibold">5 attempts per 24 hours</span> per student.</span>
+                        </p>
                     </div>
                     <div className="sm:col-span-2">
                         <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Instructions</label>

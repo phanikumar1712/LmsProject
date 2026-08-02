@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Ban, Trash2, Upload, X, Building2, Download, UserPlus, RotateCcw, Copy } from 'lucide-react';
+import { CheckCircle, Ban, Trash2, Upload, X, Building2, Download, UserPlus, RotateCcw, Copy, GraduationCap, Users, Shield, Crown, Lock, ArrowLeftRight } from 'lucide-react';
 import { usersAPI, departmentsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -22,6 +22,15 @@ export default function AdminUsers() {
     );
     const { data: requests, loading: loadingRequests, reload: reloadRequests } = useAsyncData(() => usersAPI.getInstructorRequests(), []);
     const { data: departments } = useAsyncData(() => departmentsAPI.list(), []);
+
+    // Independent fetch for the Role Changes tab — deliberately NOT derived from
+    // the All Users tab's filters/search, so a stray role/status filter or search
+    // term can never hide convertible students/instructors here. Scoped admins
+    // still get only their department's users (backend isolation).
+    const { data: roleUsers, loading: loadingRoleUsers, reload: reloadRoleUsers } = useAsyncData(
+        () => usersAPI.getAll({ limit: 500 }),
+        []
+    );
     const deptName = (id) => (departments || []).find(d => d.id === id)?.name || '—';
 
     // Add Instructor modal
@@ -45,39 +54,53 @@ export default function AdminUsers() {
     // Password reset result modal
     const [resetResult, setResetResult] = useState(null); // { name, tempPassword }
 
-    // Role change confirmation modal
+    // Role change confirmation modal — every role change now requires the
+    // acting admin's own password (verified server-side) + optional reason.
     const [roleChangeConfirm, setRoleChangeConfirm] = useState(null); // { user, newRole }
     const [roleChangeReason, setRoleChangeReason] = useState('');
+    const [roleChangePassword, setRoleChangePassword] = useState('');
+    const [roleChanging, setRoleChanging] = useState(false);
 
     const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-    const handleRoleChange = async (userId, newRole, reason = '') => {
+    const handleRoleChange = async (userId, newRole, reason = '', adminPassword = '') => {
         try {
-            await usersAPI.updateRole(userId, newRole, reason);
+            await usersAPI.updateRole(userId, newRole, reason, adminPassword);
             reloadUsers();
+            reloadRoleUsers?.(); // keep the Role Changes tab in sync
             toast.success(`User role updated to ${newRole}`);
+            return true;
         } catch (err) {
             toast.error(err.message || 'Failed to update role');
+            return false;
         }
     };
 
-    // Intercept role changes: show confirmation only for Admin/Super Admin promotions
+    // All role changes (student↔instructor and admin promotions) go through the
+    // password-gated confirmation modal.
     const handleRoleSelect = (user, newRole) => {
-        if (['ADMIN', 'SUPER_ADMIN'].includes(newRole)) {
-            // Big role change — show confirmation popup
-            setRoleChangeConfirm({ user, newRole });
-            setRoleChangeReason('');
-        } else {
-            // Student/Instructor — fast path, no confirmation
-            handleRoleChange(user.id, newRole);
-        }
+        if (newRole === user.role) return;
+        setRoleChangeConfirm({ user, newRole });
+        setRoleChangeReason('');
+        setRoleChangePassword('');
     };
 
-    const confirmRoleChange = () => {
+    const confirmRoleChange = async () => {
         if (!roleChangeConfirm) return;
-        handleRoleChange(roleChangeConfirm.user.id, roleChangeConfirm.newRole, roleChangeReason);
-        setRoleChangeConfirm(null);
-        setRoleChangeReason('');
+        if (!roleChangePassword) {
+            toast.error('Enter your password to authorize the role change');
+            return;
+        }
+        setRoleChanging(true);
+        // Keep the modal open on failure (e.g. wrong password) so the admin can
+        // retry in place instead of reopening everything.
+        const ok = await handleRoleChange(roleChangeConfirm.user.id, roleChangeConfirm.newRole, roleChangeReason, roleChangePassword);
+        setRoleChanging(false);
+        if (ok) {
+            setRoleChangeConfirm(null);
+            setRoleChangeReason('');
+            setRoleChangePassword('');
+        }
     };
 
     const handleRequestAction = async (id, action) => {
@@ -194,8 +217,8 @@ export default function AdminUsers() {
 
     const downloadPasswords = (rows, label = 'Instructor') => {
         const created = rows.filter(r => r.status === 'created');
-        const csv = "Name,Email,TempPassword\n" +
-            created.map(r => `"${r.name || ''}","${r.email}","${r.tempPassword}"`).join("\n");
+        const csv = "Name,Email,Department,TempPassword\n" +
+            created.map(r => `"${r.name || ''}","${r.email}","${r.departmentName || ''}","${r.tempPassword}"`).join("\n");
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -209,6 +232,25 @@ export default function AdminUsers() {
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Users eligible for student↔instructor conversion in the dedicated tab.
+    const convertibleUsers = (roleUsers || []).filter(u => ['STUDENT', 'INSTRUCTOR'].includes(u.role));
+
+    const roleBadge = (role) => {
+        const map = {
+            STUDENT: { cls: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400', icon: GraduationCap },
+            INSTRUCTOR: { cls: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400', icon: Users },
+            ADMIN: { cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400', icon: Shield },
+            SUPER_ADMIN: { cls: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400', icon: Crown },
+        };
+        const entry = map[role] || { cls: 'bg-muted text-muted-foreground', icon: Shield };
+        const Icon = entry.icon;
+        return (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${entry.cls}`}>
+                <Icon size={13} /> {role.replace('_', ' ')}
+            </span>
+        );
+    };
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -270,6 +312,12 @@ export default function AdminUsers() {
                         <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-full">{requests.length}</span>
                     )}
                 </button>
+                <button
+                    onClick={() => setActiveTab('roles')}
+                    className={`pb-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'roles' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                >
+                    <ArrowLeftRight size={15} /> Role Changes
+                </button>
             </div>
 
             {activeTab === 'users' && (
@@ -328,20 +376,7 @@ export default function AdminUsers() {
                                     )}
                                 </td>
                                 <td className="py-4 px-4">
-                                    <select
-                                        value={user.role}
-                                        onChange={(e) => { e.stopPropagation(); handleRoleSelect(user, e.target.value); }}
-                                        className="bg-card border border-border text-foreground text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 shadow-sm transition-colors cursor-pointer"
-                                    >
-                                        <option value="STUDENT">Student</option>
-                                        <option value="INSTRUCTOR">Instructor</option>
-                                        {isSuperAdmin() && (
-                                            <>
-                                                <option value="ADMIN">Admin</option>
-                                                <option value="SUPER_ADMIN">Super Admin</option>
-                                            </>
-                                        )}
-                                    </select>
+                                    {roleBadge(user.role)}
                                 </td>
                                 <td className="py-4 px-4">
                                     <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
@@ -423,6 +458,58 @@ export default function AdminUsers() {
                         </tr>
                     ))}
                 </DataTable>
+            )}
+
+            {activeTab === 'roles' && (
+                <>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4 mb-6 flex items-start gap-3">
+                        <Lock size={18} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-indigo-800 dark:text-indigo-200">
+                            <p className="font-bold mb-1">Convert users between Student and Instructor</p>
+                            <p className="text-xs opacity-80">
+                                Every role change requires <b>your admin password</b> to authorize. The change is logged for the audit trail.
+                            </p>
+                        </div>
+                    </div>
+
+                    <DataTable
+                        columns={['User', 'Current Role', 'Department', 'Change Role']}
+                        loading={loadingRoleUsers}
+                        loadingText="Loading users..."
+                        empty={!loadingRoleUsers && convertibleUsers.length === 0}
+                        emptyText="No students or instructors available to convert."
+                    >
+                        {convertibleUsers.map((user) => {
+                            const target = user.role === 'STUDENT' ? 'INSTRUCTOR' : 'STUDENT';
+                            return (
+                                <tr key={user.id} className="hover:bg-muted/40 transition-colors">
+                                    <td className="py-4 px-4">
+                                        <UserCell name={user.name} email={user.email} avatar={user.avatar} />
+                                    </td>
+                                    <td className="py-4 px-4">
+                                        {roleBadge(user.role)}
+                                    </td>
+                                    <td className="py-4 px-4">
+                                        <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                                            <Building2 size={12} /> {deptName(user.departmentId)}
+                                        </span>
+                                    </td>
+                                    <td className="py-4 px-4">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleRoleSelect(user, target); }}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm hover:shadow ${target === 'INSTRUCTOR'
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100'
+                                                : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100'}`}
+                                        >
+                                            <ArrowLeftRight size={14} />
+                                            Make {target === 'INSTRUCTOR' ? 'Instructor' : 'Student'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </DataTable>
+                </>
             )}
 
             {/* Add Instructor modal */}
@@ -511,8 +598,14 @@ export default function AdminUsers() {
                                 </form>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-bold text-foreground">{importResults.created} created · {importResults.failed} failed</p>
+                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        <div>
+                                            <p className="text-sm font-bold text-foreground">{importResults.created} created · {importResults.failed} failed</p>
+                                            <p className="text-xs font-semibold text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                                <Building2 size={12} className="text-indigo-500" />
+                                                Target department: <span className="font-bold text-indigo-600 dark:text-indigo-400">{importResults.departmentName || 'Global'}</span>
+                                            </p>
+                                        </div>
                                         {importResults.created > 0 && (
                                             <button onClick={() => downloadPasswords(importResults.results, 'Instructor')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-bold">
                                                 <Download size={16} /> Download passwords
@@ -521,11 +614,16 @@ export default function AdminUsers() {
                                     </div>
                                     <div className="max-h-64 overflow-y-auto border border-border rounded-2xl divide-y divide-border">
                                         {importResults.results.map((r, idx) => (
-                                            <div key={idx} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                                                <span className="font-medium text-foreground truncate">{r.email || '(no email)'}</span>
+                                            <div key={idx} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                                                <div className="min-w-0 flex items-center gap-2">
+                                                    <span className="font-medium text-foreground truncate">{r.email || '(no email)'}</span>
+                                                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
+                                                        <Building2 size={10} /> {r.departmentName || 'Global'}
+                                                    </span>
+                                                </div>
                                                 {r.status === 'created'
-                                                    ? <span className="text-emerald-600 font-bold text-xs">Created</span>
-                                                    : <span className="text-rose-600 font-bold text-xs" title={r.error}>{r.error || 'Failed'}</span>}
+                                                    ? <span className="shrink-0 text-emerald-600 font-bold text-xs">Created</span>
+                                                    : <span className="shrink-0 text-rose-600 font-bold text-xs" title={r.error}>{r.error || 'Failed'}</span>}
                                             </div>
                                         ))}
                                     </div>
@@ -575,8 +673,14 @@ export default function AdminUsers() {
                                 </form>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-bold text-foreground">{studentImportResults.created} created · {studentImportResults.failed} failed</p>
+                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        <div>
+                                            <p className="text-sm font-bold text-foreground">{studentImportResults.created} created · {studentImportResults.failed} failed</p>
+                                            <p className="text-xs font-semibold text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                                <Building2 size={12} className="text-indigo-500" />
+                                                Target department: <span className="font-bold text-indigo-600 dark:text-indigo-400">{studentImportResults.departmentName || 'Global'}</span>
+                                            </p>
+                                        </div>
                                         {studentImportResults.created > 0 && (
                                             <button onClick={() => downloadPasswords(studentImportResults.results, 'Student')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-bold">
                                                 <Download size={16} /> Download passwords
@@ -585,11 +689,17 @@ export default function AdminUsers() {
                                     </div>
                                     <div className="max-h-64 overflow-y-auto border border-border rounded-2xl divide-y divide-border">
                                         {studentImportResults.results.map((r, idx) => (
-                                            <div key={idx} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                                                <span className="font-medium text-foreground truncate">{r.email || '(no email)'}</span>
+                                            <div key={idx} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                                                <div className="min-w-0 flex items-center gap-2">
+                                                    <span className="font-medium text-foreground truncate">{r.email || '(no email)'}</span>
+                                                    {r.rollNo && <span className="shrink-0 text-muted-foreground text-[10px] font-mono font-bold">{r.rollNo}</span>}
+                                                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
+                                                        <Building2 size={10} /> {r.departmentName || 'Global'}
+                                                    </span>
+                                                </div>
                                                 {r.status === 'created'
-                                                    ? <span className="text-emerald-600 font-bold text-xs">Created</span>
-                                                    : <span className="text-rose-600 font-bold text-xs" title={r.error}>{r.error || 'Failed'}</span>}
+                                                    ? <span className="shrink-0 text-emerald-600 font-bold text-xs">Created</span>
+                                                    : <span className="shrink-0 text-rose-600 font-bold text-xs" title={r.error}>{r.error || 'Failed'}</span>}
                                             </div>
                                         ))}
                                     </div>
@@ -616,12 +726,28 @@ export default function AdminUsers() {
                                     Confirm Role Change
                                 </h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Are you sure you want to make <strong className="text-foreground">{roleChangeConfirm.user.name}</strong> a{' '}
-                                    <strong className="text-indigo-600">{roleChangeConfirm.newRole === 'ADMIN' ? 'Department Admin' : 'Super Admin'}</strong>?
+                                    Change <strong className="text-foreground">{roleChangeConfirm.user.name}</strong>'s role from{' '}
+                                    <strong className="text-foreground">{roleChangeConfirm.user.role.replace('_', ' ')}</strong> to{' '}
+                                    <strong className="text-indigo-600">{roleChangeConfirm.newRole.replace('_', ' ')}</strong>?
                                 </p>
                                 <p className="text-xs text-muted-foreground/70 mt-2">
-                                    This grants elevated platform permissions. This action is logged for compliance.
+                                    This action is logged for compliance.
                                 </p>
+                            </div>
+
+                            {/* Admin password — required to authorize the change */}
+                            <div className="text-left space-y-1.5 w-full">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground/70 ml-1">
+                                    Your admin password <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    value={roleChangePassword}
+                                    onChange={e => setRoleChangePassword(e.target.value)}
+                                    placeholder="Enter your password to authorize"
+                                    autoFocus
+                                    className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm font-medium"
+                                />
                             </div>
 
                             {/* Optional reason for compliance (NAAC/UGC audit trail) */}
@@ -641,7 +767,7 @@ export default function AdminUsers() {
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => { setRoleChangeConfirm(null); setRoleChangeReason(''); }}
+                                    onClick={() => { setRoleChangeConfirm(null); setRoleChangeReason(''); setRoleChangePassword(''); }}
                                     className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
                                 >
                                     No, Cancel
@@ -649,12 +775,10 @@ export default function AdminUsers() {
                                 <button
                                     type="button"
                                     onClick={confirmRoleChange}
-                                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-amber-200 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    disabled={roleChanging}
+                                    className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-amber-200 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Yes, Change Role
+                                    {roleChanging ? 'Changing...' : 'Yes, Change Role'}
                                 </button>
                             </div>
                         </div>

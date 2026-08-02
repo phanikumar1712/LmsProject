@@ -91,7 +91,7 @@ const getAll = async (req, res) => {
 
 // PUT /api/users/:id/role
 const updateRole = async (req, res) => {
-    const { role, reason } = req.body;
+    const { role, reason, adminPassword } = req.body;
     const validRoles = ['STUDENT', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN'];
     if (!validRoles.includes(role)) throw createError('Invalid role', 400);
 
@@ -101,6 +101,14 @@ const updateRole = async (req, res) => {
 
     // A department-scoped admin may only change roles of their own dept's non-admins.
     await assertUserInScope(req, req.params.id);
+
+    // Require the acting admin's own password to authorize a role change.
+    if (!adminPassword) throw createError('Your password is required to change roles', 400);
+    const bcrypt = require('bcryptjs');
+    const adminRow = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    if (!adminRow.rows.length) throw createError('Admin account not found', 404);
+    const passwordOk = await bcrypt.compare(String(adminPassword), adminRow.rows[0].password);
+    if (!passwordOk) throw createError('Incorrect password. Role change aborted.', 403);
 
     // Fetch the target user's current role before updating
     const targetRes = await query('SELECT name, role FROM users WHERE id = $1', [req.params.id]);
@@ -118,6 +126,14 @@ const updateRole = async (req, res) => {
         [role, req.params.id]
     );
     if (!result.rows.length) throw createError('User not found', 404);
+
+    // Demoting an admin must clear their multi-department junction rows, so a
+    // non-admin can never remain associated with more than one department.
+    // Only fires when the OLD role was an admin (a promotion to a non-admin
+    // role like STUDENT->INSTRUCTOR never had junction rows to clear).
+    if (['ADMIN', 'SUPER_ADMIN'].includes(oldRole) && !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+        await query('DELETE FROM admin_departments WHERE user_id = $1', [req.params.id]).catch(() => { });
+    }
 
     // Rich audit log with actor name, target name, old/new roles, reason, and timestamp
     const auditDetails = {
@@ -455,8 +471,11 @@ const createUserRecord = async ({ name, email, phone, departmentId, rollNo, pass
     }
     if (normRollNo) {
         // Friendly check before DB unique index throws a terse constraint violation.
+        // department_id is a uuid column — use IS NOT DISTINCT FROM with a uuid-typed
+        // param so NULLs compare equal (same department intent) without a uuid = text
+        // type error. A roll number may repeat across different departments.
         const dupRoll = await query(
-            `SELECT 1 FROM users WHERE roll_no = $1 AND COALESCE(department_id, '00000000-0000-0000-0000-000000000000') = COALESCE($2, '00000000-0000-0000-0000-000000000000') AND role = 'STUDENT'`,
+            `SELECT 1 FROM users WHERE roll_no = $1 AND department_id IS NOT DISTINCT FROM $2::uuid AND role = 'STUDENT'`,
             [normRollNo, departmentId || null]
         );
         if (dupRoll.rows.length) throw createError('Roll number is already taken in this department', 409);
@@ -564,6 +583,14 @@ const resolveTargetDepartment = (req) => {
     return scoped ? departmentId : (req.body.departmentId || null);
 };
 
+// Resolve a department's display name (used to show the target department on
+// bulk-import result pages). Returns null when there is no department.
+const resolveDepartmentName = async (departmentId) => {
+    if (!departmentId) return null;
+    const r = await query('SELECT name FROM departments WHERE id = $1', [departmentId]);
+    return r.rows.length ? r.rows[0].name : null;
+};
+
 // POST /api/users/instructors — create a single instructor manually.
 const createInstructor = async (req, res) => {
     const { name, email, phone, password } = req.body;
@@ -633,6 +660,7 @@ const importInstructors = async (req, res) => {
     if (rows.length > MAX_IMPORT_ROWS) throw createError(`File exceeds maximum of ${MAX_IMPORT_ROWS} rows`, 400);
 
     const departmentId = resolveTargetDepartment(req);
+    const departmentName = await resolveDepartmentName(departmentId);
     // Normalize header keys to lowercase for lookup.
     const pick = (row, key) => {
         const found = Object.keys(row).find(k => k.trim().toLowerCase() === key);
@@ -654,14 +682,14 @@ const importInstructors = async (req, res) => {
                 `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
                 [req.user.id, 'INSTRUCTOR_IMPORTED', 'users', user.id]
             ).catch(() => { });
-            results.push({ email: user.email, name: user.name, status: 'created', tempPassword });
+            results.push({ email: user.email, name: user.name, departmentId, departmentName, status: 'created', tempPassword });
         } catch (err) {
-            results.push({ email: String(email || '').trim().toLowerCase(), name, status: 'error', error: err.message });
+            results.push({ email: String(email || '').trim().toLowerCase(), name, departmentId, departmentName, status: 'error', error: err.message });
         }
     }
 
     const created = results.filter(r => r.status === 'created').length;
-    res.status(201).json({ total: results.length, created, failed: results.length - created, results });
+    res.status(201).json({ total: results.length, created, failed: results.length - created, departmentId, departmentName, results });
 };
 
 // POST /api/users/students/import — bulk create students from CSV/XLSX.
@@ -682,6 +710,7 @@ const importStudents = async (req, res) => {
     if (rows.length > MAX_IMPORT_ROWS) throw createError(`File exceeds maximum of ${MAX_IMPORT_ROWS} rows`, 400);
 
     const departmentId = resolveTargetDepartment(req);
+    const departmentName = await resolveDepartmentName(departmentId);
     // Normalize header keys to lowercase for lookup.
     const pick = (row, key) => {
         const found = Object.keys(row).find(k => k.trim().toLowerCase() === key);
@@ -704,14 +733,14 @@ const importStudents = async (req, res) => {
                 `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
                 [req.user.id, 'STUDENT_IMPORTED', 'users', user.id]
             ).catch(() => { });
-            results.push({ email: user.email, name: user.name, rollNo: user.roll_no, status: 'created', tempPassword });
+            results.push({ email: user.email, name: user.name, rollNo: user.roll_no, departmentId, departmentName, status: 'created', tempPassword });
         } catch (err) {
-            results.push({ email: String(email || '').trim().toLowerCase(), name, rollNo, status: 'error', error: err.message });
+            results.push({ email: String(email || '').trim().toLowerCase(), name, rollNo, departmentId, departmentName, status: 'error', error: err.message });
         }
     }
 
     const created = results.filter(r => r.status === 'created').length;
-    res.status(201).json({ total: results.length, created, failed: results.length - created, results });
+    res.status(201).json({ total: results.length, created, failed: results.length - created, departmentId, departmentName, results });
 };
 
 // GET /api/users/:id — full user detail for Admin/Super Admin/Instructor

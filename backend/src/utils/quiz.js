@@ -188,6 +188,10 @@ const validateQuizPayload = (body) => {
     if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 180) {
         throw createError('timeLimit must be an integer from 1 to 180 minutes', 400);
     }
+    const maxAttempts = Number(body.maxAttempts ?? 0);
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
+        throw createError('maxAttempts must be an integer from 0 to 100 (0 = unlimited)', 400);
+    }
     const questions = validateQuestions(body.questions);
     return {
         title: cleanText(body.title, 'title', 255),
@@ -196,6 +200,7 @@ const validateQuizPayload = (body) => {
             : '',
         passingScore,
         timeLimit,
+        maxAttempts,
         questions,
         selectionConfig: validateSelectionConfig(body.selectionConfig ?? body.selection_config, questions),
     };
@@ -221,6 +226,7 @@ const serializeQuiz = (quiz, { includeQuestions = true, includeAnswers = false, 
         instructions: quiz.description,
         passingScore: quiz.passing_score,
         timeLimit: quiz.time_limit,
+        maxAttempts: quiz.max_attempts ?? 0,
         selectionConfig: config,
         bankSize: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
         questionCount: effectiveCount,

@@ -5,11 +5,18 @@
  * @param {string} [className]  - Extra classes (e.g. "p-8" to override default padding)
  * @param {boolean} [noPadding] - Skip default padding (useful when nesting tables)
  * @param {string} [accentColor] - If provided, renders a left accent bar with this css color
+ * @param {() => void} [onClick] - If provided, renders as a clickable button (full detail page nav)
+ * @param {string} [title]      - Optional tooltip when clickable
  */
-export function Card({ children, className = '', noPadding = false, accentColor }) {
+export function Card({ children, className = '', noPadding = false, accentColor, onClick, title }) {
+    const Tag = onClick ? 'button' : 'div';
+    const interactive = onClick ? 'text-left w-full cursor-pointer hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30' : '';
     return (
-        <div
-            className={`bg-card border border-border rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-6'} ${className}`}
+        <Tag
+            onClick={onClick}
+            title={title}
+            type={onClick ? 'button' : undefined}
+            className={`bg-card border border-border rounded-2xl shadow-sm relative overflow-hidden ${noPadding ? '' : 'p-6'} ${interactive} ${className}`}
         >
             {accentColor && (
                 <div
@@ -18,7 +25,7 @@ export function Card({ children, className = '', noPadding = false, accentColor 
                 />
             )}
             {children}
-        </div>
+        </Tag>
     );
 }
 

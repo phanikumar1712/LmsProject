@@ -7,7 +7,7 @@ const courseFields = `
     c.id, c.title, c.description, c.short_desc, c.thumbnail,
     c.level, c.language, c.tags, c.what_you_learn, c.requirements,
     c.status, c.rating, c.review_count, c.enrollment_count, c.duration,
-    c.certificate, c.created_at, c.updated_at,
+    c.certificate, c.review_note, c.created_at, c.updated_at,
     COALESCE(l_agg.lesson_count, 0)::int as "lessonsCount",
     u.id as "instructorId", u.name as "instructorName", u.avatar as "instructorAvatar", u.bio as "instructorBio",
     u.role as "instructorRole",
@@ -455,7 +455,7 @@ const update = async (req, res) => {
 const approve = async (req, res) => {
     await assertCourseInScope(req, req.params.id);
     const result = await query(
-        `UPDATE courses SET status = 'PUBLISHED', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
+        `UPDATE courses SET status = 'PUBLISHED', review_note = '', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
         [req.params.id]
     );
     if (!result.rows.length) throw createError('Course not found', 404);
@@ -466,27 +466,33 @@ const approve = async (req, res) => {
     ).catch(() => { });
     await query(
         `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-        [course.instructor_id, `Your course "${course.title}" has been approved and published!`, 'approval', '/instructor/courses']
+        [course.instructor_id, `Your course "${course.title}" has been approved and published! 🎉`, 'approval', '/instructor/courses']
     ).catch(() => { });
     res.json(course);
 };
 
-// PUT /api/courses/:id/reject
+// PUT /api/courses/:id/reject — persists the rejection reason (review_note) so
+// the instructor sees exactly why the course was rejected, and includes it in
+// the notification + audit log.
 const reject = async (req, res) => {
     await assertCourseInScope(req, req.params.id);
+    const reason = (req.body.reason || req.body.reviewNote || '').trim();
     const result = await query(
-        `UPDATE courses SET status = 'REJECTED', updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
-        [req.params.id]
+        `UPDATE courses SET status = 'REJECTED', review_note = $2, updated_at = NOW() WHERE id = $1 RETURNING id, title, status, instructor_id`,
+        [req.params.id, reason]
     );
     if (!result.rows.length) throw createError('Course not found', 404);
     const course = result.rows[0];
     await query(
-        `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
-        [req.user.id, 'COURSE_REJECTED', 'courses', req.params.id]
+        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
+        [req.user.id, 'COURSE_REJECTED', 'courses', req.params.id, JSON.stringify({ reason })]
     ).catch(() => { });
+    const message = reason
+        ? `Your course "${course.title}" was rejected. Reason: ${reason}`
+        : `Your course "${course.title}" was rejected. Please review our guidelines.`;
     await query(
         `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-        [course.instructor_id, `Your course "${course.title}" has been rejected. Please review our guidelines.`, 'error', '/instructor/courses']
+        [course.instructor_id, message, 'error', '/instructor/courses']
     ).catch(() => { });
     res.json(course);
 };

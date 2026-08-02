@@ -12,6 +12,7 @@ import { TrendingUp } from 'lucide-react';
  * @param {boolean} [showTrend] - Show green TrendingUp badge (default false)
  * @param {string} [changeColor] - Override change text color (defaults to icon color)
  * @param {string} [className] - Extra wrapper classes
+ * @param {() => void} [onClick] - If provided, renders as a clickable button (navigates to detail page)
  */
 export function StatCard({
     label,
@@ -23,10 +24,15 @@ export function StatCard({
     showTrend = false,
     changeColor,
     className = '',
+    onClick,
 }) {
+    const Tag = onClick ? 'button' : 'div';
+    const interactive = onClick ? 'text-left w-full cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30' : '';
     return (
-        <div
-            className={`bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group ${className}`}
+        <Tag
+            onClick={onClick}
+            type={onClick ? 'button' : undefined}
+            className={`bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group ${interactive} ${className}`}
         >
             <div className="absolute top-0 right-0 p-6 sm:p-8 opacity-[0.03] dark:opacity-[0.07] pointer-events-none group-hover:scale-110 transition-transform duration-500">
                 <Icon size={80} />
@@ -54,7 +60,7 @@ export function StatCard({
                     {change}
                 </p>
             )}
-        </div>
+        </Tag>
     );
 }
 

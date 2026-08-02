@@ -12,7 +12,9 @@ import { useAuth } from '../../../contexts/AuthContext';
 export default function AdminCourses() {
     const { isSuperAdmin } = useAuth();
     const [searchParams] = useSearchParams();
-    const [filter, setFilter] = useState('ALL');
+    // Seed the status filter from the URL (?status=PENDING) so the dashboard's
+    // "Pending Approvals" card lands on the right tab.
+    const [filter, setFilter] = useState(searchParams.get('status')?.toUpperCase() || 'ALL');
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'ALL');
     const [departmentFilter, setDepartmentFilter] = useState('ALL');
@@ -46,10 +48,12 @@ export default function AdminCourses() {
     };
 
     const handleReject = async (courseId) => {
+        const reason = window.prompt('Provide a reason for rejecting this course. This will be sent to the instructor:');
+        if (reason === null) return; // cancelled
         try {
-            await coursesAPI.reject(courseId);
+            await coursesAPI.reject(courseId, reason);
             reload();
-            toast.success('Course rejected.');
+            toast.success('Course rejected. Instructor notified with the reason.');
         } catch {
             toast.error('Failed to reject course');
         }

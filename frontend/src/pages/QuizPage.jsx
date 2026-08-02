@@ -17,6 +17,7 @@ export default function QuizPage() {
 
     const [quiz, setQuiz] = useState(null);
     const [questions, setQuestions] = useState([]);
+    const [attemptsUsed, setAttemptsUsed] = useState(0);
     const [loading, setLoading] = useState(true);
     const [started, setStarted] = useState(false);
     const [finished, setFinished] = useState(false);
@@ -40,11 +41,18 @@ export default function QuizPage() {
     useEffect(() => {
         quizzesAPI.getById(quizId).then(q => {
             setQuiz(q);
+            // Count how many attempts this student has already used for this quiz
+            if (user?.id && q?.maxAttempts > 0) {
+                quizzesAPI.getAttempts(user.id).then(attempts => {
+                    const used = (attempts || []).filter(a => a.quizId === q.id).length;
+                    setAttemptsUsed(used);
+                }).catch(() => { });
+            }
         }).catch((err) => {
             toast.error(err.message || 'Failed to load quiz. Redirecting back...');
             navigate(`/courses/${courseId}/learn`);
         }).finally(() => setLoading(false));
-    }, [quizId, courseId, navigate]);
+    }, [quizId, courseId, navigate, user?.id]);
 
     // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const submitQuiz = useCallback(async (finalAnswers, finalViolations, auto = false) => {
@@ -344,7 +352,7 @@ export default function QuizPage() {
                         <p className="text-muted-foreground font-medium">{quiz?.instructions}</p>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                         <div className="bg-muted/40 border border-border rounded-xl p-4 text-center shadow-sm">
                             <p className="text-foreground font-black text-2xl mb-1">{quiz?.questionCount ?? quiz?.questions?.length ?? 0}</p>
                             <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-wider">Questions</p>
@@ -357,7 +365,27 @@ export default function QuizPage() {
                             <p className="text-foreground font-black text-2xl mb-1">{quiz?.passingScore}%</p>
                             <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-wider">Pass Score</p>
                         </div>
+                        <div className="bg-muted/40 border border-border rounded-xl p-4 text-center shadow-sm">
+                            <p className={`text-foreground font-black text-2xl mb-1 ${quiz?.maxAttempts > 0 && attemptsUsed >= quiz.maxAttempts ? 'text-rose-500' : ''}`}>
+                                {quiz?.maxAttempts > 0
+                                    ? `${Math.max(0, quiz.maxAttempts - attemptsUsed)}/${quiz.maxAttempts}`
+                                    : '∞'}
+                            </p>
+                            <p className="text-muted-foreground/60 text-xs font-bold uppercase tracking-wider">Attempts Left</p>
+                        </div>
                     </div>
+
+                    {quiz?.maxAttempts > 0 && attemptsUsed >= quiz.maxAttempts && (
+                        <div className="bg-rose-50 rounded-xl p-5 mb-8 border border-rose-200 shadow-sm">
+                            <h4 className="text-rose-700 font-bold text-[15px] mb-2 flex items-center gap-2">
+                                <XCircle size={16} /> Attempt Limit Reached
+                            </h4>
+                            <p className="text-[13px] font-medium text-rose-600/80">
+                                You have used all {quiz.maxAttempts} allowed attempt{quiz.maxAttempts > 1 ? 's' : ''} for this assessment.
+                                Contact your instructor if you need another attempt.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="bg-rose-50 rounded-xl p-5 mb-8 border border-rose-200 shadow-sm">
                         <h4 className="text-rose-700 font-bold text-[15px] mb-3 flex items-center gap-2">
@@ -372,9 +400,15 @@ export default function QuizPage() {
                         </ul>
                     </div>
 
-                    <button onClick={startQuiz} className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base shadow-sm flex items-center justify-center gap-2 transition-colors">
-                        <Maximize2 size={18} /> Start Quiz (Enters Fullscreen)
-                    </button>
+                    {quiz?.maxAttempts > 0 && attemptsUsed >= quiz.maxAttempts ? (
+                        <button disabled className="w-full py-4 rounded-xl bg-muted text-muted-foreground/60 font-bold text-base cursor-not-allowed flex items-center justify-center gap-2 border border-border">
+                            <XCircle size={18} /> Attempts Exhausted
+                        </button>
+                    ) : (
+                        <button onClick={startQuiz} className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base shadow-sm flex items-center justify-center gap-2 transition-colors">
+                            <Maximize2 size={18} /> Start Quiz (Enters Fullscreen)
+                        </button>
+                    )}
                     <button onClick={() => navigate(-1)} className="w-full mt-4 text-muted-foreground hover:text-foreground font-medium text-sm py-2 transition-colors">
                         Cancel
                     </button>

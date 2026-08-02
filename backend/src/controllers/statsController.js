@@ -89,8 +89,24 @@ const getPlatform = async (req, res) => {
 // GET /api/stats/instructor/:instructorId
 const getInstructor = async (req, res) => {
     const { instructorId } = req.params;
+    // Instructors may only view their own stats; students never access this.
     if (req.user.role === 'INSTRUCTOR' && req.user.id !== instructorId) {
         throw createError('Forbidden', 403);
+    }
+    if (req.user.role === 'STUDENT') {
+        throw createError('Forbidden', 403);
+    }
+
+    // Department-scoped admins may only view instructors in their department.
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (scoped) {
+        const deptCheck = await query(
+            'SELECT 1 FROM users WHERE id = $1 AND department_id = $2',
+            [instructorId, departmentId]
+        );
+        if (!deptCheck.rows.length) {
+            throw createError('Instructor not in your department', 403);
+        }
     }
 
     const [courses, enrollments, ratings] = await Promise.all([

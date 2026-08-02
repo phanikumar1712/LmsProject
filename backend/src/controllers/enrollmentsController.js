@@ -9,9 +9,34 @@ const getByStudent = async (req, res) => {
     const { limit = 20, offset = 0 } = req.query;
     const { getPagination } = require('../utils/pagination');
 
-    // Only allow students to see their own, admins can see any
+    // Only allow students to see their own
     if (req.user.role === 'STUDENT' && String(studentId) !== String(req.user.id)) {
         throw createError('Forbidden', 403);
+    }
+
+    // Instructors may only view students enrolled in their own courses
+    if (req.user.role === 'INSTRUCTOR') {
+        const check = await query(`
+            SELECT 1 FROM enrollments e
+            JOIN courses c ON e.course_id = c.id
+            WHERE e.student_id = $1 AND c.instructor_id = $2
+            LIMIT 1
+        `, [studentId, req.user.id]);
+        if (!check.rows.length) {
+            throw createError('You can only view students enrolled in your courses', 403);
+        }
+    }
+
+    // Department-scoped admins may only view students in their own department
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (scoped) {
+        const deptCheck = await query(
+            'SELECT 1 FROM users WHERE id = $1 AND department_id = $2',
+            [studentId, departmentId]
+        );
+        if (!deptCheck.rows.length) {
+            throw createError('This student is outside your department', 403);
+        }
     }
 
     const countRes = await query('SELECT COUNT(*)::int as total FROM enrollments WHERE student_id = $1', [studentId]);
@@ -43,8 +68,23 @@ const enroll = async (req, res) => {
     const { courseId } = req.body;
     if (!courseId) throw createError('courseId is required', 400);
 
-    const course = await query('SELECT id, enrollment_count FROM courses WHERE id = $1 AND status = $2', [courseId, 'PUBLISHED']);
+    const course = await query(
+        `SELECT c.id, c.enrollment_count, cat.department_id AS "departmentId"
+         FROM courses c
+         LEFT JOIN categories cat ON c.category_id = cat.id
+         WHERE c.id = $1 AND c.status = $2`,
+        [courseId, 'PUBLISHED']
+    );
     if (!course.rows.length) throw createError('Course not found or not published', 404);
+
+    // Department isolation: a student may only enroll in courses whose
+    // department matches their own (course → category → department). Students
+    // without a department, or courses without one, bypass the check.
+    const courseDeptId = course.rows[0].departmentId;
+    const studentDeptId = req.user.department_id;
+    if (courseDeptId && studentDeptId && courseDeptId !== studentDeptId) {
+        throw createError('This course is not available in your department', 403);
+    }
 
     // Check for existing enrollment to prevent duplicates
     const existing = await query(
@@ -186,12 +226,20 @@ const getStats = async (req, res) => {
         }
     }
 
+    // Defense in depth: only surface students whose department matches the
+    // instructor's own (or students with no department). Legacy cross-department
+    // enrollments from before the isolation rules are filtered out here.
+    const instructorDept = await query('SELECT department_id FROM users WHERE id = $1', [instructorId]);
+    const instructorDeptId = instructorDept.rows.length ? instructorDept.rows[0].department_id : null;
+
     const countRes = await query(`
         SELECT COUNT(*)::int as total
         FROM enrollments e
         JOIN courses c ON e.course_id = c.id
+        JOIN users u ON e.student_id = u.id
         WHERE c.instructor_id = $1
-    `, [instructorId]);
+          ${instructorDeptId ? 'AND (u.department_id IS NULL OR u.department_id = $2)' : ''}
+    `, instructorDeptId ? [instructorId, instructorDeptId] : [instructorId]);
     const total = countRes.rows[0].total;
 
     const result = await query(`
@@ -203,9 +251,12 @@ const getStats = async (req, res) => {
         JOIN courses c ON e.course_id = c.id
         JOIN users u ON e.student_id = u.id
         WHERE c.instructor_id = $1
+          ${instructorDeptId ? 'AND (u.department_id IS NULL OR u.department_id = $2)' : ''}
         ORDER BY e.last_accessed DESC
-        LIMIT $2 OFFSET $3
-    `, [instructorId, parseInt(limit), parseInt(offset)]);
+        LIMIT ${instructorDeptId ? '$3' : '$2'} OFFSET ${instructorDeptId ? '$4' : '$3'}
+    `, instructorDeptId
+        ? [instructorId, instructorDeptId, parseInt(limit), parseInt(offset)]
+        : [instructorId, parseInt(limit), parseInt(offset)]);
 
     const pageNum = Math.floor(parseInt(offset) / parseInt(limit)) + 1;
 

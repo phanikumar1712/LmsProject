@@ -48,25 +48,38 @@ export default function ManageAdmins() {
         }
     };
 
-    const handleDemote = async (userId) => {
-        if (!window.confirm('Demote this admin to Instructor role?')) return;
-        try {
-            await usersAPI.updateRole(userId, 'INSTRUCTOR');
-            toast.success('Admin demoted to Instructor');
-            reload();
-        } catch {
-            toast.error('Failed to demote admin');
-        }
+    // Role action modal — password-gated (super admin must re-enter their password)
+    const [roleAction, setRoleAction] = useState(null); // { userId, newRole, label }
+    const [roleActionPassword, setRoleActionPassword] = useState('');
+    const [roleActing, setRoleActing] = useState(false);
+
+    const handleDemote = (userId) => {
+        setRoleAction({ userId, newRole: 'INSTRUCTOR', label: 'Demote to Instructor' });
+        setRoleActionPassword('');
     };
 
-    const handlePromote = async (userId) => {
-        if (!window.confirm('Promote to Super Admin? This grants full platform access.')) return;
+    const handlePromote = (userId) => {
+        setRoleAction({ userId, newRole: 'SUPER_ADMIN', label: 'Promote to Super Admin' });
+        setRoleActionPassword('');
+    };
+
+    const confirmRoleAction = async () => {
+        if (!roleAction) return;
+        if (!roleActionPassword) {
+            toast.error('Enter your password to authorize this change');
+            return;
+        }
+        setRoleActing(true);
         try {
-            await usersAPI.updateRole(userId, 'SUPER_ADMIN');
-            toast.success('Promoted to Super Admin');
+            await usersAPI.updateRole(roleAction.userId, roleAction.newRole, '', roleActionPassword);
+            toast.success(roleAction.label);
             reload();
-        } catch {
-            toast.error('Failed to promote admin');
+            setRoleAction(null);
+            setRoleActionPassword('');
+        } catch (err) {
+            toast.error(err.message || `Failed to ${roleAction.label.toLowerCase()}`);
+        } finally {
+            setRoleActing(false);
         }
     };
 
@@ -466,6 +479,55 @@ export default function ManageAdmins() {
                     </div>
                 )}
             </div>
+
+            {/* Role Action Modal (password-gated) */}
+            {roleAction && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                {roleAction.newRole === 'SUPER_ADMIN'
+                                    ? <Crown size={20} className="text-indigo-600" />
+                                    : <UserMinus size={20} className="text-slate-600" />}
+                                Confirm {roleAction.label}
+                            </h3>
+                            <button onClick={() => setRoleAction(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                                {roleAction.newRole === 'SUPER_ADMIN'
+                                    ? 'This grants full platform access. ' : 'This removes admin permissions. '}
+                                Enter your password to authorize.
+                            </p>
+                            <div>
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1 block">
+                                    Your admin password <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    value={roleActionPassword}
+                                    onChange={e => setRoleActionPassword(e.target.value)}
+                                    placeholder="Enter your password to authorize"
+                                    autoFocus
+                                    className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-1">
+                                <button onClick={() => setRoleAction(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">
+                                    Cancel
+                                </button>
+                                <button onClick={confirmRoleAction} disabled={roleActing}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-colors">
+                                    {roleActing ? 'Working...' : `Confirm ${roleAction.newRole === 'SUPER_ADMIN' ? 'Promotion' : 'Demotion'}`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Reset Password Result Modal */}
             {resetResult && (

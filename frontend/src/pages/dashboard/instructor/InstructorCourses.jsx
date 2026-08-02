@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users } from 'lucide-react';
+import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users, AlertTriangle, Info } from 'lucide-react';
 import { coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SkeletonCard } from '../../../components/ui/CourseCard';
@@ -41,6 +41,16 @@ export default function InstructorCourses() {
     const filteredCourses = courses.filter(c =>
         c.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const statusBadge = (status) => {
+        switch (status) {
+            case 'PUBLISHED': return 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400';
+            case 'PENDING': return 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400';
+            case 'REJECTED': return 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400';
+            case 'ARCHIVED': return 'bg-slate-200 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300';
+            default: return 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300';
+        }
+    };
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -87,15 +97,35 @@ export default function InstructorCourses() {
                             <div className="relative h-44 overflow-hidden">
                                 <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                 <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors" />
-                                <span className={`absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${course.status === 'PUBLISHED' ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' : course.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400' : 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400'}`}>
+                                <span className={`absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${statusBadge(course.status)}`}>
                                     {course.status}
                                 </span>
 
                             </div>
                             <div className="p-5 flex-1 flex flex-col">
-                                <h3 className="font-bold text-foreground text-base mb-4 line-clamp-2 leading-snug flex-1 group-hover:text-indigo-600 transition-colors" title={course.title}>
+                                <h3 className="font-bold text-foreground text-base mb-2 line-clamp-2 leading-snug flex-1 group-hover:text-indigo-600 transition-colors" title={course.title}>
                                     {course.title}
                                 </h3>
+
+                                {/* Status / review-reason banner — instructors see why a
+                                    course is in Draft or Rejected, not just the status word. */}
+                                {course.status === 'REJECTED' && (
+                                    <div className="mb-3 flex items-start gap-2 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2">
+                                        <AlertTriangle size={14} className="text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs font-medium text-rose-700 dark:text-rose-300 leading-snug">
+                                            {course.reviewNote ? `Rejected: ${course.reviewNote}` : 'Rejected by admin. Please review and resubmit.'}
+                                        </p>
+                                    </div>
+                                )}
+                                {course.status === 'DRAFT' && course.reviewNote && (
+                                    <div className="mb-3 flex items-start gap-2 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+                                        <Info size={14} className="text-slate-600 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug">
+                                            {course.reviewNote}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                                         <span className="flex items-center gap-1.5"><Users size={14} className="text-muted-foreground/60" /> {course.enrollmentCount} Students</span>

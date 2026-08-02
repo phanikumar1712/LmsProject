@@ -28,6 +28,8 @@ import InstructorStudents from './pages/dashboard/instructor/InstructorStudents'
 import InstructorReviews from './pages/dashboard/instructor/InstructorReviews';
 import InstructorAnalytics from './pages/dashboard/instructor/InstructorAnalytics';
 import InstructorQuizBuilder from './pages/dashboard/instructor/InstructorQuizBuilder';
+import InstructorAssessments from './pages/dashboard/instructor/InstructorAssessments';
+import AssessmentReportPage from './pages/dashboard/instructor/AssessmentReportPage';
 import AdminUsers from './pages/dashboard/admin/AdminUsers';
 import AdminCourses from './pages/dashboard/admin/AdminCourses';
 import BecomeInstructorPage from './pages/BecomeInstructorPage';
@@ -36,6 +38,7 @@ import UserDetail from './pages/dashboard/admin/UserDetail';
 import StudentCourses from './pages/dashboard/student/StudentCourses';
 import StudentWishlist from './pages/dashboard/student/StudentWishlist';
 import StudentQuizzes from './pages/dashboard/student/StudentQuizzes';
+import StudentExams from './pages/dashboard/student/StudentExams';
 import StudentCertificates from './pages/dashboard/student/StudentCertificates';
 import CourseLearningPlayer from './pages/dashboard/student/CourseLearningPlayer';
 import SuperAdminAnalytics from './pages/dashboard/superadmin/SuperAdminAnalytics';
@@ -114,6 +117,7 @@ export default function App() {
             <Route path="/student/courses" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentCourses /></ProtectedRoute>} />
             <Route path="/student/wishlist" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentWishlist /></ProtectedRoute>} />
             <Route path="/student/quizzes" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentQuizzes /></ProtectedRoute>} />
+            <Route path="/student/exams" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentExams /></ProtectedRoute>} />
             <Route path="/student/certificates" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentCertificates /></ProtectedRoute>} />
             <Route path="/courses/:courseId/learn" element={<ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><CourseLearningPlayer /></ProtectedRoute>} />
 
@@ -126,6 +130,8 @@ export default function App() {
             <Route path="/instructor/reviews" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorReviews /></ProtectedRoute>} />
             <Route path="/instructor/analytics" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorAnalytics /></ProtectedRoute>} />
             <Route path="/instructor/quiz-builder" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorQuizBuilder /></ProtectedRoute>} />
+            <Route path="/instructor/assessments" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorAssessments /></ProtectedRoute>} />
+            <Route path="/instructor/assessments/:quizId/student/:studentId" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><AssessmentReportPage /></ProtectedRoute>} />
             <Route path="/instructor/versions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorChangelog /></ProtectedRoute>} />
             <Route path="/instructor/live-sessions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorLiveSessions /></ProtectedRoute>} />
 

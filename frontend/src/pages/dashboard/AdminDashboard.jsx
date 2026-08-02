@@ -33,9 +33,10 @@ export default function AdminDashboard() {
     const navigate = useNavigate();
 
     const statCards = stats ? [
-        { label: 'Total Users', value: stats.totalUsers?.toLocaleString(), icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month` },
-        { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published` },
-        { label: 'Pending Approvals', value: stats.pendingCourses, icon: AlertTriangle, color: '#e11d48', bg: 'bg-rose-50', change: 'Needs action', changeColor: '#e11d48' },
+        { label: 'Total Users', value: stats.totalUsers?.toLocaleString(), icon: Users, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.studentGrowth >= 0 ? '+' : ''}${stats.studentGrowth || 0}% this month`, to: '/admin/users' },
+        { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#0891b2', bg: 'bg-cyan-50', change: `${stats.approvedCourses || 0} published`, to: '/admin/courses' },
+        { label: 'Pending Approvals', value: stats.pendingCourses, icon: AlertTriangle, color: '#e11d48', bg: 'bg-rose-50', change: 'Needs action', changeColor: '#e11d48', to: '/admin/courses?status=PENDING' },
+        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString(), icon: TrendingUp, color: '#059669', bg: 'bg-emerald-50', change: `${stats.approvedCourses || 0} active courses`, to: '/admin/student-progress' },
     ] : [];
 
     return (
@@ -56,9 +57,16 @@ export default function AdminDashboard() {
                 subtitle="Platform overview and management"
             />
 
-            {loading ? <StatCardSkeleton /> : (
-                <StatCardGrid>
-                    {statCards.map(card => <StatCard key={card.label} {...card} />)}
+            {loading ? <StatCardSkeleton count={4} /> : (
+                <StatCardGrid cols={4}>
+                    {statCards.map(card => (
+                        <StatCard
+                            key={card.label}
+                            {...card}
+                            onClick={() => navigate(card.to)}
+                            title={`View ${card.label} details`}
+                        />
+                    ))}
                 </StatCardGrid>
             )}
 
@@ -66,7 +74,7 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                         {/* Roles Pie */}
-                        <Card>
+                        <Card onClick={() => navigate('/admin/users')} title="View all users">
                             <CardHeader title="Users by Role" />
                             {stats?.usersByRole && stats.usersByRole.length > 0 ? (
                                 <div className="h-48 relative">
@@ -91,7 +99,7 @@ export default function AdminDashboard() {
                         </Card>
 
                         {/* Top Categories */}
-                        <Card>
+                        <Card onClick={() => navigate('/admin/categories')} title="View categories">
                             <CardHeader title="Top Categories" />
                             <div className="space-y-4">
                                 {stats?.topCategories && stats.topCategories.length > 0 ? (

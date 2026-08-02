@@ -131,6 +131,7 @@ const createTables = async () => {
                 description     TEXT DEFAULT '',
                 passing_score   INT DEFAULT 70,
                 time_limit      INT DEFAULT 30,
+                max_attempts    INT NOT NULL DEFAULT 0,
                 questions       JSONB NOT NULL DEFAULT '[]',
                 created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 CONSTRAINT quizzes_lesson_id_key UNIQUE (lesson_id)
@@ -163,6 +164,7 @@ const createTables = async () => {
                 violations  INT DEFAULT 0,
                 time_taken  INT DEFAULT 0,
                 results     JSONB DEFAULT '[]',
+                answers     JSONB DEFAULT '[]',
                 completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         `);
@@ -360,9 +362,22 @@ const createTables = async () => {
             ALTER TABLE quizzes
             ADD COLUMN IF NOT EXISTS selection_config JSONB DEFAULT NULL;
         `);
+        // Overall attempt cap per student (0 = unlimited). Instructors set this
+        // when authoring an assessment.
+        await client.query(`
+            ALTER TABLE quizzes
+            ADD COLUMN IF NOT EXISTS max_attempts INT NOT NULL DEFAULT 0;
+        `);
         await client.query(`
             ALTER TABLE quiz_attempt_sessions
             ADD COLUMN IF NOT EXISTS question_ids TEXT[] DEFAULT NULL;
+        `);
+        // Per-question answers as given by the student ({questionId: answer}),
+        // persisted at submit time so instructors can review exactly what each
+        // student answered on the assessment detail page.
+        await client.query(`
+            ALTER TABLE quiz_attempts
+            ADD COLUMN IF NOT EXISTS answers JSONB DEFAULT '[]';
         `);
 
         // -- ENSURE USERS TABLE HAS ALL RECENT FIELDS --
@@ -412,6 +427,43 @@ const createTables = async () => {
         `);
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_admin_departments_dept ON admin_departments(department_id);
+        `);
+
+        // -- DB-LEVEL BACKSTOP: only ADMIN/SUPER_ADMIN users may ever have rows
+        // in admin_departments. A trigger (not a CHECK — CHECK constraints can't
+        // reference another table) hard-blocks any INSERT/UPDATE that would
+        // assign a non-admin to a department, even if app code is buggy or
+        // bypassed. Complements the app-side cleanup on role demotion.
+        await client.query(`
+            CREATE OR REPLACE FUNCTION enforce_admin_departments_role()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM users
+                    WHERE id = NEW.user_id AND role IN ('ADMIN', 'SUPER_ADMIN')
+                ) THEN
+                    RAISE EXCEPTION 'Only ADMIN or SUPER_ADMIN users can be assigned to departments (user_id: %)', NEW.user_id;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await client.query(`
+            DROP TRIGGER IF EXISTS trg_admin_departments_role ON admin_departments;
+        `);
+        await client.query(`
+            CREATE TRIGGER trg_admin_departments_role
+            BEFORE INSERT OR UPDATE ON admin_departments
+            FOR EACH ROW EXECUTE FUNCTION enforce_admin_departments_role();
+        `);
+        // Clean any legacy junction rows left behind before the app-side demote
+        // fix existed, so no non-admin starts out multi-department.
+        await client.query(`
+            DELETE FROM admin_departments ad
+            WHERE NOT EXISTS (
+                SELECT 1 FROM users u
+                WHERE u.id = ad.user_id AND u.role IN ('ADMIN', 'SUPER_ADMIN')
+            );
         `);
 
         // ── NEW FEATURE TABLES: Announcements, Sessions, Assignments ────────────

@@ -122,8 +122,8 @@ export const coursesAPI = {
     approve: async (id) =>
         http('PUT', `/courses/${id}/approve`, {}, getToken()),
 
-    reject: async (id) =>
-        http('PUT', `/courses/${id}/reject`, {}, getToken()),
+    reject: async (id, reason = '') =>
+        http('PUT', `/courses/${id}/reject`, { reason }, getToken()),
 
     delete: async (id) =>
         http('DELETE', `/courses/${id}`, null, getToken()),
@@ -230,8 +230,23 @@ export const quizzesAPI = {
     getAttempts: async (studentId) =>
         http('GET', `/quizzes/attempts/${studentId}`, null, getToken()),
 
+    getByInstructor: async (instructorId) =>
+        http('GET', `/quizzes/instructor/${instructorId}`, null, getToken()),
+
+    getPerformance: async (quizId) =>
+        http('GET', `/quizzes/${quizId}/performance`, null, getToken()),
+
+    getStudentAttempts: async (quizId, studentId) =>
+        http('GET', `/quizzes/${quizId}/attempts/${studentId}`, null, getToken()),
+
+    getAvailableExams: async () =>
+        http('GET', '/quizzes/available', null, getToken()),
+
     createQuiz: async (quizData) =>
         http('POST', '/quizzes', quizData, getToken()),
+
+    remindStudents: async (quizId, payload = {}) =>
+        http('POST', `/quizzes/${quizId}/remind`, payload, getToken()),
 };
 
 // ─── RATINGS ─────────────────────────────────────────────────────────────────
@@ -358,8 +373,8 @@ export const usersAPI = {
         }
     },
 
-    updateRole: async (userId, role, reason = '') =>
-        http('PUT', `/users/${userId}/role`, { role, reason }, getToken()),
+    updateRole: async (userId, role, reason = '', adminPassword = '') =>
+        http('PUT', `/users/${userId}/role`, { role, reason, adminPassword }, getToken()),
 
     resetPassword: async (userId, password) =>
         http('PUT', `/users/${userId}/reset-password`, password ? { password } : {}, getToken()),

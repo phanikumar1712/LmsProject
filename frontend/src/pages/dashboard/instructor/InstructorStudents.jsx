@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Mail, Filter, BookOpen, Upload, Download, Eye, Copy, X, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { coursesAPI, enrollmentsAPI } from '../../../services/api';
+import { coursesAPI, enrollmentsAPI, usersAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -37,7 +37,7 @@ export default function InstructorStudents() {
         setImporting(true);
         try {
             const result = await usersAPI.importStudents(file);
-            toast.success(`Imported ${result.imported || 0} students`);
+            toast.success(`Imported ${result.created || 0} students into ${result.departmentName || 'the global pool'}`);
             setShowImport(false);
             reload();
         } catch (err) {
