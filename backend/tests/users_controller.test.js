@@ -196,11 +196,6 @@ test('importStudents blocks a department that has reached its student limit', as
         if (sql.includes('SELECT name, max_students, max_courses FROM departments')) {
             return { rows: [] }; // no dept override → platform default (2)
         }
-        // IMPORTANT: the dup-roll query also contains "role = 'STUDENT'" — check
-        // roll BEFORE the student-count branch so the dispatcher never confuses them.
-        if (sql.includes('SELECT 1 FROM users WHERE roll_no = $1')) {
-            return { rows: [] }; // roll free
-        }
         if (sql.includes("COUNT(*)::int AS c FROM users WHERE department_id = $1 AND role = 'STUDENT'")) {
             return { rows: [{ c: 2 }] }; // already at the limit
         }
@@ -209,12 +204,6 @@ test('importStudents blocks a department that has reached its student limit', as
         }
         if (sql.includes("role = 'SUPER_ADMIN' AND active = true")) {
             return { rows: [{ id: 'super-1' }] }; // super admin notified for review
-        }
-        if (sql.includes('FROM notifications WHERE user_id')) {
-            return { rows: [] }; // no recent limit notification → dedupe passes
-        }
-        if (sql.includes('SELECT id FROM users WHERE email = $1')) {
-            return { rows: [] }; // email free
         }
         return { rows: [] };
     });
@@ -245,22 +234,24 @@ test('importStudents blocks a department that has reached its student limit', as
     assert.equal(res.statusCode, 201);
     assert.equal(res.payload.created, 0);
     assert.equal(res.payload.failed, 1);
-    assert.match(res.payload.results[0].error, /Student limit reached for this department \(2\/2\)/);
+    assert.match(res.payload.results[0].error, /Student limit reached: this department has 2 students and the limit is 2/);
     // No student was inserted.
     assert.equal(calls.some(c => c.sql.includes('INSERT INTO users')), false);
-    // Dept admin + super admin were notified for a limit-review discussion.
+    // Dept admin + super admin are notified for a limit-review discussion via a
+    // single batched INSERT ... SELECT (params[0] = message, params[3] = target ids).
     const notifInserts = calls.filter(c => c.sql.includes('INSERT INTO notifications'));
-    assert.ok(notifInserts.length >= 2);
-    assert.ok(notifInserts.every(c => c.params[1].includes('student limit reached')));
+    assert.ok(notifInserts.length >= 1);
+    assert.ok(notifInserts.every(c => /student limit reached/i.test(c.params[0])));
+    assert.ok(notifInserts.every(c => Array.isArray(c.params[3]) && c.params[3].length === 2));
 });
 
 test('importStudents flags a duplicate roll number as a per-row error, not a crash', async () => {
     const { controller, calls } = loadController((sql) => {
-        if (sql.includes('SELECT id FROM users WHERE email = $1')) {
+        if (sql.includes('SELECT email FROM users WHERE email = ANY')) {
             return { rows: [] }; // email is free
         }
-        if (sql.includes('SELECT 1 FROM users WHERE roll_no = $1')) {
-            return { rows: [{ '?column?': 1 }] }; // roll already taken in this dept
+        if (sql.includes('SELECT roll_no FROM users WHERE roll_no = ANY')) {
+            return { rows: [{ roll_no: 'CS22001' }] }; // roll already taken in this dept
         }
         return { rows: [] };
     });
@@ -296,6 +287,144 @@ test('importStudents flags a duplicate roll number as a per-row error, not a cra
     assert.match(res.payload.results[0].error, /Roll number is already taken in this department/);
     // No student was inserted.
     assert.equal(calls.some(c => c.sql.includes('INSERT INTO users')), false);
+});
+
+test('importStudents falls back to per-row inserts when the bulk insert hits a roll_no race', async () => {
+    const { controller, calls } = loadController((sql, params) => {
+        if (sql.includes('SELECT email FROM users WHERE email = ANY')) {
+            return { rows: [] }; // emails free in pre-fetch
+        }
+        if (sql.includes('SELECT roll_no FROM users WHERE roll_no = ANY')) {
+            return { rows: [] }; // rolls free in pre-fetch (race happens later)
+        }
+        // Bulk INSERT aborts (simulated roll_no race on the whole statement)…
+        if (sql.includes('INSERT INTO users') && sql.includes('unnest')) {
+            const err = new Error('duplicate key value violates unique constraint idx_users_roll_no_dept');
+            err.code = '23505';
+            throw err;
+        }
+        // …then the per-row fallback succeeds for one row and fails for the other.
+        if (sql.includes('INSERT INTO users') && !sql.includes('unnest')) {
+            const email = params[1];
+            if (email === 'good@demo.com') return { rows: [{ id: 'created-id-1', email }] };
+            const err = new Error('duplicate key value violates unique constraint idx_users_roll_no_dept');
+            err.code = '23505';
+            throw err;
+        }
+        if (sql.includes('INSERT INTO notifications')) return { rows: [] };
+        if (sql.includes('INSERT INTO audit_logs')) return { rows: [] };
+        return { rows: [] };
+    });
+
+    // Real XLSX buffer with two student rows — one that succeeds, one whose
+    // roll_no is claimed by a concurrent import mid-flight.
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet([
+        { name: 'Good Student', email: 'good@demo.com', roll_no: 'CS22001' },
+        { name: 'Racy Student', email: 'racy@demo.com', roll_no: 'CS22002' },
+    ]);
+    xlsx.utils.book_append_sheet(wb, ws, 'Students');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const req = {
+        user: { id: 'actor-id', name: 'Admin', role: 'SUPER_ADMIN' },
+        body: {},
+        file: { buffer },
+    };
+    const res = {
+        statusCode: 0,
+        payload: null,
+        status(c) { this.statusCode = c; return this; },
+        json(p) { this.payload = p; return this; },
+    };
+
+    await controller.importStudents(req, res);
+
+    // One row imported, the racy row reported as a per-row error — not a 500.
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.payload.created, 1);
+    assert.equal(res.payload.failed, 1);
+    const good = res.payload.results.find(r => r.email === 'good@demo.com');
+    const racy = res.payload.results.find(r => r.email === 'racy@demo.com');
+    assert.equal(good.status, 'created');
+    assert.ok(good.tempPassword);
+    assert.equal(racy.status, 'error');
+    assert.match(racy.error, /Roll number is already taken in this department/);
+    // The created user got batched notifications + audit log (single statements).
+    const notifInserts = calls.filter(c => c.sql.includes('INSERT INTO notifications'));
+    assert.ok(notifInserts.some(c => Array.isArray(c.params[1]) && c.params[1].length === 1));
+});
+
+// ── resetUserPassword (privileged reset) ────────────────────────────────────
+
+test('resetUserPassword blocks an ADMIN from resetting their OWN password (403)', async () => {
+    const { controller, calls } = loadController(() => ({ rows: [] }));
+    const req = {
+        user: { id: 'admin-user-id', role: 'ADMIN' },
+        params: { id: 'admin-user-id' }, // self
+        body: {},
+    };
+
+    await assert.rejects(
+        () => controller.resetUserPassword(req, {}),
+        (err) => {
+            assert.equal(err.statusCode, 403);
+            assert.match(err.message, /managed by the Super Admin/);
+            return true;
+        }
+    );
+    // The block fires before any query — no UPDATE, no notification.
+    assert.equal(calls.length, 0);
+});
+
+test('resetUserPassword blocks a non-super-admin from resetting an ADMIN account (403)', async () => {
+    const { controller, calls } = loadController((sql) => {
+        // Unscoped ADMIN (no department_id) → assertUserInScope short-circuits
+        // without a query; the target lookup returns an ADMIN account.
+        if (sql.includes('SELECT id, email, name, role FROM users')) {
+            return { rows: [{ id: 'target-admin', email: 'a@demo.com', name: 'Admin', role: 'ADMIN' }] };
+        }
+        return { rows: [] };
+    });
+    const req = {
+        user: { id: 'actor-admin', role: 'ADMIN', department_id: null },
+        params: { id: 'target-admin' },
+        body: {},
+    };
+
+    await assert.rejects(
+        () => controller.resetUserPassword(req, {}),
+        (err) => {
+            assert.equal(err.statusCode, 403);
+            assert.match(err.message, /Only the Super Admin can reset admin passwords/);
+            return true;
+        }
+    );
+    assert.equal(calls.some(c => c.sql.includes('UPDATE users SET password')), false);
+});
+
+test('resetUserPassword lets a SUPER_ADMIN reset an ADMIN account', async () => {
+    const { controller, calls } = loadController((sql) => {
+        if (sql.includes('SELECT id, email, name, role FROM users')) {
+            return { rows: [{ id: 'target-admin', email: 'a@demo.com', name: 'Admin', role: 'ADMIN' }] };
+        }
+        if (sql.includes('UPDATE users SET password')) return { rows: [] };
+        if (sql.includes('INSERT INTO notifications')) return { rows: [] };
+        if (sql.includes('INSERT INTO audit_logs')) return { rows: [] };
+        return { rows: [] };
+    });
+    const req = {
+        user: { id: 'super-id', role: 'SUPER_ADMIN' },
+        params: { id: 'target-admin' },
+        body: {},
+    };
+    const res = { json: (payload) => { res.payload = payload; } };
+
+    await controller.resetUserPassword(req, res);
+
+    assert.equal(res.payload.success, true);
+    assert.ok(res.payload.tempPassword); // generated temp password returned
+    assert.equal(calls.some(c => c.sql.includes('UPDATE users SET password')), true);
 });
 
 // ── setAdminDepartments ──────────────────────────────────────────────────────

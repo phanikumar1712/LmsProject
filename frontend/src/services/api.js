@@ -6,6 +6,28 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 // Bulk imports have their own longer timeout (120s) via AbortController.
 const DEFAULT_TIMEOUT_MS = 60000;
 
+// Multipart file upload used by bulk import endpoints (preview + confirm).
+const uploadImportFile = async (endpoint, file, { signal, timeoutMs = 120000 } = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
+    try {
+        const res = await fetch(`${BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` },
+            body: formData,
+            signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        return data;
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
 const http = async (method, path, body = null, token = null, { signal, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -33,7 +55,9 @@ const http = async (method, path, body = null, token = null, { signal, timeoutMs
                     window.location.href = '/login?expired=true';
                 }
             }
-            throw new Error(data.error || data.message || `HTTP ${res.status}`);
+            const err = new Error(data.error || data.message || `HTTP ${res.status}`);
+            err.status = res.status;
+            throw err;
         }
         return data;
     } catch (err) {
@@ -66,7 +90,8 @@ export const authAPI = {
         return http('PUT', '/auth/profile', updates, getToken());
     },
 
-    changePassword: async (userId, currentPassword, newPassword) => {
+    changePassword: async (currentPassword, newPassword) => {
+        // The backend uses the authenticated user (req.user.id) — no userId needed.
         return http('PUT', '/auth/change-password', { currentPassword, newPassword }, getToken());
     },
 
@@ -100,7 +125,10 @@ export const coursesAPI = {
         if (filters.sort) params.set('sort', filters.sort);
         if (filters.limit) params.set('limit', filters.limit);
         if (filters.departmentId) params.set('departmentId', filters.departmentId);
-        const token = filters.admin ? getToken() : null;
+        // Always send the auth token when logged in (even for non-admin views) so
+        // the backend can apply STUDENT department scoping on the catalog. Public
+        // (logged-out) requests still go without a token.
+        const token = getToken();
         const opts = filters.admin ? { timeoutMs: 120000 } : {};
         const res = await http('GET', `/courses?${params.toString()}`, null, token, opts);
         return res.data || [];
@@ -124,6 +152,53 @@ export const coursesAPI = {
 
     reject: async (id, reason = '') =>
         http('PUT', `/courses/${id}/reject`, { reason }, getToken()),
+
+    publish: async (id) =>
+        http('PUT', `/courses/${id}/publish`, {}, getToken()),
+
+    unpublish: async (id) =>
+        http('PUT', `/courses/${id}/unpublish`, {}, getToken()),
+
+    assignInstructor: async (id, instructorId) =>
+        http('PUT', `/courses/${id}/instructor`, { instructorId }, getToken()),
+
+    importCourses: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/courses/import', file, { signal, timeoutMs }),
+
+    previewCourseImport: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/courses/import/preview', file, { signal, timeoutMs }),
+
+    downloadCourseTemplate: async () => {
+        const token = getToken();
+        const res = await fetch(`${BASE_URL}/courses/import/template`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to download template');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Course_Import_Template.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    },
+
+    reorderSections: async (courseId, sectionIds) =>
+        http('PUT', `/courses/${courseId}/sections/reorder`, { sectionIds }, getToken()),
+
+    // Many-to-many semester/year buckets (copy-to-multiple drag pages)
+    addBuckets: async (courseId, { semesters, years } = {}) =>
+        http('POST', `/courses/${courseId}/buckets`, { semesters, years }, getToken()),
+
+    removeBuckets: async (courseId, { semesters, years } = {}) =>
+        http('DELETE', `/courses/${courseId}/buckets`, { semesters, years }, getToken()),
+
+    reorderLessons: async (sectionId, lessonIds) =>
+        http('PUT', `/courses/sections/${sectionId}/lessons/reorder`, { lessonIds }, getToken()),
+
+    moveLesson: async (lessonId, sectionId, order) =>
+        http('PUT', `/courses/lessons/${lessonId}/move`, { sectionId, order }, getToken()),
 
     delete: async (id) =>
         http('DELETE', `/courses/${id}`, null, getToken()),
@@ -162,6 +237,51 @@ export const coursesAPI = {
     // ── DRIP CONTENT ───────────────────────────────────────────────────────
     getDripStatus: async (courseId) =>
         http('GET', `/courses/${courseId}/drip-status`, null, getToken()),
+};
+
+// ─── ASSIGNMENTS ──────────────────────────────────────────────────────────────
+export const assignmentsAPI = {
+    getStudentOverview: async () =>
+        http('GET', '/assignments/overview', null, getToken()),
+
+    getMy: async () =>
+        http('GET', '/assignments/my', null, getToken()),
+
+    getByCourse: async (courseId) =>
+        http('GET', `/assignments/course/${courseId}`, null, getToken()),
+
+    create: async (data) =>
+        http('POST', '/assignments', data, getToken()),
+
+    update: async (id, data) =>
+        http('PUT', `/assignments/${id}`, data, getToken()),
+
+    remove: async (id) =>
+        http('DELETE', `/assignments/${id}`, null, getToken()),
+
+    getSubmissions: async (assignmentId) =>
+        http('GET', `/assignments/${assignmentId}/submissions`, null, getToken()),
+
+    submit: async (assignmentId, data) =>
+        http('POST', `/assignments/${assignmentId}/submit`, data, getToken()),
+
+    grade: async (submissionId, data) =>
+        http('PUT', `/assignments/submissions/${submissionId}/grade`, data, getToken()),
+
+    getRubric: async (assignmentId) =>
+        http('GET', `/assignments/${assignmentId}/rubric`, null, getToken()),
+
+    saveRubric: async (assignmentId, criteria) =>
+        http('PUT', `/assignments/${assignmentId}/rubric`, { criteria }, getToken()),
+
+    getRubricScores: async (submissionId) =>
+        http('GET', `/assignments/submissions/${submissionId}/rubric-scores`, null, getToken()),
+
+    saveRubricScores: async (submissionId, scores) =>
+        http('PUT', `/assignments/submissions/${submissionId}/rubric-scores`, { scores }, getToken()),
+
+    checkPlagiarism: async (assignmentId) =>
+        http('GET', `/assignments/${assignmentId}/plagiarism`, null, getToken()),
 };
 
 // ─── ATTENDANCE / LIVE SESSIONS ───────────────────────────────────────────────
@@ -211,6 +331,37 @@ export const enrollmentsAPI = {
 
     bulkEnroll: async (courseId, studentIds, rollNos = []) =>
         http('POST', '/enrollments/bulk', { courseId, studentIds, rollNos }, getToken()),
+
+    bulkUnenroll: async (courseId, studentIds) =>
+        http('POST', '/enrollments/unenroll', { courseId, studentIds }, getToken()),
+
+    getCourseStudents: async (courseId) => {
+        const res = await http('GET', `/enrollments/course/${courseId}`, null, getToken());
+        return res.data || res;
+    },
+
+    // Bulk enrollment import — validate → preview → confirm (CSV/XLSX)
+    previewEnrollmentImport: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/enrollments/import/preview', file, { signal, timeoutMs }),
+
+    importEnrollments: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/enrollments/import', file, { signal, timeoutMs }),
+
+    downloadEnrollmentTemplate: async () => {
+        const token = getToken();
+        const res = await fetch(`${BASE_URL}/enrollments/import/template`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to download template');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Enrollment_Import_Template.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    },
 };
 
 // ─── QUIZZES ─────────────────────────────────────────────────────────────────
@@ -247,6 +398,12 @@ export const quizzesAPI = {
 
     remindStudents: async (quizId, payload = {}) =>
         http('POST', `/quizzes/${quizId}/remind`, payload, getToken()),
+};
+
+// ─── GRADES (student per-course weighted breakdown) ─────────────────────────
+export const gradesAPI = {
+    getMy: async () =>
+        http('GET', '/grades/my', null, getToken()),
 };
 
 // ─── RATINGS ─────────────────────────────────────────────────────────────────
@@ -298,6 +455,21 @@ export const usersAPI = {
     createInstructor: async (data) =>
         http('POST', '/users/instructors', data, getToken()),
 
+    createStudent: async (data) =>
+        http('POST', '/users/students', data, getToken()),
+
+    updateUser: async (id, data) =>
+        http('PUT', `/users/${id}`, data, getToken()),
+
+    bulkToggleStatus: async (ids, active) =>
+        http('POST', '/users/bulk/status', { ids, active }, getToken()),
+
+    bulkDeleteUsers: async (ids) =>
+        http('POST', '/users/bulk/delete', { ids }, getToken()),
+
+    bulkAssignCohort: async (ids, fields) =>
+        http('POST', '/users/bulk/assign', { ids, ...fields }, getToken()),
+
     downloadInstructorTemplate: async () => {
         const token = getToken();
         const res = await fetch(`${BASE_URL}/users/instructors/template`, {
@@ -330,60 +502,35 @@ export const usersAPI = {
         window.URL.revokeObjectURL(url);
     },
 
-    importInstructors: async (file, { signal, timeoutMs = 120000 } = {}) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        // Chain external signal to our controller (compatible with older browsers)
-        if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
-        try {
-            const res = await fetch(`${BASE_URL}/users/instructors/import`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${getToken()}` },
-                body: formData,
-                signal: controller.signal,
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
-            return data;
-        } finally {
-            clearTimeout(timer);
-        }
-    },
+    importInstructors: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/users/instructors/import', file, { signal, timeoutMs }),
 
-    importStudents: async (file, { signal, timeoutMs = 120000 } = {}) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
-        try {
-            const res = await fetch(`${BASE_URL}/users/students/import`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${getToken()}` },
-                body: formData,
-                signal: controller.signal,
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
-            return data;
-        } finally {
-            clearTimeout(timer);
-        }
-    },
+    previewInstructors: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/users/instructors/preview', file, { signal, timeoutMs }),
+
+    importStudents: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/users/students/import', file, { signal, timeoutMs }),
+
+    previewStudents: async (file, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile('/users/students/preview', file, { signal, timeoutMs }),
 
     updateRole: async (userId, role, reason = '', adminPassword = '') =>
         http('PUT', `/users/${userId}/role`, { role, reason, adminPassword }, getToken()),
 
-    resetPassword: async (userId, password) =>
-        http('PUT', `/users/${userId}/reset-password`, password ? { password } : {}, getToken()),
+    resetPassword: async (userId, password, force = false) =>
+        http('PUT', `/users/${userId}/reset-password`, password ? { password, force } : { force }, getToken()),
 
     toggleStatus: async (userId) =>
         http('PUT', `/users/${userId}/toggle-status`, {}, getToken()),
 
     delete: async (userId) =>
         http('DELETE', `/users/${userId}`, null, getToken()),
+
+    getPermissions: async (userId) =>
+        http('GET', `/users/${userId}/permissions`, null, getToken()),
+
+    updatePermissions: async (userId, permissions) =>
+        http('PUT', `/users/${userId}/permissions`, { permissions }, getToken()),
 
     submitInstructorRequest: async (data) =>
         http('POST', '/users/instructor-request', data, getToken()),
@@ -428,6 +575,9 @@ export const departmentsAPI = {
     update: async (id, data) =>
         http('PUT', `/departments/${id}`, data, getToken()),
 
+    updateStatus: async (id, active) =>
+        http('PUT', `/departments/${id}/status`, { active }, getToken()),
+
     delete: async (id) =>
         http('DELETE', `/departments/${id}`, null, getToken()),
 
@@ -439,6 +589,7 @@ export const departmentsAPI = {
 export const certificatesAPI = {
     verify: async (certId) => http('GET', `/certificates/verify/${certId}`),
     getMy: async () => http('GET', '/certificates/my', null, getToken()),
+    getByUser: async (userId) => http('GET', `/certificates/user/${userId}`, null, getToken()),
     generate: async (courseId) => http('POST', '/certificates/generate', { courseId }, getToken()),
 };
 
@@ -494,6 +645,12 @@ export const notificationsAPI = {
     clearAll: async () =>
         http('DELETE', '/notifications/clear-all', null, getToken()),
 
+    // Paginated page for the Notifications center (data + total for load-more).
+    getPage: async ({ limit = 25, offset = 0 } = {}) => {
+        const res = await http('GET', `/notifications?limit=${limit}&offset=${offset}`, null, getToken());
+        return { data: res.data || [], pagination: res.pagination || { total: (res.data || []).length } };
+    },
+
     create: async (data) =>
         http('POST', '/notifications', data, getToken()),
 };
@@ -515,17 +672,62 @@ export const statsAPI = {
     getInstructor: async (instructorId) =>
         http('GET', `/stats/instructor/${instructorId}`, null, getToken()),
 
-    getAuditLogs: async () =>
-        http('GET', '/stats/audit-logs', null, getToken()),
+    getAuditLogs: async (filters = {}) => {
+        const params = new URLSearchParams();
+        if (filters.action) params.set('action', filters.action);
+        if (filters.resource) params.set('resource', filters.resource);
+        if (filters.search) params.set('search', filters.search);
+        if (filters.from) params.set('from', filters.from);
+        if (filters.to) params.set('to', filters.to);
+        if (filters.limit) params.set('limit', filters.limit);
+        if (filters.offset) params.set('offset', filters.offset);
+        const qs = params.toString();
+        return http('GET', `/stats/audit-logs${qs ? `?${qs}` : ''}`, null, getToken());
+    },
+
+    getAuditLogActions: async () =>
+        http('GET', '/stats/audit-logs/actions', null, getToken()),
 
     getAdminOverview: async () =>
         http('GET', '/stats/admins', null, getToken()),
 
+    getDeptAdminDashboard: async () =>
+        http('GET', '/stats/admin/dashboard', null, getToken()),
+
     getStudentStreak: async () =>
         http('GET', '/stats/student/streak', null, getToken()),
 
+    getStudentProgress: async (params = {}) => {
+        const qs = new URLSearchParams(params).toString();
+        return http('GET', `/stats/students/progress${qs ? `?${qs}` : ''}`, null, getToken());
+    },
+
+    getAcademicSessions: async () =>
+        http('GET', '/stats/academic-sessions', null, getToken()),
+
+    createAcademicSession: async (data) =>
+        http('POST', '/stats/academic-sessions', data, getToken()),
+
+    updateAcademicSession: async (id, data) =>
+        http('PUT', `/stats/academic-sessions/${id}`, data, getToken()),
+
+    deleteAcademicSession: async (id) =>
+        http('DELETE', `/stats/academic-sessions/${id}`, null, getToken()),
+
     getDepartments: async () =>
         http('GET', '/stats/departments', null, getToken()),
+
+    getAttendanceReport: async () =>
+        http('GET', '/stats/reports/attendance', null, getToken()),
+
+    getAssignmentsReport: async () =>
+        http('GET', '/stats/reports/assignments', null, getToken()),
+
+    getQuizReport: async () =>
+        http('GET', '/stats/reports/quizzes', null, getToken()),
+
+    getCertificateReport: async () =>
+        http('GET', '/stats/reports/certificates', null, getToken()),
 
     getSystemHealth: async () =>
         http('GET', '/stats/system-health', null, getToken()),
@@ -582,6 +784,31 @@ export const statsAPI = {
 
     updateSettings: async (settings) =>
         http('PUT', '/stats/settings', settings, getToken()),
+};
+
+// ─── NOTES (student lesson notes) ────────────────────────────────────────────
+export const notesAPI = {
+    getByCourse: async (courseId, lessonId) => {
+        const qs = new URLSearchParams();
+        if (courseId) qs.set('courseId', courseId);
+        if (lessonId) qs.set('lessonId', lessonId);
+        const query = qs.toString();
+        return http('GET', `/notes${query ? `?${query}` : ''}`, null, getToken());
+    },
+    create: async (data) =>
+        http('POST', '/notes', data, getToken()),
+    update: async (id, content) =>
+        http('PUT', `/notes/${id}`, { content }, getToken()),
+    remove: async (id) =>
+        http('DELETE', `/notes/${id}`, null, getToken()),
+};
+
+// ─── BOOKMARKS (student lesson bookmarks) ────────────────────────────────────
+export const bookmarksAPI = {
+    getByCourse: async (courseId) =>
+        http('GET', `/bookmarks?courseId=${courseId}`, null, getToken()),
+    toggle: async (courseId, lessonId) =>
+        http('POST', '/bookmarks/toggle', { courseId, lessonId }, getToken()),
 };
 
 // ─── WISHLIST ─────────────────────────────────────────────────────────────────

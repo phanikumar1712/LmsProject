@@ -62,6 +62,128 @@ const getPlatform = async (req, res) => {
     const enrollmentsByMonth = monthlyStatsQuery.rows.map(r => ({ month: r.month, count: parseInt(r.count) }));
     const topCategories = topCatQuery.rows.map(r => ({ name: r.name, enrollments: parseInt(r.enrollments) }));
 
+    // ── SUPER-ADMIN DASHBOARD METRICS ─────────────────────────────────────────
+    // Extra KPIs, recent lists, recent activity, and chart data — all fetched in
+    // parallel so the richer dashboard costs a handful of round-trips total.
+    // Department-scoped admins get dept-filtered numbers; per-department chart
+    // series are only meaningful platform-wide, so scoped callers get [].
+    const [
+        deptCountRes,
+        roleCountsRes,
+        activeUsersRes,
+        completionRes,
+        recentUsersRes,
+        recentCoursesRes,
+        deptBreakdownRes,
+        monthlyRegsRes,
+        monthlyCoursesRes,
+        recentActivityRes,
+    ] = await Promise.all([
+        scoped
+            ? Promise.resolve({ rows: [{ count: 1 }] })
+            : query('SELECT COUNT(*) FROM departments'),
+        query(`SELECT
+                    COUNT(*) FILTER (WHERE role = 'STUDENT')    AS students,
+                    COUNT(*) FILTER (WHERE role = 'INSTRUCTOR') AS instructors,
+                    COUNT(*) FILTER (WHERE role = 'ADMIN')      AS admins
+               FROM users
+               WHERE ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
+        query(`SELECT COUNT(*) FROM users
+               WHERE active = true AND ($1::uuid IS NULL OR department_id = $1)`, [deptId]),
+        query(`SELECT COUNT(*) AS total,
+                      COUNT(*) FILTER (WHERE e.progress >= 100) AS completed
+               FROM enrollments e
+               JOIN courses c ON e.course_id = c.id
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE ($1::uuid IS NULL OR cat.department_id = $1) ${timeWin}`, p),
+        query(`SELECT u.id, u.name, u.email, u.role, u.avatar, d.name AS department_name, u.created_at
+               FROM users u
+               LEFT JOIN departments d ON u.department_id = d.id
+               WHERE ($1::uuid IS NULL OR u.department_id = $1)
+               ORDER BY u.created_at DESC
+               LIMIT 8`, [deptId]),
+        query(`SELECT c.id, c.title, c.status, c.thumbnail, c.enrollment_count, c.created_at,
+                      u.name AS instructor_name
+               FROM courses c
+               LEFT JOIN users u ON c.instructor_id = u.id
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE c.status NOT IN ('REJECTED', 'ARCHIVED')
+                 AND ($1::uuid IS NULL OR cat.department_id = $1)
+               ORDER BY c.created_at DESC
+               LIMIT 8`, [deptId]),
+        scoped
+            ? Promise.resolve({ rows: [] })
+            : query(`SELECT d.name,
+                            COALESCE(u_agg.students, 0)::int     AS students,
+                            COALESCE(u_agg.instructors, 0)::int  AS instructors,
+                            COALESCE(c_agg.courses, 0)::int      AS courses,
+                            COALESCE(e_agg.enrollments, 0)::int  AS enrollments,
+                            COALESCE(e_agg.completed, 0)::int    AS completed
+                     FROM departments d
+                     LEFT JOIN (
+                         SELECT department_id,
+                                COUNT(*) FILTER (WHERE role = 'STUDENT')    AS students,
+                                COUNT(*) FILTER (WHERE role = 'INSTRUCTOR') AS instructors
+                         FROM users
+                         WHERE department_id IS NOT NULL
+                         GROUP BY department_id
+                     ) u_agg ON u_agg.department_id = d.id
+                     LEFT JOIN (
+                         SELECT cat.department_id, COUNT(*) AS courses
+                         FROM courses c
+                         JOIN categories cat ON c.category_id = cat.id
+                         WHERE c.status NOT IN ('REJECTED', 'ARCHIVED')
+                           AND cat.department_id IS NOT NULL
+                         GROUP BY cat.department_id
+                     ) c_agg ON c_agg.department_id = d.id
+                     LEFT JOIN (
+                         SELECT cat.department_id,
+                                COUNT(e.id) AS enrollments,
+                                COUNT(e.id) FILTER (WHERE e.progress >= 100) AS completed
+                         FROM enrollments e
+                         JOIN courses c2 ON e.course_id = c2.id
+                         JOIN categories cat ON c2.category_id = cat.id
+                         WHERE cat.department_id IS NOT NULL
+                         GROUP BY cat.department_id
+                     ) e_agg ON e_agg.department_id = d.id
+                     ORDER BY d.name ASC`),
+        query(`SELECT TO_CHAR(u.created_at, 'Mon') AS month, COUNT(*) AS count
+               FROM users u
+               WHERE u.created_at >= NOW() - INTERVAL '6 months'
+                 AND ($1::uuid IS NULL OR u.department_id = $1)
+               GROUP BY TO_CHAR(u.created_at, 'Mon'), DATE_TRUNC('month', u.created_at)
+               ORDER BY DATE_TRUNC('month', u.created_at) ASC`, [deptId]),
+        query(`SELECT TO_CHAR(c.created_at, 'Mon') AS month, COUNT(*) AS count
+               FROM courses c
+               LEFT JOIN categories cat ON c.category_id = cat.id
+               WHERE c.created_at >= NOW() - INTERVAL '6 months'
+                 AND ($1::uuid IS NULL OR cat.department_id = $1)
+               GROUP BY TO_CHAR(c.created_at, 'Mon'), DATE_TRUNC('month', c.created_at)
+               ORDER BY DATE_TRUNC('month', c.created_at) ASC`, [deptId]),
+        query(`SELECT al.id, al.action, al.resource, al.resource_id, al.created_at,
+                      u.name AS user_name, u.role AS user_role
+               FROM audit_logs al
+               LEFT JOIN users u ON al.user_id = u.id
+               WHERE ($1::uuid IS NULL OR u.department_id = $1)
+               ORDER BY al.created_at DESC
+               LIMIT 8`, [deptId]),
+    ]);
+
+    const roleCounts = roleCountsRes.rows[0];
+    const completion = completionRes.rows[0];
+    const completionTotal = parseInt(completion.total);
+    const completionRate = completionTotal > 0
+        ? Math.round((parseInt(completion.completed) / completionTotal) * 1000) / 10
+        : 0;
+
+    const departmentRows = deptBreakdownRes.rows;
+    const completionByDepartment = departmentRows.map(d => ({
+        name: d.name,
+        completionRate: d.enrollments > 0
+            ? Math.round((d.completed / d.enrollments) * 1000) / 10
+            : 0,
+    }));
+
     let studentGrowth = 0;
     if (enrollmentsByMonth.length >= 2) {
         const curr = enrollmentsByMonth[enrollmentsByMonth.length - 1].count;
@@ -76,13 +198,56 @@ const getPlatform = async (req, res) => {
         avgRating: parseFloat(avgRatingQuery.rows[0].avg_rating) || 0,
         totalCourses: parseInt(courses.rows[0].total),
         approvedCourses: parseInt(courses.rows[0].published),
+        activeCourses: parseInt(courses.rows[0].published), // alias for clarity on the dashboard
         pendingCourses: parseInt(courses.rows[0].pending),
+        pendingApprovals: parseInt(courses.rows[0].pending), // alias for clarity on the dashboard
         totalEnrollments: parseInt(enrollments.rows[0].count),
         usersByRole,
         enrollmentsByMonth,
         topCategories,
         studentGrowth,
-        platformGrowth: studentGrowth // Proxy for platform growth
+        platformGrowth: studentGrowth, // Proxy for platform growth
+
+        // ── Super Admin dashboard metrics ─────────────────────────────────────
+        totalDepartments: parseInt(deptCountRes.rows[0].count),
+        totalAdmins: parseInt(roleCounts.admins),
+        totalStudents: parseInt(roleCounts.students),
+        totalInstructors: parseInt(roleCounts.instructors),
+        activeUsers: parseInt(activeUsersRes.rows[0].count),
+        completionRate,
+        recentlyAddedUsers: recentUsersRes.rows.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatar: u.avatar,
+            departmentName: u.department_name,
+            createdAt: u.created_at,
+        })),
+        recentCourses: recentCoursesRes.rows.map(c => ({
+            id: c.id,
+            title: c.title,
+            status: c.status,
+            thumbnail: c.thumbnail,
+            enrollmentCount: parseInt(c.enrollment_count),
+            instructorName: c.instructor_name,
+            createdAt: c.created_at,
+        })),
+        recentActivities: recentActivityRes.rows.map(log => ({
+            id: log.id,
+            userName: log.user_name || 'System',
+            role: log.user_role,
+            action: log.action,
+            target: log.resource + (log.resource_id ? ` (${log.resource_id})` : ''),
+            timestamp: log.created_at,
+        })),
+        studentsByDepartment: departmentRows.map(d => ({ name: d.name, count: d.students })),
+        instructorsByDepartment: departmentRows.map(d => ({ name: d.name, count: d.instructors })),
+        coursesByDepartment: departmentRows.map(d => ({ name: d.name, count: d.courses })),
+        enrollmentsByDepartment: departmentRows.map(d => ({ name: d.name, count: d.enrollments })),
+        completionByDepartment,
+        monthlyUserRegistrations: monthlyRegsRes.rows.map(r => ({ month: r.month, count: parseInt(r.count) })),
+        monthlyCourseCreation: monthlyCoursesRes.rows.map(r => ({ month: r.month, count: parseInt(r.count) })),
     });
 };
 
@@ -138,8 +303,72 @@ const getInstructor = async (req, res) => {
         SELECT COUNT(*) FROM courses WHERE instructor_id = $1 AND created_at >= DATE_TRUNC('month', NOW())
     `, [instructorId]);
 
-    const [monthlyEnrollments, thisMonth, newCourses] = await Promise.all([
-        monthlyEnrollmentsQuery, thisMonthQuery, newCoursesThisMonthQuery
+    // ── Instructor dashboard extra blocks (module 17 spec) ─────────────────────
+    // All scoped to the instructor's own courses; batched, not N+1.
+    const pendingAssignmentsQuery = query(`
+        SELECT COUNT(*) FROM submissions s
+        JOIN assignments a ON s.assignment_id = a.id
+        JOIN courses c ON a.course_id = c.id
+        WHERE c.instructor_id = $1 AND s.marks IS NULL
+    `, [instructorId]);
+
+    const upcomingSessionsQuery = query(`
+        SELECT ls.id, ls.title, ls.session_date, ls.start_time, ls.end_time, ls.meeting_link,
+               c.id AS "courseId", c.title AS "courseTitle"
+        FROM live_sessions ls
+        JOIN courses c ON ls.course_id = c.id
+        WHERE c.instructor_id = $1 AND ls.session_date >= CURRENT_DATE
+        ORDER BY ls.session_date ASC, ls.start_time ASC NULLS LAST
+        LIMIT 5
+    `, [instructorId]);
+
+    const upcomingQuizzesQuery = query(`
+        SELECT q.id, q.title, q.lesson_id AS "lessonId", q.time_limit AS "timeLimit", q.passing_score AS "passingScore",
+               c.id AS "courseId", c.title AS "courseTitle",
+               (SELECT COUNT(*) FROM quiz_attempts qa WHERE qa.quiz_id = q.id) AS attempts
+        FROM quizzes q
+        JOIN courses c ON q.course_id = c.id
+        WHERE c.instructor_id = $1
+        ORDER BY q.created_at DESC
+        LIMIT 5
+    `, [instructorId]);
+
+    const recentSubmissionsQuery = query(`
+        SELECT s.id, s.marks, s.submitted_at, s.comments, u.name AS "studentName", u.email AS "studentEmail",
+               a.title AS "assignmentTitle", c.id AS "courseId", c.title AS "courseTitle"
+        FROM submissions s
+        JOIN assignments a ON s.assignment_id = a.id
+        JOIN courses c ON a.course_id = c.id
+        JOIN users u ON s.student_id = u.id
+        WHERE c.instructor_id = $1
+        ORDER BY s.submitted_at DESC
+        LIMIT 6
+    `, [instructorId]);
+
+    const avgCompletionQuery = query(`
+        SELECT COALESCE(AVG(e.progress)::numeric, 0)::int AS avg
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.id
+        WHERE c.instructor_id = $1
+    `, [instructorId]);
+
+    const recentAnnouncementsQuery = query(`
+        SELECT a.id, a.title, a.content, a.priority, a.pinned, a.created_at, u.name AS "authorName"
+        FROM announcements a
+        LEFT JOIN users u ON a.author_id = u.id
+        WHERE a.department_id = (
+            SELECT u2.department_id FROM users u2 WHERE u2.id = $1
+        ) OR a.department_id IS NULL
+        ORDER BY a.created_at DESC
+        LIMIT 5
+    `, [instructorId]);
+
+    const [monthlyEnrollments, thisMonth, newCourses,
+        pendingAssignments, upcomingSessions, upcomingQuizzes,
+        recentSubmissions, avgCompletion, recentAnnouncements] = await Promise.all([
+        monthlyEnrollmentsQuery, thisMonthQuery, newCoursesThisMonthQuery,
+        pendingAssignmentsQuery, upcomingSessionsQuery, upcomingQuizzesQuery,
+        recentSubmissionsQuery, avgCompletionQuery, recentAnnouncementsQuery
     ]);
 
     res.json({
@@ -152,34 +381,100 @@ const getInstructor = async (req, res) => {
         thisMonth: {
             enrollments: parseInt(thisMonth.rows[0].enrollments),
             newCourses: parseInt(newCourses.rows[0].count)
-        }
+        },
+        pendingAssignments: parseInt(pendingAssignments.rows[0].count),
+        avgCompletion: parseInt(avgCompletion.rows[0].avg),
+        upcomingSessions: upcomingSessions.rows,
+        upcomingQuizzes: upcomingQuizzes.rows,
+        recentSubmissions: recentSubmissions.rows,
+        recentAnnouncements: recentAnnouncements.rows
     });
 };
 
 // GET /api/stats/audit-logs
+// Full audit trail with filters + pagination:
+//   ?action=USER_SUSPENDED&resource=users&search=riya&from=2025-01-01&to=2025-12-31&limit=25&offset=0
+// Super Admin sees every log; a department-scoped ADMIN only sees entries
+// produced by users in their own department. Each row carries WHO (user), WHAT
+// (action), WHEN (timestamp), WHICH RECORD (resource + id), OLD/NEW values, and
+// IP + parsed device info.
 const getAuditLogs = async (req, res) => {
     const { scoped, departmentId } = getDepartmentScope(req);
-    // A scoped ADMIN only sees audit entries produced by users in their department.
-    const where = scoped ? 'WHERE u.department_id = $1' : '';
-    const values = scoped ? [departmentId] : [];
+    const { action, resource, search, from, to } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const conditions = [];
+    const values = [];
+    let i = 1;
+
+    if (scoped) {
+        conditions.push(`u.department_id = $${i++}`);
+        values.push(departmentId);
+    }
+    if (action) { conditions.push(`al.action = $${i++}`); values.push(action); }
+    if (resource) { conditions.push(`al.resource = $${i++}`); values.push(resource); }
+    if (search) {
+        conditions.push(`(u.name ILIKE $${i} OR al.resource_id::text ILIKE $${i} OR al.details::text ILIKE $${i})`);
+        values.push(`%${search}%`);
+        i++;
+    }
+    if (from) { conditions.push(`al.created_at >= $${i++}`); values.push(from); }
+    if (to) { conditions.push(`al.created_at <= $${i++}::timestamptz + INTERVAL '1 day'`); values.push(to); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRes = await query(
+        `SELECT COUNT(*)::int AS total FROM audit_logs al
+         LEFT JOIN users u ON al.user_id = u.id ${where}`,
+        values
+    );
+    const total = countRes.rows[0].total;
+
     const result = await query(`
         SELECT al.*, u.name as user_name, u.email as user_email, u.role as user_role
         FROM audit_logs al
         LEFT JOIN users u ON al.user_id = u.id
         ${where}
         ORDER BY al.created_at DESC
-        LIMIT 200
-    `, values);
+        LIMIT $${i++} OFFSET $${i++}
+    `, [...values, limit, offset]);
+
     const formatted = result.rows.map(log => ({
         id: log.id,
         userName: log.user_name || 'System',
         userRole: log.user_role,
         action: log.action,
+        resource: log.resource,
+        resourceId: log.resource_id,
         target: log.resource + (log.resource_id ? ' (' + log.resource_id + ')' : ''),
+        oldValue: log.old_value,
+        newValue: log.new_value,
+        details: log.details,
+        device: log.device,
+        ip: log.ip_address || '127.0.0.1',
         timestamp: log.created_at,
-        ip: log.ip_address || '127.0.0.1'
     }));
-    res.json(formatted);
+
+    res.json({ data: formatted, total, limit, offset });
+};
+
+// GET /api/stats/audit-logs/actions — distinct actions (for the filter UI).
+// Scoped to the caller's department so admins only see actions that exist in
+// their own audit trail.
+const getAuditLogActions = async (req, res) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const where = scoped ? 'WHERE u.department_id = $1' : '';
+    const values = scoped ? [departmentId] : [];
+    const result = await query(`
+        SELECT DISTINCT al.action, COUNT(*)::int AS count
+        FROM audit_logs al
+        LEFT JOIN users u ON al.user_id = u.id
+        ${where}
+        GROUP BY al.action
+        ORDER BY count DESC
+    `, values);
+    res.json(result.rows.map(r => ({ action: r.action, count: r.count })));
 };
 
 // GET /api/stats/admins — per-department overview with usage vs limits.
@@ -251,6 +546,119 @@ const getAdminOverview = async (req, res) => {
     });
 
     res.json({ defaults: { maxStudents: defaultMaxStudents, maxCourses: defaultMaxCourses }, data });
+};
+
+// GET /api/stats/admin/dashboard — department-admin dashboard aggregate.
+// Everything is department-scoped: a scoped ADMIN is locked to its own dept
+// (backend-enforced), while a SUPER_ADMIN must pass ?departmentId=. Returns the
+// totals, recent activity, and the chart series the admin dashboard renders.
+const getDeptAdminDashboard = async (req, res) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const deptId = scoped ? departmentId : (req.query.departmentId || null);
+    if (!deptId) throw createError('departmentId is required', 400);
+
+    const deptRes = await query('SELECT id, name, code FROM departments WHERE id = $1', [deptId]);
+    if (!deptRes.rows.length) throw createError('Department not found', 404);
+    const dept = deptRes.rows[0];
+
+    const totals = await query(`
+        SELECT
+            (SELECT COUNT(*) FROM users WHERE role = 'STUDENT' AND department_id = $1)::int             AS "totalStudents",
+            (SELECT COUNT(*) FROM users WHERE role = 'INSTRUCTOR' AND department_id = $1)::int          AS "totalInstructors",
+            (SELECT COUNT(*) FROM courses c JOIN categories cat ON c.category_id = cat.id
+                WHERE cat.department_id = $1 AND c.status NOT IN ('REJECTED','ARCHIVED'))::int          AS "totalCourses",
+            (SELECT COUNT(*) FROM courses c JOIN categories cat ON c.category_id = cat.id
+                WHERE cat.department_id = $1 AND c.status = 'PUBLISHED')::int                           AS "activeCourses",
+            (SELECT COUNT(*) FROM enrollments e JOIN courses c ON e.course_id = c.id
+                JOIN categories cat ON c.category_id = cat.id WHERE cat.department_id = $1)::int        AS "totalEnrollments",
+            (SELECT COUNT(*) FROM enrollments e JOIN courses c ON e.course_id = c.id
+                JOIN categories cat ON c.category_id = cat.id
+                WHERE cat.department_id = $1 AND e.completed_at IS NOT NULL)::int                       AS "completedEnrollments",
+            (SELECT COUNT(*) FROM courses c JOIN categories cat ON c.category_id = cat.id
+                WHERE cat.department_id = $1 AND c.status = 'PENDING')::int                            AS "pendingCourses"
+    `, [deptId]);
+
+    const userFields = `u.id, u.name, u.email, u.role, u.phone, u.avatar, u.active, u.department_id, u.roll_no, u.username, u.last_login, u.created_at, u.year, u.semester, u.section, u.batch`;
+    const recentStudents = await query(
+        `SELECT ${userFields} FROM users u WHERE u.role = 'STUDENT' AND u.department_id = $1
+         ORDER BY u.created_at DESC LIMIT 5`, [deptId]);
+    const recentInstructors = await query(
+        `SELECT ${userFields} FROM users u WHERE u.role = 'INSTRUCTOR' AND u.department_id = $1
+         ORDER BY u.created_at DESC LIMIT 5`, [deptId]);
+    const recentCourses = await query(`
+        SELECT c.id, c.title, c.thumbnail, c.status, c.created_at, u.name AS instructor_name
+        FROM courses c
+        JOIN categories cat ON c.category_id = cat.id
+        LEFT JOIN users u ON c.instructor_id = u.id
+        WHERE cat.department_id = $1
+        ORDER BY c.created_at DESC LIMIT 5`, [deptId]);
+
+    const studentsByYear = await query(`
+        SELECT year, COUNT(*)::int AS count FROM users
+        WHERE role = 'STUDENT' AND department_id = $1 AND year IS NOT NULL
+        GROUP BY year ORDER BY year`, [deptId]);
+    const studentsBySection = await query(`
+        SELECT section, COUNT(*)::int AS count FROM users
+        WHERE role = 'STUDENT' AND department_id = $1 AND section IS NOT NULL AND section <> ''
+        GROUP BY section ORDER BY section`, [deptId]);
+
+    const courseEnrollment = await query(`
+        SELECT c.id AS "courseId", c.title AS title,
+               COUNT(DISTINCT e.student_id)::int AS students
+        FROM courses c
+        JOIN categories cat ON c.category_id = cat.id
+        LEFT JOIN enrollments e ON e.course_id = c.id
+        WHERE cat.department_id = $1 AND c.status NOT IN ('REJECTED','ARCHIVED')
+        GROUP BY c.id, c.title
+        ORDER BY students DESC LIMIT 8`, [deptId]);
+
+    const courseCompletion = await query(`
+        SELECT c.id AS "courseId", c.title AS title,
+               COUNT(DISTINCT e.student_id)::int AS enrolled,
+               COUNT(DISTINCT e.student_id) FILTER (WHERE e.completed_at IS NOT NULL)::int AS completed
+        FROM courses c
+        JOIN categories cat ON c.category_id = cat.id
+        LEFT JOIN enrollments e ON e.course_id = c.id
+        WHERE cat.department_id = $1 AND c.status NOT IN ('REJECTED','ARCHIVED')
+        GROUP BY c.id, c.title
+        HAVING COUNT(DISTINCT e.student_id) > 0
+        ORDER BY enrolled DESC LIMIT 8`, [deptId]);
+
+    const instructorCourseCount = await query(`
+        SELECT u.id AS "instructorId", u.name AS name,
+               COUNT(DISTINCT c.id)::int AS courses
+        FROM users u
+        LEFT JOIN courses c ON c.instructor_id = u.id
+        JOIN categories cat ON c.category_id = cat.id
+        WHERE u.role = 'INSTRUCTOR' AND u.department_id = $1
+        GROUP BY u.id, u.name
+        ORDER BY courses DESC LIMIT 8`, [deptId]);
+
+    const t = totals.rows[0];
+    res.json({
+        department: dept,
+        totals: {
+            totalStudents: t.totalStudents,
+            totalInstructors: t.totalInstructors,
+            totalCourses: t.totalCourses,
+            activeCourses: t.activeCourses,
+            totalEnrollments: t.totalEnrollments,
+            courseCompletion: t.totalEnrollments ? Math.round((t.completedEnrollments / t.totalEnrollments) * 100) : 0,
+            pendingCourses: t.pendingCourses,
+        },
+        recent: {
+            students: recentStudents.rows,
+            instructors: recentInstructors.rows,
+            courses: recentCourses.rows,
+        },
+        charts: {
+            studentsByYear: studentsByYear.rows,
+            studentsBySection: studentsBySection.rows,
+            courseEnrollment: courseEnrollment.rows,
+            courseCompletion: courseCompletion.rows,
+            instructorCourseCount: instructorCourseCount.rows,
+        },
+    });
 };
 
 // GET /api/stats/categories
@@ -641,6 +1049,78 @@ const updatePlatformSettings = async (req, res) => {
     res.json(result.rows[0].value);
 };
 
+// ── SUPER-ADMIN REPORT AGGREGATES ────────────────────────────────────────────
+
+// GET /api/stats/reports/attendance — per-course attendance summary.
+const getAttendanceReport = async (req, res) => {
+    const result = await query(`
+        SELECT c.id AS "courseId", c.title AS "courseTitle",
+               COUNT(DISTINCT ls.id)::int AS sessions,
+               COUNT(a.id)::int AS records,
+               COUNT(a.id) FILTER (WHERE a.status = 'present')::int AS present,
+               COUNT(a.id) FILTER (WHERE a.status = 'absent')::int AS absent,
+               COUNT(a.id) FILTER (WHERE a.status = 'late')::int AS late,
+               COUNT(a.id) FILTER (WHERE a.status = 'excused')::int AS excused
+        FROM courses c
+        LEFT JOIN live_sessions ls ON ls.course_id = c.id
+        LEFT JOIN attendance a ON a.session_id = ls.id
+        GROUP BY c.id, c.title
+        HAVING COUNT(DISTINCT ls.id) > 0
+        ORDER BY c.title ASC
+    `);
+    res.json(result.rows);
+};
+
+// GET /api/stats/reports/assignments — per-course assignment + submission summary.
+const getAssignmentsReport = async (req, res) => {
+    const result = await query(`
+        SELECT c.id AS "courseId", c.title AS "courseTitle",
+               COUNT(DISTINCT a.id)::int AS assignments,
+               COUNT(s.id)::int AS submissions,
+               COUNT(DISTINCT s.student_id)::int AS "submittingStudents",
+               ROUND(AVG(s.marks)::numeric, 1) AS "avgMarks",
+               COALESCE(MAX(a.max_marks), 0)::int AS "maxMarks"
+        FROM courses c
+        LEFT JOIN assignments a ON a.course_id = c.id
+        LEFT JOIN submissions s ON s.assignment_id = a.id
+        GROUP BY c.id, c.title
+        HAVING COUNT(DISTINCT a.id) > 0
+        ORDER BY c.title ASC
+    `);
+    res.json(result.rows);
+};
+
+// GET /api/stats/reports/quizzes — per-course quiz attempt + pass summary.
+const getQuizReport = async (req, res) => {
+    const result = await query(`
+        SELECT c.id AS "courseId", c.title AS "courseTitle",
+               COUNT(DISTINCT q.id)::int AS quizzes,
+               COUNT(qa.id)::int AS attempts,
+               COUNT(qa.id) FILTER (WHERE qa.passed = true)::int AS passed,
+               ROUND(AVG(qa.score)::numeric, 1) AS "avgScore"
+        FROM courses c
+        LEFT JOIN quizzes q ON q.course_id = c.id
+        LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id
+        GROUP BY c.id, c.title
+        HAVING COUNT(DISTINCT q.id) > 0
+        ORDER BY c.title ASC
+    `);
+    res.json(result.rows);
+};
+
+// GET /api/stats/reports/certificates — per-course certificate counts.
+const getCertificateReport = async (req, res) => {
+    const result = await query(`
+        SELECT c.id AS "courseId", c.title AS "courseTitle",
+               COUNT(cer.id)::int AS certificates
+        FROM certificates cer
+        JOIN courses c ON cer.course_id = c.id
+        GROUP BY c.id, c.title
+        ORDER BY c.title ASC
+    `);
+    res.json(result.rows);
+};
+
 const MAX_IMPORT_ROWS = 500;
 
 // GET /api/stats/departments — SUPER_ADMIN overview of every department with
@@ -651,8 +1131,15 @@ const getDepartmentsStats = async (req, res) => {
             d.id,
             d.name,
             d.icon,
-            d.max_students                            AS "maxStudentsOverride",
-            d.max_courses                             AS "maxCoursesOverride",
+            d.code,
+            d.description,
+            d.hod,
+            d.contact_email                            AS "contactEmail",
+            d.contact_number                           AS "contactNumber",
+            d.active                                   AS active,
+            d.created_at                               AS "createdAt",
+            d.max_students                             AS "maxStudentsOverride",
+            d.max_courses                              AS "maxCoursesOverride",
             COALESCE(u_agg.students, 0)::int       AS "studentCount",
             COALESCE(u_agg.instructors, 0)::int    AS "instructorCount",
             COALESCE(u_agg.admins, 0)::int          AS "adminCount",
@@ -661,7 +1148,14 @@ const getDepartmentsStats = async (req, res) => {
             COALESCE(c_agg.pending, 0)::int         AS "coursePending",
             COALESCE(e_agg.enrollments, 0)::int     AS "totalEnrollments",
             COALESCE(r_agg.avg_rating, 0)::float    AS "avgRating",
-            COALESCE(cat_agg.category_count, 0)::int AS "categoryCount"
+            COALESCE(cat_agg.category_count, 0)::int AS "categoryCount",
+            (SELECT COALESCE(string_agg(u.name, ', ' ORDER BY u.name), '')
+             FROM users u
+             WHERE u.role = 'ADMIN'
+               AND (u.department_id = d.id OR EXISTS (
+                   SELECT 1 FROM admin_departments ad
+                   WHERE ad.user_id = u.id AND ad.department_id = d.id
+               )))                                   AS "assignedAdmins"
         FROM departments d
         LEFT JOIN (
             SELECT department_id,
@@ -735,7 +1229,7 @@ const getAiReport = async (req, res) => {
         query(`
             SELECT c.title, c.enrollment_count, c.rating, c.review_count,
                    u.name as instructor_name
-            FROM courses c JOIN users u ON c.instructor_id = u.id
+            FROM courses c LEFT JOIN users u ON c.instructor_id = u.id
             WHERE c.status = 'PUBLISHED'
             ORDER BY c.enrollment_count DESC LIMIT 5
         `),
@@ -751,13 +1245,13 @@ const getAiReport = async (req, res) => {
         `),
         query(`
             SELECT c.title, c.created_at, u.name as instructor_name
-            FROM courses c JOIN users u ON c.instructor_id = u.id
+            FROM courses c LEFT JOIN users u ON c.instructor_id = u.id
             WHERE c.status = 'PENDING'
             ORDER BY c.created_at DESC LIMIT 10
         `),
         query(`
             SELECT c.title, u.name as instructor_name
-            FROM courses c JOIN users u ON c.instructor_id = u.id
+            FROM courses c LEFT JOIN users u ON c.instructor_id = u.id
             WHERE c.status = 'PUBLISHED' AND c.enrollment_count = 0
             ORDER BY c.created_at DESC LIMIT 10
         `),
@@ -1043,7 +1537,8 @@ module.exports = {
     getPlatform,
     getInstructor,
     getAuditLogs,
-    getAdminOverview,
+    getAuditLogActions,
+    getAdminOverview, getDeptAdminDashboard,
     getCategories,
     getCategoryDetail,
     createCategory,
@@ -1064,4 +1559,8 @@ module.exports = {
     createAcademicSession,
     updateAcademicSession,
     deleteAcademicSession,
+    getAttendanceReport,
+    getAssignmentsReport,
+    getQuizReport,
+    getCertificateReport,
 };

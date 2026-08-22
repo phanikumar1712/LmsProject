@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, GripVertical, ListChecks } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Save, ListChecks } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -16,17 +16,13 @@ const http = async (method, path, body = null) => {
     return data;
 };
 
-export default function RubricGradingPanel({ assignmentId, onTotalScore }) {
+export default function RubricGradingPanel({ assignmentId }) {
     const [criteria, setCriteria] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editing, setEditing] = useState(false);
 
-    useEffect(() => {
-        if (assignmentId) loadRubric();
-    }, [assignmentId]);
-
-    const loadRubric = async () => {
+    const loadRubric = useCallback(async () => {
         setLoading(true);
         try {
             const data = await http('GET', `/assignments/${assignmentId}/rubric`);
@@ -49,7 +45,11 @@ export default function RubricGradingPanel({ assignmentId, onTotalScore }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [assignmentId]);
+
+    useEffect(() => {
+        if (assignmentId) loadRubric();
+    }, [assignmentId, loadRubric]);
 
     const addCriterion = () => {
         setCriteria(prev => [...prev, {
@@ -210,11 +210,7 @@ export function RubricScoringPanel({ submissionId, criteria, onScoreChange }) {
     const [saving, setSaving] = useState(false);
     const [loaded, setLoaded] = useState(false);
 
-    useEffect(() => {
-        if (submissionId && !loaded) loadExistingScores();
-    }, [submissionId]);
-
-    const loadExistingScores = async () => {
+    const loadExistingScores = useCallback(async () => {
         try {
             const data = await http('GET', `/assignments/submissions/${submissionId}/rubric-scores`);
             if (data && data.length > 0) {
@@ -232,7 +228,11 @@ export function RubricScoringPanel({ submissionId, criteria, onScoreChange }) {
         } finally {
             setLoaded(true);
         }
-    };
+    }, [submissionId]);
+
+    useEffect(() => {
+        if (submissionId && !loaded) loadExistingScores();
+    }, [submissionId, loaded, loadExistingScores]);
 
     const updateScore = (criterionId, value) => {
         const newScores = { ...scores, [criterionId]: Math.max(0, Number(value || 0)) };

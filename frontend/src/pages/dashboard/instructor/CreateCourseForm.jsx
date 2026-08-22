@@ -1,11 +1,38 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle, Clock, Award, Play, FileSpreadsheet, Download, Shuffle, Smile } from 'lucide-react';
+import { Save, Upload, Plus, Trash2, GripVertical, CheckCircle, Video, FileText, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle, Clock, Award, Play, FileSpreadsheet, Download, Shuffle, Smile, Headphones, Type, ExternalLink, Code2, ClipboardList } from 'lucide-react';
 import { coursesAPI, statsAPI, quizzesAPI, uploadAPI } from '../../../services/api';
 import { parseQuestionFile, downloadQuestionTemplate } from '../../../utils/quizImport';
 import { useAuth } from '../../../contexts/AuthContext';
-import { CourseThumbnail, EMOJI_OPTIONS } from '../../../components/ui/CourseThumbnail';
+import { EMOJI_OPTIONS } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
+
+// ── Lesson type metadata (module 19: full type palette) ──────────────────────
+// All class strings are literal so Tailwind JIT can generate them.
+const LESSON_TYPE_META = {
+    video:      { value: 'video', label: 'Video', icon: Play, chip: 'bg-blue-500 text-white shadow-sm', iconBox: 'bg-blue-100 text-blue-600', card: 'border-blue-100 bg-blue-50/20', banner: 'bg-blue-50 border border-blue-200', iconBoxSolid: 'bg-blue-500 text-white', title: 'Video Content', desc: 'Upload a video file or paste a YouTube/Vimeo link. Students will watch this lesson.' },
+    pdf:        { value: 'pdf', label: 'PDF', icon: FileText, chip: 'bg-emerald-600 text-white shadow-sm', iconBox: 'bg-emerald-100 text-emerald-600', card: 'border-emerald-100 bg-emerald-50/20', banner: 'bg-emerald-50 border border-emerald-200', iconBoxSolid: 'bg-emerald-600 text-white', title: 'PDF Resource', desc: 'Upload a PDF or share a link to a document students can read or download.' },
+    document:   { value: 'document', label: 'Document', icon: FileSpreadsheet, chip: 'bg-teal-500 text-white shadow-sm', iconBox: 'bg-teal-100 text-teal-600', card: 'border-teal-100 bg-teal-50/20', banner: 'bg-teal-50 border border-teal-200', iconBoxSolid: 'bg-teal-500 text-white', title: 'Document Resource', desc: 'Upload a DOC/PDF, or share a link to reading material. Students can view or download it.' },
+    audio:      { value: 'audio', label: 'Audio', icon: Headphones, chip: 'bg-cyan-500 text-white shadow-sm', iconBox: 'bg-cyan-100 text-cyan-600', card: 'border-cyan-100 bg-cyan-50/20', banner: 'bg-cyan-50 border border-cyan-200', iconBoxSolid: 'bg-cyan-500 text-white', title: 'Audio Lesson', desc: 'Upload an audio file (MP3) or paste a podcast/recording link. Students play it inline.' },
+    text:       { value: 'text', label: 'Text', icon: Type, chip: 'bg-slate-600 text-white shadow-sm', iconBox: 'bg-slate-100 text-slate-600', card: 'border-slate-200 bg-slate-50/30', banner: 'bg-slate-50 border border-slate-200', iconBoxSolid: 'bg-slate-600 text-white', title: 'Text Lesson', desc: 'Write lesson content directly here. Students read it inline in the lesson player.' },
+    quiz:       { value: 'quiz', label: 'Quiz', icon: HelpCircle, chip: 'bg-purple-500 text-white shadow-sm', iconBox: 'bg-purple-100 text-purple-600', card: 'border-purple-100 bg-purple-50/20', banner: 'bg-purple-50 border border-purple-200', iconBoxSolid: 'bg-purple-500 text-white', title: 'Assessment Quiz', desc: 'Create auto-graded assessments with multiple-choice or fill-in-the-blank questions.' },
+    assignment: { value: 'assignment', label: 'Assignment', icon: ClipboardList, chip: 'bg-orange-500 text-white shadow-sm', iconBox: 'bg-orange-100 text-orange-600', card: 'border-orange-100 bg-orange-50/20', banner: 'bg-orange-50 border border-orange-200', iconBoxSolid: 'bg-orange-500 text-white', title: 'Assignment', desc: 'Describe the task students must complete. Instructions are shown in the lesson.' },
+    coding:     { value: 'coding', label: 'Coding', icon: Code2, chip: 'bg-rose-500 text-white shadow-sm', iconBox: 'bg-rose-100 text-rose-600', card: 'border-rose-100 bg-rose-50/20', banner: 'bg-rose-50 border border-rose-200', iconBoxSolid: 'bg-rose-500 text-white', title: 'Coding Exercise', desc: 'Paste a link to a coding exercise (Replit, GitHub Codespaces, etc.). Students open it in the lesson.' },
+    external:   { value: 'external', label: 'External', icon: ExternalLink, chip: 'bg-indigo-500 text-white shadow-sm', iconBox: 'bg-indigo-100 text-indigo-600', card: 'border-indigo-100 bg-indigo-50/20', banner: 'bg-indigo-50 border border-indigo-200', iconBoxSolid: 'bg-indigo-500 text-white', title: 'External Resource', desc: 'Paste a link to external content (website, article, tool). It opens inside the lesson.' },
+};
+
+// Upload-accept + placeholder hints for the file-based lesson types.
+const CONTENT_META = {
+    video:    { accept: 'video/*', placeholder: 'Paste YouTube/Vimeo link', upload: 'Video' },
+    audio:    { accept: 'audio/*', placeholder: 'Paste audio link (MP3, podcast)', upload: 'Audio' },
+    pdf:      { accept: 'application/pdf', placeholder: 'Paste PDF link', upload: 'PDF' },
+    document: { accept: 'application/pdf,.doc,.docx', placeholder: 'Paste shareable document link', upload: 'Document' },
+};
+
+const LessonTypeIcon = ({ type, size = 18 }) => {
+    const Icon = LESSON_TYPE_META[type]?.icon || FileText;
+    return <Icon size={size} />;
+};
 
 export default function CreateCourseForm() {
     useAuth();
@@ -27,12 +54,20 @@ export default function CreateCourseForm() {
     const [thumbnailPreview, setThumbnailPreview] = useState('');
     const [thumbnailType, setThumbnailType] = useState('image'); // 'image' | 'emoji'
     const [selectedEmoji, setSelectedEmoji] = useState('');
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [, setShowEmojiPicker] = useState(false);
     const [courseStatus, setCourseStatus] = useState(null); // current status when editing
     const thumbnailInputRef = useRef(null);
 
     const [deletedSections, setDeletedSections] = useState([]);
     const [deletedLessons, setDeletedLessons] = useState([]);
+
+    // ── Curriculum drag-and-drop state ──────────────────────────────────────────
+    // The grip handles drive real HTML5 drag reorder: modules move vertically,
+    // lessons reorder within their module or drop into another module. Order is
+    // derived from array position on save (order: sIdx + 1 / lIdx + 1).
+    const [dragSecId, setDragSecId] = useState(null); // module id being dragged
+    const [dragLesson, setDragLesson] = useState(null); // { id, sIdx } being dragged
+    const [dropTargetSecId, setDropTargetSecId] = useState(null); // module highlighted as a lesson drop target
 
     const [curriculum, setCurriculum] = useState([
         {
@@ -214,6 +249,49 @@ export default function CreateCourseForm() {
         if (ls.dbId) setDeletedLessons(prev => [...prev, ls.dbId]);
         newCurr[secIdx].lessons.splice(lessIdx, 1);
         setCurriculum(newCurr);
+    };
+
+    // ── Curriculum drag-and-drop reordering ────────────────────────────────────
+    const clearDragState = () => { setDragSecId(null); setDragLesson(null); setDropTargetSecId(null); };
+
+    const moveSection = (fromId, toId) => {
+        setCurriculum(prev => {
+            const fromIdx = prev.findIndex(s => s.id === fromId);
+            const toIdx = prev.findIndex(s => s.id === toId);
+            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, moved);
+            return next;
+        });
+    };
+
+    const moveLessonWithin = (sIdx, fromId, toId) => {
+        setCurriculum(prev => {
+            const sec = prev[sIdx];
+            if (!sec) return prev;
+            const fromIdx = sec.lessons.findIndex(l => l.id === fromId);
+            const toIdx = sec.lessons.findIndex(l => l.id === toId);
+            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return prev;
+            const lessons = [...sec.lessons];
+            const [moved] = lessons.splice(fromIdx, 1);
+            lessons.splice(toIdx, 0, moved);
+            const next = [...prev];
+            next[sIdx] = { ...sec, lessons };
+            return next;
+        });
+    };
+
+    const moveLessonToSection = (srcSIdx, lessonId, dstSIdx, dstLIdx) => {
+        setCurriculum(prev => {
+            const next = prev.map(s => ({ ...s, lessons: [...s.lessons] }));
+            const src = next[srcSIdx];
+            const fromIdx = src.lessons.findIndex(l => l.id === lessonId);
+            if (fromIdx < 0) return prev;
+            const [moved] = src.lessons.splice(fromIdx, 1);
+            next[dstSIdx].lessons.splice(dstLIdx, 0, moved);
+            return next;
+        });
     };
 
     const handleLessonFileUpload = async (e, secIdx, lessIdx) => {
@@ -737,9 +815,46 @@ export default function CreateCourseForm() {
 
                     <div className="space-y-5">
                         {curriculum.map((section, sIdx) => (
-                            <div key={section.id} className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
+                            <div
+                                key={section.id}
+                                draggable={!saving}
+                                onDragStart={e => {
+                                    if (e.target.closest('input, textarea, select')) { e.preventDefault(); return; }
+                                    setDragSecId(section.id);
+                                    setDragLesson(null);
+                                    setDropTargetSecId(null);
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('text/plain', section.id);
+                                }}
+                                onDragEnter={e => {
+                                    e.preventDefault();
+                                    if (!dragSecId || dragSecId === section.id) return;
+                                    moveSection(dragSecId, section.id);
+                                }}
+                                onDragOver={e => e.preventDefault()}
+                                onDrop={e => {
+                                    e.preventDefault();
+                                    // A lesson from another module dropped on this
+                                    // module's row → append it at the end.
+                                    if (dragLesson && dragLesson.sIdx !== sIdx) {
+                                        moveLessonToSection(dragLesson.sIdx, dragLesson.id, sIdx, curriculum[sIdx].lessons.length);
+                                    }
+                                    clearDragState();
+                                }}
+                                onDragEnd={clearDragState}
+                                onDragLeave={e => {
+                                    if (!e.currentTarget.contains(e.relatedTarget)) setDropTargetSecId(null);
+                                }}
+                                className={`border border-border rounded-xl overflow-hidden bg-card shadow-sm transition-all ${
+                                    dragSecId === section.id
+                                        ? 'ring-2 ring-indigo-400 border-indigo-300 opacity-80'
+                                        : dropTargetSecId === section.id
+                                            ? 'ring-2 ring-indigo-300 border-indigo-300 bg-indigo-50/40'
+                                            : ''
+                                }`}
+                            >
                                 <div className="p-4 bg-muted/40 border-b border-border flex items-center gap-3">
-                                    <GripVertical size={18} className="text-muted-foreground/60 cursor-move" />
+                                    <GripVertical size={18} className={`flex-shrink-0 cursor-grab active:cursor-grabbing ${dragSecId === section.id ? 'text-indigo-500' : 'text-muted-foreground/60'}`} title="Drag to reorder module" />
                                     <span className="font-bold text-foreground/80">Module {sIdx + 1}:</span>
                                     <input
                                         type="text"
@@ -757,38 +872,73 @@ export default function CreateCourseForm() {
                                 {section.isExpanded && (
                                     <div className="p-5 space-y-4 bg-card">
                                         {section.lessons.map((lesson, lIdx) => (
-                                            <div key={lesson.id} className={`ml-4 md:ml-12 border rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${lesson.type === 'video' ? 'border-blue-100 bg-blue-50/20' : lesson.type === 'quiz' ? 'border-purple-100 bg-purple-50/20' : 'border-emerald-100 bg-emerald-50/20'}`}>
+                                            <div
+                                                key={lesson.id}
+                                                draggable={!saving}
+                                                onDragStart={e => {
+                                                    if (e.target.closest('input, textarea, select')) { e.preventDefault(); return; }
+                                                    setDragLesson({ id: lesson.id, sIdx });
+                                                    setDragSecId(null);
+                                                    setDropTargetSecId(null);
+                                                    e.dataTransfer.effectAllowed = 'move';
+                                                    e.dataTransfer.setData('text/plain', lesson.id);
+                                                    e.stopPropagation(); // never start a module drag from a nested lesson
+                                                }}
+                                                onDragEnter={e => {
+                                                    e.preventDefault();
+                                                    if (!dragLesson) return;
+                                                    if (dragLesson.sIdx === sIdx) {
+                                                        // Same module → live reorder above the hovered lesson.
+                                                        if (dragLesson.id !== lesson.id) moveLessonWithin(sIdx, dragLesson.id, lesson.id);
+                                                        e.stopPropagation();
+                                                    } else {
+                                                        // Other module → highlight it as the lesson drop target.
+                                                        setDropTargetSecId(section.id);
+                                                    }
+                                                }}
+                                                onDragOver={e => {
+                                                    e.preventDefault();
+                                                    if (dragLesson) e.stopPropagation();
+                                                }}
+                                                onDrop={e => {
+                                                    e.preventDefault();
+                                                    if (!dragLesson) return;
+                                                    e.stopPropagation();
+                                                    if (dragLesson.sIdx !== sIdx) {
+                                                        // Cross-module move: insert above the hovered lesson.
+                                                        moveLessonToSection(dragLesson.sIdx, dragLesson.id, sIdx, lIdx);
+                                                    }
+                                                    clearDragState();
+                                                }}
+                                                onDragEnd={clearDragState}
+                                                className={`ml-4 md:ml-12 border rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${LESSON_TYPE_META[lesson.type]?.card || 'border-emerald-100 bg-emerald-50/20'} ${
+                                                    dragLesson?.id === lesson.id ? 'opacity-70 ring-2 ring-indigo-400 border-indigo-300' : ''
+                                                }`}
+                                            >
                                                 <div className="p-4 flex flex-col md:flex-row items-center gap-4 bg-card/60 backdrop-blur-sm">
                                                     <div className="flex items-center gap-3 w-full md:w-auto">
-                                                        <GripVertical size={18} className="text-muted-foreground/30 cursor-move" />
-                                                        <div className={`p-2 rounded-lg ${lesson.type === 'video' ? 'bg-blue-100 text-blue-600' : lesson.type === 'quiz' ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                                            {lesson.type === 'video' && <Play size={18} />}
-                                                            {lesson.type === 'document' && <FileText size={18} />}
-                                                            {lesson.type === 'quiz' && <HelpCircle size={18} />}
+                                                        <GripVertical size={18} className={`flex-shrink-0 cursor-grab active:cursor-grabbing ${dragLesson?.id === lesson.id ? 'text-indigo-500' : 'text-muted-foreground/30'}`} title="Drag to reorder or move lesson" />
+                                                        <div className={`p-2 rounded-lg ${LESSON_TYPE_META[lesson.type]?.iconBox || 'bg-emerald-100 text-emerald-600'}`}>
+                                                            <LessonTypeIcon type={lesson.type} />
                                                         </div>
-                                                        <div className="flex rounded-lg bg-muted/60 p-0.5 border border-border shadow-sm">
-                                                            {[
-                                                                { value: 'video', icon: Play, label: 'Video' },
-                                                                { value: 'document', icon: FileText, label: 'Document' },
-                                                                { value: 'quiz', icon: HelpCircle, label: 'Quiz' }
-                                                            ].map(({ value, icon: TypeIcon, label }) => (
-                                                                <button
-                                                                    key={value}
-                                                                    type="button"
-                                                                    onClick={() => updateLesson(sIdx, lIdx, 'type', value)}
-                                                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-all ${
-                                                                        lesson.type === value
-                                                                            ? value === 'video' ? 'bg-blue-500 text-white shadow-sm'
-                                                                            : value === 'document' ? 'bg-emerald-500 text-white shadow-sm'
-                                                                            : 'bg-purple-500 text-white shadow-sm'
-                                                                            : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted'
-                                                                    }`}
-                                                                    title={label}
-                                                                >
-                                                                    <TypeIcon size={14} />
-                                                                    <span className="hidden sm:inline">{label}</span>
-                                                                </button>
-                                                            ))}
+                                                        <div className="flex flex-wrap gap-0.5 rounded-lg bg-muted/60 p-0.5 border border-border shadow-sm max-w-[560px]">
+                                                            {Object.entries(LESSON_TYPE_META).map(([value, t]) => {
+                                                                const TI = t.icon;
+                                                                return (
+                                                                    <button
+                                                                        key={value}
+                                                                        type="button"
+                                                                        onClick={() => updateLesson(sIdx, lIdx, 'type', value)}
+                                                                        className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                                                                            lesson.type === value ? t.chip : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted'
+                                                                        }`}
+                                                                        title={t.label}
+                                                                    >
+                                                                        <TI size={13} />
+                                                                        <span className="hidden xl:inline">{t.label}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                     <div className="flex-1 w-full relative">
@@ -817,30 +967,16 @@ export default function CreateCourseForm() {
 
                                                 <div className="p-4 md:p-6 bg-card/40 border-t border-border">
                                                     {/* Type-specific header banner */}
-                                                    <div className={`mb-5 rounded-2xl p-4 flex items-center gap-4 ${
-                                                        lesson.type === 'video' ? 'bg-blue-50 border border-blue-200' :
-                                                        lesson.type === 'document' ? 'bg-emerald-50 border border-emerald-200' :
-                                                        'bg-purple-50 border border-purple-200'
-                                                    }`}>
-                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
-                                                            lesson.type === 'video' ? 'bg-blue-500 text-white' :
-                                                            lesson.type === 'document' ? 'bg-emerald-500 text-white' :
-                                                            'bg-purple-500 text-white'
-                                                        }`}>
-                                                            {lesson.type === 'video' && <Video size={22} />}
-                                                            {lesson.type === 'document' && <FileText size={22} />}
-                                                            {lesson.type === 'quiz' && <HelpCircle size={22} />}
+                                                    <div className={`mb-5 rounded-2xl p-4 flex items-center gap-4 ${LESSON_TYPE_META[lesson.type]?.banner || 'bg-purple-50 border border-purple-200'}`}>
+                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${LESSON_TYPE_META[lesson.type]?.iconBoxSolid || 'bg-purple-500 text-white'}`}>
+                                                            <LessonTypeIcon type={lesson.type} size={22} />
                                                         </div>
                                                         <div>
                                                             <h4 className="text-[15px] font-extrabold text-foreground">
-                                                                {lesson.type === 'video' && 'Video Content'}
-                                                                {lesson.type === 'document' && 'Document Resource'}
-                                                                {lesson.type === 'quiz' && 'Assessment Quiz'}
+                                                                {LESSON_TYPE_META[lesson.type]?.title || 'Lesson'}
                                                             </h4>
                                                             <p className="text-[12px] text-muted-foreground/80 font-medium mt-0.5">
-                                                                {lesson.type === 'video' && 'Upload a video file or paste a YouTube/Vimeo link. Students will watch this lesson.'}
-                                                                {lesson.type === 'document' && 'Upload a PDF, DOC, or share a link to reading material. Students can view or download it.'}
-                                                                {lesson.type === 'quiz' && 'Create auto-graded assessments with multiple-choice or fill-in-the-blank questions.'}
+                                                                {LESSON_TYPE_META[lesson.type]?.desc}
                                                             </p>
                                                             {/* Quick stats for quiz type */}
                                                             {lesson.type === 'quiz' && (lesson.questions || []).length > 0 && (
@@ -863,45 +999,70 @@ export default function CreateCourseForm() {
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-3">
                                                                     <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
-                                                                    <label className="text-[12px] font-extrabold text-foreground/80 uppercase tracking-widest">Content Resource</label>
+                                                                    <label className="text-[12px] font-extrabold text-foreground/80 uppercase tracking-widest">
+                                                                        {lesson.type === 'text' ? 'Lesson Content' : lesson.type === 'assignment' ? 'Assignment Instructions' : lesson.type === 'external' ? 'External Link' : lesson.type === 'coding' ? 'Exercise Link' : 'Content Resource'}
+                                                                    </label>
                                                                 </div>
-                                                                <div className="flex flex-col sm:flex-row gap-4">
-                                                                    <div className="flex-1 flex flex-col gap-2">
-                                                                        <div className="flex flex-wrap gap-3 items-center">
-                                                                            <label className="cursor-pointer bg-card border border-border hover:border-indigo-400 hover:shadow-md px-5 py-2.5 rounded-xl text-[13px] text-foreground/80 font-bold flex items-center gap-2.5 transition-all group">
-                                                                                <Upload size={16} className="text-indigo-600 group-hover:scale-110 transition-transform" />
-                                                                                <span>Upload {lesson.type === 'video' ? 'Video' : 'Document'}</span>
-                                                                                <input type="file" className="hidden" onChange={(e) => handleLessonFileUpload(e, sIdx, lIdx)} accept={lesson.type === 'video' ? 'video/*' : 'application/pdf,.doc,.docx'} />
-                                                                            </label>
-                                                                            <div className="h-4 w-px bg-muted hidden sm:block" />
-                                                                            <div className="relative flex-1 group">
-                                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500">
-                                                                                    {lesson.type === 'video' ? <Play size={14} /> : <FileText size={14} />}
-                                                                                </div>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={lesson.contentUrl || ''}
-                                                                                    onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
-                                                                                    className="w-full bg-muted border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-foreground focus:bg-card focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
-                                                                                    placeholder={lesson.fileName ? `File: ${lesson.fileName}` : lesson.type === 'video' ? "Paste YouTube/Vimeo link" : "Paste shareable document link"}
-                                                                                    disabled={!!lesson.fileName}
-                                                                                />
-                                                                            </div>
+                                                                {lesson.type === 'text' || lesson.type === 'assignment' ? (
+                                                                    <textarea
+                                                                        rows={5}
+                                                                        value={lesson.contentUrl || ''}
+                                                                        onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
+                                                                        className="w-full bg-muted border-0 px-4 py-3 text-[13px] rounded-xl text-foreground focus:bg-card focus:ring-2 focus:ring-indigo-100 transition-all outline-none resize-y leading-relaxed"
+                                                                        placeholder={lesson.type === 'text' ? 'Write the lesson content here — students will read this inline.' : 'Describe the task, deliverables, and any links students need to complete the assignment.'}
+                                                                    />
+                                                                ) : lesson.type === 'external' || lesson.type === 'coding' ? (
+                                                                    <div className="relative group">
+                                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500">
+                                                                            <ExternalLink size={14} />
                                                                         </div>
-                                                                        {lesson.fileName && (
-                                                                            <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-2 mt-1 ml-1">
-                                                                                <CheckCircle size={12} /> {lesson.fileName} uploaded
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => { updateLesson(sIdx, lIdx, 'fileName', ''); updateLesson(sIdx, lIdx, 'contentUrl', ''); }}
-                                                                                    className="text-rose-500 hover:text-rose-600 underline font-bold"
-                                                                                >
-                                                                                    Remove
-                                                                                </button>
-                                                                            </p>
-                                                                        )}
+                                                                        <input
+                                                                            type="url"
+                                                                            value={lesson.contentUrl || ''}
+                                                                            onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
+                                                                            className="w-full bg-muted border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-foreground focus:bg-card focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                                                                            placeholder={lesson.type === 'coding' ? 'Paste coding exercise link (Replit, Codespaces…)' : 'Paste external resource link (https://…)'}
+                                                                        />
                                                                     </div>
-                                                                </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col sm:flex-row gap-4">
+                                                                        <div className="flex-1 flex flex-col gap-2">
+                                                                            <div className="flex flex-wrap gap-3 items-center">
+                                                                                <label className="cursor-pointer bg-card border border-border hover:border-indigo-400 hover:shadow-md px-5 py-2.5 rounded-xl text-[13px] text-foreground/80 font-bold flex items-center gap-2.5 transition-all group">
+                                                                                    <Upload size={16} className="text-indigo-600 group-hover:scale-110 transition-transform" />
+                                                                                    <span>Upload {CONTENT_META[lesson.type]?.upload || 'File'}</span>
+                                                                                    <input type="file" className="hidden" onChange={(e) => handleLessonFileUpload(e, sIdx, lIdx)} accept={CONTENT_META[lesson.type]?.accept || 'application/pdf,.doc,.docx'} />
+                                                                                </label>
+                                                                                <div className="h-4 w-px bg-muted hidden sm:block" />
+                                                                                <div className="relative flex-1 group">
+                                                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-500">
+                                                                                        <LessonTypeIcon type={lesson.type} size={14} />
+                                                                                    </div>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        value={lesson.contentUrl || ''}
+                                                                                        onChange={e => updateLesson(sIdx, lIdx, 'contentUrl', e.target.value)}
+                                                                                        className="w-full bg-muted border-0 pl-10 pr-4 py-2.5 text-[13px] rounded-xl text-foreground focus:bg-card focus:ring-2 focus:ring-indigo-100 transition-all outline-none"
+                                                                                        placeholder={lesson.fileName ? `File: ${lesson.fileName}` : CONTENT_META[lesson.type]?.placeholder || 'Paste a link'}
+                                                                                        disabled={!!lesson.fileName}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            {lesson.fileName && (
+                                                                                <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-2 mt-1 ml-1">
+                                                                                    <CheckCircle size={12} /> {lesson.fileName} uploaded
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => { updateLesson(sIdx, lIdx, 'fileName', ''); updateLesson(sIdx, lIdx, 'contentUrl', ''); }}
+                                                                                        className="text-rose-500 hover:text-rose-600 underline font-bold"
+                                                                                    >
+                                                                                        Remove
+                                                                                    </button>
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             <div className="flex items-center gap-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50 w-max">
@@ -1131,6 +1292,9 @@ export default function CreateCourseForm() {
                                         <button type="button" onClick={() => addLesson(sIdx)} className="ml-8 mt-3 text-[13px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 flex items-center gap-1.5 py-2 px-4 rounded-lg transition-colors shadow-sm">
                                             <Plus size={16} /> Add Lesson
                                         </button>
+                                        <p className="ml-8 mt-3 text-[11px] font-medium text-muted-foreground/70 flex items-center gap-1.5">
+                                            <GripVertical size={12} /> Tip: drag the grip handles to reorder modules & lessons, or drop a lesson onto another module to move it.
+                                        </p>
                                     </div>
                                 )}
                             </div>

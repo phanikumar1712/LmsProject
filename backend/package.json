@@ -8,7 +8,8 @@
     "dev": "nodemon src/index.js",
     "migrate": "node src/db/migrate.js",
     "test": "node tests/test_api.js",
-    "test:unit": "node --test tests/quiz_utils.test.js tests/users_controller.test.js tests/users_http.test.js tests/courses_limits.test.js tests/seed_super_admin.test.js",
+    "test:db": "node --test tests/course_department_sync.test.js",
+    "test:unit": "node --test tests/quiz_utils.test.js tests/users_controller.test.js tests/users_http.test.js tests/auth_password.test.js tests/courses_limits.test.js tests/course_move_lesson.test.js tests/course_reorder.test.js tests/seed_super_admin.test.js tests/platform_stats.test.js tests/departments_controller.test.js tests/permissions.test.js tests/audit_utils.test.js tests/quizzes_scope.test.js tests/ratings_scope.test.js tests/discussions_scope.test.js",
     "maintenance": "ls scripts/maintenance"
   },
   "keywords": [],
@@ -32,7 +33,7 @@
     "resend": "^6.12.4",
     "uuid": "^14.0.0",
     "ws": "^8.21.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

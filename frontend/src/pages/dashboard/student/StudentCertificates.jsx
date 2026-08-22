@@ -1,28 +1,19 @@
 import { useAuth } from '../../../contexts/AuthContext';
-import { enrollmentsAPI, coursesAPI } from '../../../services/api';
-import { Award, Download } from 'lucide-react';
+import { certificatesAPI } from '../../../services/api';
+import { Award, Download, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { LoadingContainer, EmptyState } from '../../../components/ui/Feedback';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import QRCode from '../../../components/ui/QRCode';
 
 export default function StudentCertificates() {
     const { user } = useAuth();
 
-    const { data: certificates, loading } = useAsyncData(async () => {
-        if (!user) return [];
-        const [enrolls, allCourses] = await Promise.all([
-            enrollmentsAPI.getByStudent(user.id),
-            coursesAPI.getAll(),
-        ]);
-        const completedEnrolls = enrolls.filter(e => e.progress === 100);
-        return completedEnrolls.map(e => {
-            const c = allCourses.find(course => course.id === e.courseId);
-            return c && c.certificate
-                ? { ...c, completedAt: e.completedAt || e.enrolledAt }
-                : null;
-        }).filter(Boolean);
-    }, [user?.id]);
+    const { data: certificates, loading } = useAsyncData(
+        () => certificatesAPI.getMy(),
+        [user?.id]
+    );
 
     if (loading) return <LoadingContainer height="h-64" />;
 
@@ -51,15 +42,33 @@ export default function StudentCertificates() {
                         <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                             <Award size={32} />
                         </div>
-                        <h3 className="font-bold text-foreground text-lg mb-1 leading-tight">{cert.title}</h3>
-                        <p className="text-xs text-muted-foreground/60 font-bold uppercase tracking-widest mb-4">
-                            Issued: {new Date(cert.completedAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                        <h3 className="font-bold text-foreground text-lg mb-1 leading-tight">{cert.course_title}</h3>
+                        <p className="text-xs text-muted-foreground/60 font-bold uppercase tracking-widest mb-2">
+                            Issued: {new Date(cert.issue_date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                         </p>
+                        <p className="text-[11px] font-mono text-muted-foreground/50 mb-4">ID: {cert.cert_id}</p>
+
+                        <div className="bg-muted/40 border border-border rounded-xl p-3 mb-4">
+                            <QRCode value={`${window.location.origin}/verify/${cert.cert_id}`} size={80} />
+                        </div>
 
                         <div className="mt-auto pt-4 w-full border-t border-border flex gap-2">
-                            <button className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-muted/40 hover:bg-indigo-50 hover:text-indigo-700 text-muted-foreground rounded-lg text-xs font-bold transition-colors">
-                                <Download size={14} /> Download PDF
-                            </button>
+                            <Link
+                                to={`/verify/${cert.cert_id}`}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors"
+                            >
+                                <ExternalLink size={14} /> View Certificate
+                            </Link>
+                            <a
+                                href={`/verify/${cert.cert_id}`}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-muted/40 hover:bg-indigo-50 hover:text-indigo-700 text-muted-foreground rounded-lg text-xs font-bold transition-colors"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    window.open(`/verify/${cert.cert_id}`, '_blank');
+                                }}
+                            >
+                                <Download size={14} /> Download
+                            </a>
                         </div>
                     </div>
                 ))}

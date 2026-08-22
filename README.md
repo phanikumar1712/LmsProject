@@ -41,7 +41,7 @@ Designed for **Indian colleges, universities, and ed-tech platforms** with depar
 | Auth | JWT (`jsonwebtoken` 9) + bcrypt |
 | Email | Resend API |
 | File Uploads | Cloudinary + Multer |
-| Spreadsheet Parsing | xlsx 0.18 |
+| Spreadsheet Parsing | xlsx 0.20 |
 | Security | Helmet 8, express-rate-limit 8 |
 
 ### Frontend
@@ -76,7 +76,7 @@ LmsProject/
 │   │   ├── routes/           # API route definitions with role guards
 │   │   ├── middleware/        # Auth (JWT), error handling, rate limiting
 │   │   ├── db/               # NeonDB pool, migrations, seed data
-│   │   ├── utils/            # Helpers (email, quiz, pagination, formatters)
+│   │   ├── utils/            # Helpers (email, quiz, pagination, formatters, courseAuth)
 │   │   └── index.js          # Express app entry point
 │   ├── tests/                # Unit & API integration tests
 │   ├── scripts/              # Maintenance & one-off cleanup scripts
@@ -92,7 +92,7 @@ LmsProject/
 │   │   │       ├── instructor/  # Instructor dashboards
 │   │   │       ├── admin/       # Admin dashboards
 │   │   │       └── superadmin/  # Super Admin dashboards
-│   │   ├── components/       # Reusable UI (DataTable, Charts, Layout)
+│   │   ├── components/       # Reusable UI (DataGrid, DataTable, Modal, ConfirmDialog, Breadcrumbs, Charts, Layout)
 │   │   ├── contexts/         # AuthContext for global auth state
 │   │   ├── services/         # API client layer (fetch-based)
 │   │   ├── hooks/            # Custom React hooks
@@ -140,13 +140,15 @@ The platform includes granular role-based access for courses, users, departments
 | Action | Student | Instructor | Admin (Dept) | Super Admin |
 |--------|---------|------------|--------------|-------------|
 | View own profile | ✅ | ✅ | ✅ | ✅ |
+| Change own password (self-service) | ✅ | ✅ | ❌ (managed by Super Admin) | ✅ |
 | List users | ❌ | ❌ | ✅ Dept students+instructors | ✅ All roles |
-| Change user role | ❌ | ❌ | ❌ | ✅ Any role |
+| Change user role | ❌ | ❌ | ✅ Dept non-admin | ✅ Any role |
 | Create Instructor | ❌ | ❌ | ✅ Dept | ✅ Any dept |
 | Import Instructors (CSV) | ❌ | ❌ | ✅ Dept | ✅ Any dept |
 | Import Students (CSV) | ❌ | ❌ | ✅ Dept | ✅ Any dept |
 | Suspend/Activate user | ❌ | ❌ | ✅ Dept non-admin | ✅ Any user |
-| Reset user password | ❌ | ❌ | ✅ Dept non-admin | ✅ Any user |
+| Reset user password | ❌ | ❌ | ✅ Dept non-admin | ✅ Any user (incl. admins) |
+| Force password change on next login | ❌ | ❌ | ✅ Dept non-admin | ✅ Any user |
 | Delete user | ❌ | ❌ | ✅ Dept non-admin | ✅ Any user |
 | Create Admin | ❌ | ❌ | ❌ | ✅ |
 | Create Super Admin | ❌ | ❌ | ❌ | ✅ Only |
@@ -193,8 +195,13 @@ The platform includes granular role-based access for courses, users, departments
 |--------|---------|------------|--------------|-------------|
 | View department logs | ❌ | ❌ | ✅ (Scoped) | ✅ |
 | View platform-wide logs | ❌ | ❌ | ❌ | ✅ |
-| Export audit logs (CSV) | ❌ | ❌ | ❌ | ✅ |
-| Filter by user/action/date | ❌ | ❌ | ❌ | ✅ |
+| See old → new values & device info | ❌ | ❌ | ✅ (Scoped) | ✅ |
+| Export audit logs (CSV) | ❌ | ❌ | ✅ (Scoped) | ✅ |
+| Filter by action / record / date / search | ❌ | ❌ | ✅ (Scoped) | ✅ |
+
+> Every sensitive action is recorded with **WHO** (actor + role), **WHAT** (action),
+> **WHEN** (timestamp), **WHICH record** (resource + id), **OLD → NEW values** (e.g.
+> Active → Inactive), and **IP + device** (browser/OS parsed from the User-Agent).
 
 #### ⚙️ Platform Settings
 | Action | Student | Instructor | Admin | Super Admin |
@@ -243,9 +250,13 @@ Students can **browse courses, enroll for free, watch videos, take quizzes** (wi
 
 Instructors **create courses** with sections/lessons/quizzes, **track student progress**, view **analytics**, respond to **reviews**, and **submit courses for admin approval**. The course lifecycle follows: **DRAFT → PENDING (submitted) → PUBLISHED (approved)** or **REJECTED (sent back for revision)**.
 
+- **Instructor dashboard** (`/instructor`) shows My Courses · Total Students · Pending Assignments (ungraded submissions) · Avg Course Completion, plus **Upcoming Classes** (live sessions), **Upcoming Quizzes**, **Recent Submissions**, and **Recent Announcements** — all computed server-side from the instructor's own courses.
+- **Course Builder** supports the full lesson-type palette: **Video · PDF · Document · Audio · Text · Quiz · Assignment · Coding Exercise · External Link** (each renders correctly in the student lesson player).
+- **My Courses** cards deep-link into **Manage Content** (drag-to-reorder `/instructor/content-order?course=`), **Manage Students / View Progress** (`/instructor/students?course=`), and a one-click **Submit for Approval** button on Draft/Rejected courses.
+
 ### 3. Admin Flow (Department-Scoped)
 
-Admins **manage users**, **moderate courses** (approve/reject/send back to draft), **bulk import** students & instructors via CSV/Excel, **create announcements**, **track student progress**, and generate **reports** — all scoped to their department.
+Admins **manage users**, **moderate courses** (approve/reject/send back to draft), **bulk import** students & instructors via CSV/Excel, **create announcements**, **track student progress**, and generate **reports** — all scoped to their department. Admin passwords are **managed by the Super Admin** (no self-service or email-OTP reset) — students and instructors change their own password from the profile **Security** tab.
 
 ### 4. Super Admin Flow (Platform-Wide)
 
@@ -271,11 +282,13 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 ### 🔐 Authentication & Authorization
 - JWT-based login, registration, and password reset
 - OTP verification via Resend email API
-- Demo login for all roles
+- Demo login for Student/Instructor only (disabled in production)
 - Role-based access control: **Student**, **Instructor**, **Admin**, **Super Admin**
 - Department-scoped admin isolation
 - Rate limiting: 10 login attempts/hour, 5 imports/5 minutes
 - Constant-time OTP comparison (timing attack prevention)
+- **Notifications**: created for 10+ event types (course approved/rejected, announcements, quizzes, assignments, discussions, certificates, enrollments, password resets, role changes)
+- **Announcements**: batch-insert to target roles/departments; mark-read with view_count; read-receipt tracking
 
 ### 👩‍🏫 Instructor Portal
 - Create & manage courses with sections and lessons
@@ -286,6 +299,9 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - View enrolled students and progress
 - Analytics dashboard (enrollments, ratings)
 - Respond to course reviews
+- **Live Sessions**: create/manage live class sessions with meeting links
+- **Content Versioning**: version snapshots with changelog and drip-status
+- **Course Changelog**: document changes per version for student visibility
 
 ### 🎓 Student Dashboard
 - Browse and enroll in courses (all **completely free**)
@@ -297,12 +313,16 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - **Certificates** on course completion
 - **Learning streaks** (current + longest)
 - **Discussion forums** per course/lesson
+- **Notes**: personal notes per lesson, visible only to the student
+- **Bookmarks**: mark and revisit specific lessons
+- **Grades**: consolidated grade view across all courses
 
 ### 🛡️ Admin Dashboard (Department-Scoped)
 - **Department limit enforcement**: capacity card with progress bars; course approval & student imports blocked with a clear message when the department limit is reached (admins & super admins get notified)
 - User management: view, create, suspend, reset passwords for dept students & instructors
-- **Bulk import** instructors and students from CSV/Excel
-- **Course moderation**: approve, reject, send back to draft with notes
+- **Self-service password change** for students & instructors (profile Security tab + Settings Security tab); admin passwords are managed by the Super Admin only — self-service and email-OTP reset are blocked for admins
+- **Bulk import** instructors and students from CSV/Excel (one-student-per-department enforced via globally unique email + per-department roll number constraint)
+- **Course moderation**: approve, reject (with structured reason modal), send back to draft with notes
 - Course content editing: edit sections, lessons, quizzes within dept courses
 - Category management with bulk import
 - Department-level analytics (enrollments, ratings)
@@ -321,7 +341,7 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - **Course Oversight**: View all courses across all departments, force-edit or delete any course, override instructor/admin decisions
 - **Platform Settings**: Branding (logo, colors, platform name), email/SMTP config, SSO/login config, terms & policies
 - **Analytics & Reports**: Platform-wide analytics, **AI-powered reports**, per-department limit usage overview, CSV export
-- **Audit Logs**: View every action by every user, filter by user/action/date, CSV export (DPDP Act compliance)
+- **Audit Logs**: View every action by every user — with **old → new values**, **IP + device info**, filters by action/record/date/search, and CSV export (DPDP Act compliance). Super Admin sees the full platform trail; department admins see their own department's entries
 - **System Health**: Server/uptime monitoring, DB status, memory usage, service health dashboard
 - **Announcements**: Broadcast to **admins only** (or specific departments via filter), or all users/roles platform-wide
 - **Force Logout**: Terminate any user session
@@ -333,6 +353,7 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - Profile photo uploads with auto-cropping
 - Course thumbnails and lesson content files
 - Support for video, document, quiz, and text lesson types
+- Course preview modal with video/audio/PDF/text/external link rendering
 
 ### 🛡️ Security & Hardening
 - Rate limiting on auth endpoints (10 attempts/hour) and import endpoints (5/5 min)
@@ -342,8 +363,19 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 - Helmet security headers
 - CORS protection with configurable origins
 - Request timeout (30s) to prevent connection pool exhaustion
-- Audit logging for all sensitive actions
+- Audit logging for all sensitive actions — each entry records actor, action, record, **old/new values**, and **IP + parsed device** (browser/OS) via the shared `writeAudit` helper
+- **Granular role-based permissions**: every protected route is gated by a permission (`student.create`, `course.approve`, `audit.view`, …) from `backend/src/utils/permissions.js`, not bare role strings — the Super Admin can **grant/revoke individual permissions per user** (`/super-admin/permissions`), and auth responses ship the user's effective permission list to the frontend (`useAuth().can('course.approve')`)
 - Password hashing with bcrypt (12 rounds)
+- Ownership & department-scope checks on assignments, attendance/live sessions, course mutations, and course-version endpoints — cross-course/cross-department access is rejected
+- Self-service password change (`PUT /api/auth/change-password`) works for every role incl. admins; admins are always allowed to view their own user-detail page (self is exempt from department isolation)
+
+### ⚡ Performance
+- **N+1 query elimination**: notifications, bulk enrollments, and CSV/Excel user imports use batched `INSERT ... SELECT FROM unnest(...)` / `ON CONFLICT` queries — a 500-row import drops from ~3,000 round-trips to ~5
+- **Bulk import constraint enforcement**: email uniqueness (global) + roll number uniqueness (per-department) prevent duplicate students across departments; dept capacity limits are checked before insert
+- Memoized auth context (provider value + role helpers) to avoid re-rendering every consumer on each provider render
+- Debounced course search (400ms) with stale-response guards so a slow older request can never overwrite a newer one
+- Abortable data fetching: `useAsyncData` aborts in-flight requests on dependency change and unmount (network cancellation + state-write guards)
+- Route-level code splitting: each page is its own lazy-loaded chunk (React.lazy + Suspense) with an error boundary for failed chunk loads
 
 ### 🌙 UX
 - Dark mode support
@@ -368,12 +400,15 @@ Supports **CSV and Excel (XLSX)** bulk imports with **case-insensitive headers**
 
 ### 👑 Demo Accounts
 
-After running the database migration, the following demo accounts are created automatically.
+Demo accounts are seeded **only in development/test environments** (`NODE_ENV != production`). In production they are never created — real users must be provisioned via the admin UI, and the super admin password must be provided via `SUPER_ADMIN_PASSWORD`.
+
 **All non-SuperAdmin accounts use password: `demo123`**
 
-> 👑 The **Super Admin** account is seeded with the display name **"Super Admin"** — a proper name, not a placeholder. If your database was created by an older seed (which used a placeholder like `Test`), re-running `npm run migrate` automatically corrects the name to `Super Admin` (the password is never touched).
+> 👑 The **Super Admin** account is seeded with the display name **"Super Admin"** — a proper name, not a placeholder. If your database was created by an older seed (which used a placeholder like `Test`), re-running `npm run migrate` automatically corrects the name to `Super Admin`. In production the password comes **only** from the `SUPER_ADMIN_PASSWORD` env var — the migration **fails hard** if it is missing, and automatically rotates an existing super-admin password to the env value (healing databases seeded before this hardening). In dev/test a manually-changed password is never overwritten by re-runs.
 
-> 💡 **Tip:** Use the **"Quick Demo Login"** buttons on the login page — one click per role (Student / Instructor / Admin / Super Admin), no password needed! Demo login maps to: `cse.student1@demo.com`, `cse.instructor@demo.com`, `cse.admin@demo.com`, `superadmin@lms.com`.
+> 🧹 **Production migrations also delete any pre-existing `*@demo.com` demo accounts** — so a database migrated before this security fix gets its known demo credentials purged on the next `npm run migrate`.
+
+> 💡 **Tip:** Use the **"Quick Demo Login"** buttons on the login page for one-click access to the **Student** and **Instructor** demo accounts. Admin and Super Admin are intentionally **not** exposed as one-click demos — privileged accounts must always authenticate with their real password. Demo login (`POST /api/auth/demo`) is **disabled in production**.
 
 #### 🌐 Platform-Wide Roles
 
@@ -424,7 +459,7 @@ cd lms
 cp backend/.env.example backend/.env
 ```
 
-Open `backend/.env` and fill in **at minimum**: `DATABASE_URL`, `JWT_SECRET`, `CLOUDINARY_*`, `RESEND_API_KEY`.
+Open `backend/.env` and fill in **at minimum**: `DATABASE_URL`, `JWT_SECRET`, `CLOUDINARY_*`, `RESEND_API_KEY`, and `SUPER_ADMIN_PASSWORD` (required for production migrations).
 
 ### 🐳 Option A — Run with Docker (Easiest)
 
@@ -460,7 +495,7 @@ npm run dev        # http://localhost:5173
 | POST | `/api/auth/demo` | Public | Demo login by role |
 | GET | `/api/auth/me` | Auth | Current user profile |
 | PUT | `/api/auth/profile` | Auth | Update profile |
-| PUT | `/api/auth/change-password` | Auth | Change password |
+| PUT | `/api/auth/change-password` | Auth | Change own password (self-service; admins blocked — managed by Super Admin) |
 | POST | `/api/auth/reset-password/request` | Public | Request OTP |
 | POST | `/api/auth/verify-otp` | Public | Verify OTP |
 | POST | `/api/auth/reset-password` | Public | Reset password |
@@ -476,7 +511,7 @@ npm run dev        # http://localhost:5173
 | PUT | `/api/courses/:id` | Instructor+ | Update course |
 | DELETE | `/api/courses/:id` | Instructor+ | Delete course |
 | PUT | `/api/courses/:id/approve` | Admin+ | Approve course |
-| PUT | `/api/courses/:id/reject` | Admin+ | Reject course |
+| PUT | `/api/courses/:id/reject` | Admin+ | Reject course with reason (`{ reason, moveToDraft }`) |
 | POST | `/api/courses/:id/sections` | Instructor+ | Add section |
 | PUT | `/api/courses/sections/:id` | Instructor+ | Update section |
 | DELETE | `/api/courses/sections/:id` | Instructor+ | Delete section |
@@ -512,7 +547,7 @@ npm run dev        # http://localhost:5173
 | GET | `/api/users` | Admin+ | List users (filtered by role/dept) |
 | PUT | `/api/users/:id/role` | Admin+ | Change user role |
 | PUT | `/api/users/:id/toggle-status` | Admin+ | Suspend/activate |
-| PUT | `/api/users/:id/reset-password` | Admin+ | Force password reset |
+| PUT | `/api/users/:id/reset-password` | Admin+ | Force password reset — `{ force: true }` marks the account to change password on next login (temp password generated & returned) |
 | DELETE | `/api/users/:id` | Admin+ | Delete user |
 | POST | `/api/users/instructors` | Admin+ | Create instructor |
 | POST | `/api/users/instructors/import` | Admin+ | Bulk import instructors |
@@ -520,6 +555,8 @@ npm run dev        # http://localhost:5173
 | POST | `/api/users/invite-admin` | SuperAdmin | Create admin |
 | PUT | `/api/users/:id/departments` | SuperAdmin | Assign admin to departments |
 | GET | `/api/users/:id/departments` | SuperAdmin | Get admin's departments |
+| GET | `/api/users/:id/permissions` | SuperAdmin | Effective permissions + overrides for a user |
+| PUT | `/api/users/:id/permissions` | SuperAdmin | Grant/revoke individual permissions (`{ permissions: { "grade.update": true } }`) |
 | GET | `/api/users/instructors/template` | Admin+ | Download instructor import template |
 | GET | `/api/users/students/template` | Admin+ | Download student import template |
 | POST | `/api/users/instructor-request` | Student | Apply to be instructor |
@@ -535,7 +572,8 @@ npm run dev        # http://localhost:5173
 | GET | GET | `/api/stats/departments` | SuperAdmin | Department comparison |
 | GET | `/api/stats/admins` | Admin+ | Per-department usage vs limits (scoped for dept admins) |
 | GET | `/api/stats/system-health` | SuperAdmin | System monitoring |
-| GET | `/api/stats/audit-logs` | Admin+ | Audit trail (scoped) |
+| GET | `/api/stats/audit-logs` | Admin+ | Audit trail (scoped) — filters: `action`, `resource`, `search`, `from`, `to`, `limit`, `offset`; rows include `oldValue`, `newValue`, `device`, `ip` |
+| GET | `/api/stats/audit-logs/actions` | Admin+ | Distinct audit actions + counts (filter UI) |
 | GET | `/api/stats/settings` | SuperAdmin | Platform settings |
 | PUT | `/api/stats/settings` | SuperAdmin | Update settings |
 | GET | `/api/stats/ai-report` | SuperAdmin | AI insights report |
@@ -558,6 +596,7 @@ Copy `backend/.env.example` to `backend/.env`. Key variables:
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | Same |
 | `RESEND_API_KEY` | Resend email API key | [resend.com](https://resend.com) |
 | `RESEND_FROM_EMAIL` | Sender email (optional) | Configured sender |
+| `SUPER_ADMIN_PASSWORD` | Super admin password — **required in production** (migration refuses to seed a default) | Generate a strong one |
 
 ---
 
@@ -569,7 +608,7 @@ npm run dev          # Start with hot reload (nodemon)
 npm start            # Start production server
 npm run migrate      # Run DB migrations (seeds default data + demo accounts)
 npm test             # Run API flow tests
-npm run test:unit    # Run unit tests (quiz, users, courses-limits — 27 tests)
+npm run test:unit    # Run unit tests (quiz, users, courses-limits, seed, permissions, audit — 91 tests)
 node tests/e2e_department_isolation.js   # Department isolation E2E (23 checks)
 node tests/e2e_assessment_flow.js        # Assessment create → take → report flow
 node tests/e2e_quiz_notif.js             # Quiz + notification flow
@@ -635,6 +674,13 @@ The following end-to-end flows have been verified via automated API testing:
 - ✅ Department admins + all super admins receive a notification when a limit is reached (24h deduped)
 - ✅ Admin dashboard shows live capacity progress bars and over-limit warnings
 
+### Bulk Import Integrity
+- ✅ Email uniqueness is enforced globally — a student in ECE cannot be imported into CSE (duplicate email rejected)
+- ✅ Roll number uniqueness is scoped per department — same roll number in different departments is allowed (different students)
+- ✅ Dept capacity limits checked before bulk insert — import fails fast with clear error when limit reached
+- ✅ Preview mode validates all rows without writing — UI shows exactly what will be created/rejected
+- ✅ Roll number constraint violations fall back to per-row inserts so one bad row doesn't sink the entire import
+
 ### Assessment Flow
 - ✅ Instructor creates assessment with max-attempt limit & question selection mode (ALL / RANDOM / BY_DIFFICULTY / BY_CATEGORY)
 - ✅ Enrolled students are notified and can take the exam from the **Write Exam** tab
@@ -645,15 +691,40 @@ The following end-to-end flows have been verified via automated API testing:
 - ✅ All 4 roles (Student, Instructor, Admin, Super Admin) login successfully
 - ✅ JWT token validation, password reset with OTP
 - ✅ Role-based access control on all API routes
+- ✅ Demo login exposes Student/Instructor only (rate-limited, disabled in production); no demo credentials are seeded in production
+
+### Admin Password Management
+- ✅ Students & instructors change their own password via the profile Security tab; **admins are blocked** from self-service and email-OTP reset (their passwords are managed by the Super Admin)
+- ✅ Super Admins reset any user's password (temp password generated and returned once); dept-scoped admins reset only their dept's students & instructors
+- ✅ **Force password change on next login** (`force: true`) — the account is flagged `must_change_password`, the user sees a banner and lands on the profile Security tab until they set a new password
+- ✅ Admins can always open their own user-detail page (self is exempt from department isolation)
+
+### Granular Permissions (Role-Based Permission System)
+- ✅ Every protected route is gated by a permission (`student.create`, `course.approve`, `assignment.submit`, `audit.view`, …) — never bare role strings alone
+- ✅ Permission matrix per role (`backend/src/utils/permissions.js`) mirrors the spec: Super Admin holds all; dept Admin gets `student.*`, `instructor.*`, `course.approve/update/delete`, `user.role.change`, `audit.view`; Instructor gets `course.create/update`, `assignment.create`, `quiz.create`, `grade.update`; Student gets `course.view/enroll`, `assignment.submit`, `quiz.attempt`
+- ✅ Super Admin can **grant/revoke individual permissions per user** from `/super-admin/permissions` (overrides stored in `user_permissions`, audit-logged); overrides take precedence over the role default, and Super Admin can never be locked out
+- ✅ Auth responses ship the user's effective permission list; the frontend gates UI with `useAuth().can('course.approve')`
+
+### Audit Trail
+- ✅ Every sensitive action logs **WHO** (actor + role), **WHAT**, **WHEN**, **WHICH record**, **OLD → NEW values** (e.g. Active → Inactive on suspend), and **IP + parsed device** (browser/OS from the User-Agent)
+- ✅ Audit Logs page: filters by action/record/date/search, pagination, CSV export — Super Admin sees all, dept admins see their department's entries only
+
+### Authorization Hardening
+- ✅ Assignments, attendance/live sessions, course mutations, and course-version endpoints enforce instructor ownership or admin department scope
+- ✅ Course-version snapshots (which embed quiz answers) are readable by course editors and enrolled students only
+- ✅ Quiz answer keys are never serialized to non-editors
 
 ### Course Management
 - ✅ CRUD operations for courses, sections, lessons
 - ✅ Course lifecycle: DRAFT → PENDING → PUBLISHED / REJECTED
+- ✅ Course rejection with structured reason modal (textarea + "Move to Draft" toggle) — replaces old `window.prompt()` with proper UI in both Admin and Super Admin dashboards
 - ✅ Department-scoped course visibility for admins
 
 ### UI Dashboards
 - ✅ All 4 dashboards render in-browser with zero console errors
 - ✅ Stat cards, charts, navigation work correctly
+- ✅ CourseDetailPage: rating distribution bar chart, expanded instructor card, lesson preview modal
+- ✅ HomePage: typewriter hero, animated stats, category marquee, testimonials section, production footer
 
 ---
 

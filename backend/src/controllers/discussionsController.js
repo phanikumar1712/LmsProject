@@ -1,9 +1,30 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 
+// Gate discussion access. Students must be enrolled in the course; instructors
+// must own it. Admins (including department-scoped) and SUPER_ADMIN may read
+// and participate in any course's discussion — discussions are not
+// department-scoped (an admin can moderate Q&A anywhere on the platform).
+const assertDiscussionAccess = async (req, courseId) => {
+    if (req.user.role === 'STUDENT') {
+        const enrolled = await query(
+            'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
+            [req.user.id, courseId]
+        );
+        if (!enrolled.rows.length) throw createError('Enroll in this course to join its discussion', 403);
+        return;
+    }
+    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [courseId]);
+    if (!course.rows.length) throw createError('Course not found', 404);
+    if (req.user.role === 'INSTRUCTOR' && course.rows[0].instructor_id !== req.user.id) {
+        throw createError('Not authorized to join this course discussion', 403);
+    }
+};
+
 // GET /api/discussions/course/:courseId — get questions for a course (optionally filtered by lesson)
 const getQuestions = async (req, res) => {
     const { courseId } = req.params;
+    await assertDiscussionAccess(req, courseId);
     const { lessonId } = req.query;
     let where = 'WHERE dq.course_id = $1';
     const values = [courseId];
@@ -30,6 +51,7 @@ const getQuestions = async (req, res) => {
 const createQuestion = async (req, res) => {
     const { courseId, lessonId, title, content } = req.body;
     if (!courseId || !title || !content) throw createError('courseId, title, and content are required', 400);
+    await assertDiscussionAccess(req, courseId);
     const result = await query(
         `INSERT INTO discussion_questions (course_id, lesson_id, student_id, title, content)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -48,7 +70,7 @@ const createQuestion = async (req, res) => {
 
 // DELETE /api/discussions/questions/:id
 const deleteQuestion = async (req, res) => {
-    const q = await query('SELECT student_id, title FROM discussion_questions WHERE id = $1', [req.params.id]);
+    const q = await query('SELECT student_id, title, course_id FROM discussion_questions WHERE id = $1', [req.params.id]);
     if (!q.rows.length) throw createError('Question not found', 404);
     if (q.rows[0].student_id !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
         throw createError('Not authorized', 403);
@@ -66,6 +88,9 @@ const deleteQuestion = async (req, res) => {
 
 // GET /api/discussions/questions/:id/answers — get answers for a question
 const getAnswers = async (req, res) => {
+    const qCourse = await query('SELECT course_id FROM discussion_questions WHERE id = $1', [req.params.id]);
+    if (!qCourse.rows.length) throw createError('Question not found', 404);
+    await assertDiscussionAccess(req, qCourse.rows[0].course_id);
     const result = await query(`
         SELECT da.*, u.name as user_name, u.avatar as user_avatar, u.role as user_role,
                (SELECT COUNT(*) FROM answer_upvotes au WHERE au.answer_id = da.id) as upvote_count
@@ -88,6 +113,9 @@ const getAnswers = async (req, res) => {
 const createAnswer = async (req, res) => {
     const { content } = req.body;
     if (!content) throw createError('Content is required', 400);
+    const qCourse = await query('SELECT course_id FROM discussion_questions WHERE id = $1', [req.params.id]);
+    if (!qCourse.rows.length) throw createError('Question not found', 404);
+    await assertDiscussionAccess(req, qCourse.rows[0].course_id);
     const result = await query(
         `INSERT INTO discussion_answers (question_id, user_id, content) VALUES ($1, $2, $3) RETURNING *`,
         [req.params.id, req.user.id, content]
@@ -110,7 +138,12 @@ const createAnswer = async (req, res) => {
 
 // DELETE /api/discussions/answers/:id
 const deleteAnswer = async (req, res) => {
-    const a = await query('SELECT user_id, question_id FROM discussion_answers WHERE id = $1', [req.params.id]);
+    const a = await query(
+        `SELECT da.user_id, da.question_id, dq.course_id FROM discussion_answers da
+         JOIN discussion_questions dq ON da.question_id = dq.id
+         WHERE da.id = $1`,
+        [req.params.id]
+    );
     if (!a.rows.length) throw createError('Answer not found', 404);
     if (a.rows[0].user_id !== req.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
         throw createError('Not authorized', 403);

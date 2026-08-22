@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     Building2, Users, BookOpen, Star, GraduationCap,
     ShieldCheck, TrendingUp, ArrowLeft, BarChart3, Layers, Save,
-    UserCheck, Eye, ExternalLink, Gauge, Plus, X, Mail, Lock, User
+    UserCheck, Eye, ExternalLink, Gauge, Plus, X, Mail, Lock, User,
+    Hash, Clock, Phone
 } from 'lucide-react';
 import { statsAPI, usersAPI, coursesAPI, departmentsAPI } from '../../../services/api';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
@@ -946,10 +947,46 @@ export default function DepartmentDetail() {
                         {dept.icon || '🏛️'}
                     </div>
                     <div className="flex-1">
-                        <h1 className="text-3xl font-extrabold text-foreground tracking-tight">{dept.name}</h1>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">{dept.name}</h1>
+                            {dept.code && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/70 dark:bg-black/20 border border-indigo-200/50 text-indigo-700 dark:text-indigo-300 text-xs font-black tracking-wide">
+                                    <Hash size={12} /> {dept.code}
+                                </span>
+                            )}
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold ${dept.active === false ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${dept.active === false ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
+                                {dept.active === false ? 'Inactive' : 'Active'}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                                <Clock size={13} /> Created {dept.createdAt ? new Date(dept.createdAt).toLocaleDateString() : '—'}
+                            </span>
+                        </div>
                         <p className="text-muted-foreground font-medium mt-1">
                             Full department analytics, users, courses, and reports
                         </p>
+                        {dept.description && (
+                            <p className="text-sm text-muted-foreground/80 mt-2 max-w-2xl">{dept.description}</p>
+                        )}
+                        {(dept.hod || dept.contactEmail || dept.contactNumber) && (
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
+                                {dept.hod && (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground/80">
+                                        <User size={13} className="text-muted-foreground/60" /> HOD: {dept.hod}
+                                    </span>
+                                )}
+                                {dept.contactEmail && (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground/80">
+                                        <Mail size={13} className="text-muted-foreground/60" /> {dept.contactEmail}
+                                    </span>
+                                )}
+                                {dept.contactNumber && (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground/80">
+                                        <Phone size={13} className="text-muted-foreground/60" /> {dept.contactNumber}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <div className="flex items-center gap-4 mt-4 flex-wrap">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold">
                                 <Users size={14} /> {dept.studentCount?.toLocaleString()} Students

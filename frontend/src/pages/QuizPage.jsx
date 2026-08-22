@@ -242,7 +242,19 @@ export default function QuizPage() {
             const startedQuiz = startedAttempt.quiz;
             setQuiz(startedQuiz);
             setAttemptId(startedAttempt.attemptId);
-            setQuestions([...(startedQuiz.questions || [])].sort(() => Math.random() - 0.5));
+            // Randomize question order AND option order per attempt. Answers are
+            // submitted as option TEXT, so shuffling display order never breaks
+            // grading — each attempt simply sees options in a different order.
+            setQuestions([...(startedQuiz.questions || [])]
+                .sort(() => Math.random() - 0.5)
+                .map(q => {
+                    const opts = [...(q.options || [])];
+                    for (let i = opts.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [opts[i], opts[j]] = [opts[j], opts[i]];
+                    }
+                    return { ...q, options: opts };
+                }));
             const remainingSeconds = Math.max(0, Math.floor(
                 (new Date(startedAttempt.expiresAt).getTime() - Date.now()) / 1000
             ));
@@ -266,7 +278,7 @@ export default function QuizPage() {
     };
 
     const handleNext = () => {
-        if (questions[currentQ]?.type === 'FILL_BLANK') handleFillSubmit();
+        if (questions[currentQ]?.type === 'FILL_BLANK' || questions[currentQ]?.type === 'SHORT_ANSWER') handleFillSubmit();
         if (currentQ < questions.length - 1) { setCurrentQ(c => c + 1); setFillText(''); }
     };
 
@@ -299,16 +311,20 @@ export default function QuizPage() {
                     <h2 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">
                         {result.passed ? '🎉 Quiz Passed!' : '😔 Quiz Failed'}
                     </h2>
-                    <p className="text-muted-foreground font-medium mb-8">{quiz?.title}</p>
+                    <p className="text-muted-foreground font-medium mb-2">{quiz?.title}</p>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider mb-8 ${result.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {result.passed ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                        Status: {result.passed ? 'Passed' : 'Failed'}
+                    </span>
 
                     <div className="grid grid-cols-3 gap-4 mb-8">
                         <div className="bg-muted/40 border border-border rounded-xl p-4">
-                            <p className="text-3xl font-black text-indigo-600">{result.score}%</p>
+                            <p className="text-3xl font-black text-indigo-600">{Math.round((result.score / 100) * (quiz?.questionCount || 0))} / {quiz?.questionCount || 0}</p>
                             <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mt-1">Score</p>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-4">
-                            <p className="text-3xl font-black text-cyan-600">{quiz?.passingScore}%</p>
-                            <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mt-1">Required</p>
+                            <p className="text-3xl font-black text-cyan-600">{result.score}%</p>
+                            <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mt-1">Percentage</p>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-4">
                             <p className={`text-3xl font-black ${violations > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{violations}</p>
@@ -383,6 +399,17 @@ export default function QuizPage() {
                             <p className="text-[13px] font-medium text-rose-600/80">
                                 You have used all {quiz.maxAttempts} allowed attempt{quiz.maxAttempts > 1 ? 's' : ''} for this assessment.
                                 Contact your instructor if you need another attempt.
+                            </p>
+                        </div>
+                    )}
+
+                    {quiz?.negativeMarking > 0 && (
+                        <div className="bg-amber-50 rounded-xl p-5 mb-8 border border-amber-200 shadow-sm">
+                            <h4 className="text-amber-700 font-bold text-[15px] mb-2 flex items-center gap-2">
+                                <AlertTriangle size={16} /> Negative Marking
+                            </h4>
+                            <p className="text-[13px] font-medium text-amber-700/80">
+                                Wrong answers deduct {quiz.negativeMarking * 100}% of a question's marks. Scores never go below 0.
                             </p>
                         </div>
                     )}
@@ -521,18 +548,30 @@ export default function QuizPage() {
                             </div>
                         )}
 
-                        {/* Fill in the blank */}
-                        {q?.type === 'FILL_BLANK' && (
+                        {/* Fill in the blank / Short answer */}
+                        {(q?.type === 'FILL_BLANK' || q?.type === 'SHORT_ANSWER') && (
                             <div className="mt-4">
-                                <input
-                                    type="text"
-                                    value={fillText || answers[currentQ] || ''}
-                                    onChange={e => setFillText(e.target.value)}
-                                    placeholder="Type your answer here..."
-                                    className="w-full bg-muted/40 border-2 border-border outline-none text-foreground placeholder:text-muted-foreground/60 rounded-xl p-5 text-lg font-medium focus:border-indigo-500 focus:bg-card transition-all"
-                                    autoComplete="off"
-                                    spellCheck="false"
-                                />
+                                {q?.type === 'SHORT_ANSWER' ? (
+                                    <textarea
+                                        value={fillText || answers[currentQ] || ''}
+                                        onChange={e => setFillText(e.target.value)}
+                                        placeholder="Type your answer here..."
+                                        rows={4}
+                                        className="w-full bg-muted/40 border-2 border-border outline-none text-foreground placeholder:text-muted-foreground/60 rounded-xl p-5 text-lg font-medium focus:border-indigo-500 focus:bg-card transition-all resize-y"
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={fillText || answers[currentQ] || ''}
+                                        onChange={e => setFillText(e.target.value)}
+                                        placeholder="Type your answer here..."
+                                        className="w-full bg-muted/40 border-2 border-border outline-none text-foreground placeholder:text-muted-foreground/60 rounded-xl p-5 text-lg font-medium focus:border-indigo-500 focus:bg-card transition-all"
+                                        autoComplete="off"
+                                        spellCheck="false"
+                                    />
+                                )}
                             </div>
                         )}
 
@@ -554,7 +593,7 @@ export default function QuizPage() {
                                 <button
                                     onClick={() => {
                                         const finalAnswers = { ...answers };
-                                        if (q?.type === 'FILL_BLANK' && fillText.trim()) {
+                                        if ((q?.type === 'FILL_BLANK' || q?.type === 'SHORT_ANSWER') && fillText.trim()) {
                                             finalAnswers[currentQ] = fillText.trim();
                                         }
                                         submitQuiz(finalAnswers, violations);

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { MessageSquare, ThumbsUp, CheckCircle, Trash2, Send, ChevronDown, ChevronUp, Reply, Award } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { MessageSquare, ThumbsUp, CheckCircle, Trash2, Send, ChevronDown, ChevronUp, Award, Lock } from 'lucide-react';
 import { discussionsAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -17,22 +17,28 @@ export default function DiscussionSection({ courseId }) {
     const [loadingAnswers, setLoadingAnswers] = useState({});
     const [newAnswers, setNewAnswers] = useState({});
     const [submittingAnswer, setSubmittingAnswer] = useState({});
+    const [accessDenied, setAccessDenied] = useState(false);
 
-    useEffect(() => {
-        loadQuestions();
-    }, [courseId]);
-
-    const loadQuestions = async () => {
+    const loadQuestions = useCallback(async () => {
         setLoading(true);
         try {
             const data = await discussionsAPI.getQuestions(courseId);
             setQuestions(data || []);
-        } catch {
-            // silently fail
+            setAccessDenied(false);
+        } catch (err) {
+            // 403 = the backend's course-access guard (not enrolled / not the
+            // course's instructor / out of the admin's department) — show a
+            // clear notice instead of a silently-empty section.
+            setAccessDenied(err?.status === 403);
+            setQuestions([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [courseId]);
+
+    useEffect(() => {
+        loadQuestions();
+    }, [loadQuestions]);
 
     const toggleExpand = async (qId) => {
         const next = !expandedQs[qId];
@@ -152,7 +158,7 @@ export default function DiscussionSection({ courseId }) {
                         Ask questions and get help from instructors and peers
                     </p>
                 </div>
-                {user && (
+                {user && !accessDenied && (
                     <button
                         onClick={() => setShowAskForm(!showAskForm)}
                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center gap-2"
@@ -163,8 +169,18 @@ export default function DiscussionSection({ courseId }) {
                 )}
             </div>
 
-            {/* Ask Form */}
-            {showAskForm && (
+            {accessDenied ? (
+                <div className="text-center py-16 bg-muted/20 rounded-2xl border border-border border-dashed">
+                    <Lock size={40} className="text-muted-foreground/20 mx-auto mb-4" />
+                    <h4 className="font-bold text-foreground mb-1">Discussion not available</h4>
+                    <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                        This course's discussion is only available to enrolled students and the course instructor.
+                    </p>
+                </div>
+            ) : (
+                <>
+                    {/* Ask Form */}
+                    {showAskForm && (
                 <div className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-sm">
                     <input
                         type="text"
@@ -347,6 +363,8 @@ export default function DiscussionSection({ courseId }) {
                         </div>
                     ))}
                 </div>
+            )}
+                </>
             )}
         </div>
     );

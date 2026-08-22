@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Layers, BookOpen, Users, TrendingUp,
-    Search, Plus, X, Edit2, Trash2,
-    Building2, ChevronRight, ShieldCheck
+    Search, Plus, X,
+    ChevronRight, ShieldCheck
 } from 'lucide-react';
 import { statsAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -79,12 +79,6 @@ export default function CategoryOverview() {
     const [showCreate, setShowCreate] = useState(false);
     const [createForm, setCreateForm] = useState({ name: '', icon: '📚', departmentId: '' });
     const [creating, setCreating] = useState(false);
-
-    const deptMap = useMemo(() => {
-        const map = {};
-        (departments || []).forEach(d => { map[d.id] = d; });
-        return map;
-    }, [departments]);
 
     const filtered = useMemo(() => {
         if (!categories) return [];

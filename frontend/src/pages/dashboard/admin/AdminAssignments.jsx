@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FileText, BookOpen, Plus, X, Save, Trash2, Eye, CheckCircle, Users, Clock, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
-import { coursesAPI } from '../../../services/api';
+import { FileText, BookOpen, Plus, X, Save, Trash2, Eye, CheckCircle, Users, Clock, ListChecks, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { coursesAPI, assignmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card, CardHeader } from '../../../components/ui/Card';
@@ -8,24 +8,10 @@ import { UserCell } from '../../../components/ui/DataTable';
 import RubricGradingPanel, { RubricScoringPanel } from '../../../components/ui/RubricGradingPanel';
 import toast from 'react-hot-toast';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const getToken = () => localStorage.getItem('lms_token');
-
-const http = async (method, path, body = null) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-        body: body ? JSON.stringify(body) : null
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
-    return data;
-};
-
 export default function AdminAssignments() {
     const [selectedCourse, setSelectedCourse] = useState('');
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ courseId: '', title: '', description: '', maxMarks: 100, dueDate: '', allowLate: false });
+    const [createForm, setCreateForm] = useState({ courseId: '', title: '', description: '', maxMarks: 100, dueDate: '', allowLate: false, allowResubmit: false });
     const [creating, setCreating] = useState(false);
     const [viewingSubmissions, setViewingSubmissions] = useState(null);
     const [grading, setGrading] = useState({});
@@ -36,7 +22,7 @@ export default function AdminAssignments() {
     // Load rubric criteria when rubric panel opens
     useEffect(() => {
         if (showRubric && viewingSubmissions) {
-            http('GET', `/assignments/${viewingSubmissions}/rubric`).then(data => {
+            assignmentsAPI.getRubric(viewingSubmissions).then(data => {
                 if (data && data.length > 0) {
                     setRubricCriteria(data.map(c => ({
                         id: c.id,
@@ -50,11 +36,11 @@ export default function AdminAssignments() {
 
     const { data: courses } = useAsyncData(() => coursesAPI.getAll({ admin: true, limit: 200 }), []);
     const { data: assignments, loading, reload } = useAsyncData(
-        () => selectedCourse ? http('GET', `/assignments/course/${selectedCourse}`) : Promise.resolve([]),
+        () => selectedCourse ? assignmentsAPI.getByCourse(selectedCourse) : Promise.resolve([]),
         [selectedCourse]
     );
     const { data: submissions, loading: subsLoading, reload: reloadSubs } = useAsyncData(
-        () => viewingSubmissions ? http('GET', `/assignments/${viewingSubmissions}/submissions`) : Promise.resolve([]),
+        () => viewingSubmissions ? assignmentsAPI.getSubmissions(viewingSubmissions) : Promise.resolve([]),
         [viewingSubmissions]
     );
 
@@ -63,10 +49,10 @@ export default function AdminAssignments() {
         if (!createForm.title || !createForm.dueDate) { toast.error('Title and due date are required'); return; }
         setCreating(true);
         try {
-            await http('POST', '/assignments', { ...createForm, courseId: selectedCourse });
+            await assignmentsAPI.create({ ...createForm, courseId: selectedCourse });
             toast.success('Assignment created!');
             setShowCreate(false);
-            setCreateForm({ courseId: '', title: '', description: '', maxMarks: 100, dueDate: '', allowLate: false });
+            setCreateForm({ courseId: '', title: '', description: '', maxMarks: 100, dueDate: '', allowLate: false, allowResubmit: false });
             reload();
         } catch (err) {
             toast.error(err.message);
@@ -78,7 +64,7 @@ export default function AdminAssignments() {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this assignment? Submissions will also be removed.')) return;
         try {
-            await http('DELETE', `/assignments/${id}`);
+            await assignmentsAPI.remove(id);
             toast.success('Assignment deleted');
             reload();
         } catch (err) {
@@ -91,7 +77,7 @@ export default function AdminAssignments() {
         if (grade === undefined || grade === '') { toast.error('Enter marks'); return; }
         setSavingGrade(true);
         try {
-            await http('PUT', `/assignments/submissions/${submissionId}/grade`, { marks: Number(grade), feedback: grading[`feedback_${submissionId}`] || '' });
+            await assignmentsAPI.grade(submissionId, { marks: Number(grade), feedback: grading[`feedback_${submissionId}`] || '' });
             toast.success('Grade saved!');
             reloadSubs();
             setGrading({});
@@ -100,6 +86,36 @@ export default function AdminAssignments() {
         } finally {
             setSavingGrade(false);
         }
+    };
+
+    // Send a submission back for revision — clears the grade and flags it
+    // RESUBMISSION_REQUIRED until the student resubmits.
+    const handleRequestResubmission = async (submissionId) => {
+        if (!window.confirm('Send this submission back for revision? The current grade (if any) will be cleared.')) return;
+        setSavingGrade(true);
+        try {
+            await assignmentsAPI.grade(submissionId, { requestResubmission: true, feedback: grading[`feedback_${submissionId}`] || '' });
+            toast.success('Sent back for revision — student notified');
+            reloadSubs();
+            setGrading({});
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setSavingGrade(false);
+        }
+    };
+
+    const STATUS_STYLES = {
+        GRADED: 'bg-emerald-50 text-emerald-600',
+        LATE: 'bg-rose-50 text-rose-600',
+        SUBMITTED: 'bg-blue-50 text-blue-600',
+        RESUBMISSION_REQUIRED: 'bg-amber-50 text-amber-700',
+    };
+    const STATUS_LABELS = {
+        GRADED: 'Graded',
+        LATE: 'Late',
+        SUBMITTED: 'Submitted',
+        RESUBMISSION_REQUIRED: 'Resubmission Required',
     };
 
     const isOverdue = (dueDate) => new Date(dueDate) < new Date();
@@ -188,9 +204,16 @@ export default function AdminAssignments() {
                                                 </span>
                                             </td>
                                             <td className="px-3 sm:px-6 py-4">
-                                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${a.allow_late ? 'bg-amber-50 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
-                                                    {a.allow_late ? 'Late OK' : 'Strict'}
-                                                </span>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={`w-max text-[10px] font-bold px-2.5 py-1 rounded-full ${a.allow_late ? 'bg-amber-50 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
+                                                        {a.allow_late ? 'Late OK' : 'Strict'}
+                                                    </span>
+                                                    {a.allow_resubmit && (
+                                                        <span className="w-max text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-600">
+                                                            Resubmit OK
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-3 sm:px-6 py-4 text-right">
                                                 <div className="flex gap-2 justify-end">
@@ -266,18 +289,37 @@ export default function AdminAssignments() {
                                                     <UserCell name={s.student_name} email={s.student_email} avatar={s.student_avatar} />
                                                 </td>
                                                 <td className="px-6 py-4 text-xs text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock size={12} />
-                                                        {new Date(s.submitted_at).toLocaleDateString()}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock size={12} />
+                                                            {new Date(s.submitted_at).toLocaleDateString()}
+                                                        </span>
+                                                        {s.file_url && (
+                                                            <a href={s.file_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-bold flex items-center gap-1 text-[11px]">
+                                                                <Download size={12} /> Download
+                                                            </a>
+                                                        )}
+                                                        <span className={`w-max text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[s.status] || 'bg-muted text-muted-foreground'}`}>
+                                                            {STATUS_LABELS[s.status] || s.status || 'Submitted'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-bold">{s.marks !== null ? s.marks : '—'}</td>
                                                 <td className="px-6 py-4 text-xs text-muted-foreground max-w-[200px] truncate">{s.feedback || '—'}</td>
                                                 <td className="px-6 py-4">
-                                                    {s.marks !== null ? (
-                                                        <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                                                            <CheckCircle size={12} /> Graded
-                                                        </span>
+                                                    {s.marks !== null && s.status !== 'RESUBMISSION_REQUIRED' ? (
+                                                        <div className="flex flex-col items-start gap-1.5">
+                                                            <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
+                                                                <CheckCircle size={12} /> Graded
+                                                            </span>
+                                                            <button
+                                                                onClick={() => handleRequestResubmission(s.id)}
+                                                                disabled={savingGrade}
+                                                                className="text-[10px] font-bold text-amber-600 hover:text-amber-700 underline"
+                                                            >
+                                                                Send back for revision
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <div className="flex flex-col gap-2">
                                                             <div className="flex items-center gap-2">
@@ -298,6 +340,13 @@ export default function AdminAssignments() {
                                                                     {savingGrade ? '...' : 'Grade'}
                                                                 </button>
                                                             </div>
+                                                            <button
+                                                                onClick={() => handleRequestResubmission(s.id)}
+                                                                disabled={savingGrade}
+                                                                className="w-max text-[10px] font-bold text-amber-600 hover:text-amber-700 underline"
+                                                            >
+                                                                Send back for revision
+                                                            </button>
                                                             {showRubric && rubricCriteria.length > 0 && (
                                                                 <RubricScoringPanel
                                                                     submissionId={s.id}
@@ -348,10 +397,16 @@ export default function AdminAssignments() {
                                     <input required type="datetime-local" value={createForm.dueDate} onChange={e => setCreateForm(p => ({ ...p, dueDate: e.target.value }))} className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium" />
                                 </div>
                             </div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" checked={createForm.allowLate} onChange={e => setCreateForm(p => ({ ...p, allowLate: e.target.checked }))} className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500" />
-                                <span className="text-sm font-medium text-foreground">Allow late submissions</span>
-                            </label>
+                            <div className="flex flex-col gap-2.5">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={createForm.allowLate} onChange={e => setCreateForm(p => ({ ...p, allowLate: e.target.checked }))} className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500" />
+                                    <span className="text-sm font-medium text-foreground">Allow late submissions</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={createForm.allowResubmit} onChange={e => setCreateForm(p => ({ ...p, allowResubmit: e.target.checked }))} className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500" />
+                                    <span className="text-sm font-medium text-foreground">Allow resubmission</span>
+                                </label>
+                            </div>
                             <div className="pt-2 flex gap-3">
                                 <button type="button" onClick={() => setShowCreate(false)} className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">Cancel</button>
                                 <button type="submit" disabled={creating} className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2">

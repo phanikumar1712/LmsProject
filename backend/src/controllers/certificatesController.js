@@ -9,20 +9,15 @@ const generateCertId = () => {
     return `CERT-${year}-${rand}`;
 };
 
-// POST /api/certificates/generate — called when a student completes a course
-const generate = async (req, res) => {
-    const { courseId } = req.body;
-    if (!courseId) throw createError('courseId is required', 400);
-    const studentId = req.user.id;
-
-    // Check if already exists
+// Ensure a student has a certificate for a completed course. Creates one if
+// missing and returns it (idempotent — safe to call from the enrollment
+// progress update every time a lesson is marked complete).
+const ensureCertificate = async (studentId, courseId) => {
     const existing = await query(
         'SELECT * FROM certificates WHERE student_id = $1 AND course_id = $2',
         [studentId, courseId]
     );
-    if (existing.rows.length) {
-        return res.json(existing.rows[0]);
-    }
+    if (existing.rows.length) return existing.rows[0];
 
     // Verify enrollment + completion
     const enrollment = await query(
@@ -36,19 +31,23 @@ const generate = async (req, res) => {
     // Get course and instructor info
     const course = await query(
         `SELECT c.title, u.name as instructor_name FROM courses c
-         JOIN users u ON c.instructor_id = u.id WHERE c.id = $1`,
+         LEFT JOIN users u ON c.instructor_id = u.id WHERE c.id = $1`,
         [courseId]
     );
     if (!course.rows.length) throw createError('Course not found', 404);
     // Course must have certificate enabled (defaults to true in schema)
 
-    const user = await query('SELECT name FROM users WHERE id = $1', [studentId]);
+    const user = await query(
+        `SELECT u.name, d.name as department_name FROM users u
+         LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = $1`,
+        [studentId]
+    );
 
     const certId = generateCertId();
     const result = await query(
-        `INSERT INTO certificates (student_id, course_id, cert_id, student_name, course_title, instructor_name)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [studentId, courseId, certId, user.rows[0].name, course.rows[0].title, course.rows[0].instructor_name]
+        `INSERT INTO certificates (student_id, course_id, cert_id, student_name, course_title, instructor_name, department_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [studentId, courseId, certId, user.rows[0].name, course.rows[0].title, course.rows[0].instructor_name, user.rows[0].department_name || '']
     );
 
     // Notify student
@@ -57,7 +56,15 @@ const generate = async (req, res) => {
         [studentId, `🎓 Certificate earned for "${course.rows[0].title}"!`, 'certificate', `/verify/${certId}`]
     ).catch(() => {});
 
-    res.status(201).json(result.rows[0]);
+    return result.rows[0];
+};
+
+// POST /api/certificates/generate — called when a student completes a course
+const generate = async (req, res) => {
+    const { courseId } = req.body;
+    if (!courseId) throw createError('courseId is required', 400);
+    const cert = await ensureCertificate(req.user.id, courseId);
+    res.status(201).json(cert);
 };
 
 // GET /api/certificates/verify/:certId — public verification page
@@ -82,4 +89,27 @@ const getMy = async (req, res) => {
     res.json(result.rows);
 };
 
-module.exports = { generate, verify, getMy };
+// GET /api/certificates/user/:userId — admin/super-admin views a student's certificates.
+// Department-scoped admins may only view students in their own department.
+const getByUser = async (req, res) => {
+    const { userId } = req.params;
+    const { getDepartmentScope } = require('../utils/scope');
+    const { scoped, departmentId } = getDepartmentScope(req);
+
+    if (scoped) {
+        const check = await query(
+            `SELECT 1 FROM users WHERE id = $1 AND department_id = $2 AND role = 'STUDENT'`,
+            [userId, departmentId]
+        );
+        if (!check.rows.length) throw createError('This student is outside your department', 403);
+    }
+
+    const result = await query(
+        `SELECT id, cert_id, course_id, course_title, instructor_name, issue_date
+         FROM certificates WHERE student_id = $1 ORDER BY issue_date DESC`,
+        [userId]
+    );
+    res.json(result.rows);
+};
+
+module.exports = { generate, ensureCertificate, verify, getMy, getByUser };

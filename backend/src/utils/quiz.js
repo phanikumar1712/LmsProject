@@ -1,6 +1,6 @@
 const { createError } = require('../middleware/errorHandler');
 
-const QUESTION_TYPES = new Set(['MCQ', 'MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 'FILL_BLANK']);
+const QUESTION_TYPES = new Set(['MCQ', 'MCQ_SINGLE', 'MCQ_MULTI', 'TRUE_FALSE', 'SHORT_ANSWER', 'FILL_BLANK']);
 const DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
 const SELECTION_MODES = new Set(['ALL', 'RANDOM', 'BY_DIFFICULTY', 'BY_CATEGORY']);
 const MAX_QUESTIONS = 500;
@@ -64,8 +64,14 @@ const validateQuestions = (questions) => {
             }
             normalized.correctAnswer = [...new Set(question.correctAnswer.map(answer =>
                 normalizeOptionAnswer(answer, normalized.options, `Question ${index + 1} correctAnswer`)))].sort();
-        } else if (type === 'FILL_BLANK') {
-            normalized.correctAnswer = cleanText(question.correctAnswer, `Question ${index + 1} correctAnswer`, 500);
+        } else if (type === 'FILL_BLANK' || type === 'SHORT_ANSWER') {
+            // Free-text questions: the correct answer is an exact (case-insensitive)
+            // text match. Short answers can carry a hint via options (optional).
+            normalized.correctAnswer = cleanText(question.correctAnswer, `Question ${index + 1} correctAnswer`, 2000);
+            if (Array.isArray(question.options) && question.options.length) {
+                normalized.options = question.options.map((option, optionIndex) =>
+                    cleanText(option, `Question ${index + 1} option ${optionIndex + 1}`, 500));
+            }
         } else {
             normalized.correctAnswer = normalizeOptionAnswer(
                 question.correctAnswer, normalized.options, `Question ${index + 1} correctAnswer`);
@@ -192,6 +198,31 @@ const validateQuizPayload = (body) => {
     if (!Number.isInteger(maxAttempts) || maxAttempts < 0 || maxAttempts > 100) {
         throw createError('maxAttempts must be an integer from 0 to 100 (0 = unlimited)', 400);
     }
+    // Negative marking: fraction of a question's marks deducted for a wrong
+    // answer (0 = none, 1 = a wrong answer costs the full question marks).
+    const negativeMarking = Number(body.negativeMarking ?? 0);
+    if (!Number.isFinite(negativeMarking) || negativeMarking < 0 || negativeMarking > 1) {
+        throw createError('negativeMarking must be a number from 0 to 1', 400);
+    }
+    // Optional availability window — quizzes can only be started inside it.
+    let startDate = null;
+    let endDate = null;
+    if (body.startDate) {
+        startDate = new Date(body.startDate);
+        if (Number.isNaN(startDate.getTime())) throw createError('startDate must be a valid date', 400);
+    }
+    if (body.endDate) {
+        endDate = new Date(body.endDate);
+        if (Number.isNaN(endDate.getTime())) throw createError('endDate must be a valid date', 400);
+    }
+    if (startDate && endDate && endDate < startDate) {
+        throw createError('endDate must be after startDate', 400);
+    }
+    // Assessment type: 'mid' / 'final' mark this quiz as an exam component in
+    // the student Grades breakdown; anything else is a regular quiz.
+    const examKind = body.examKind && ['mid', 'final'].includes(String(body.examKind))
+        ? String(body.examKind)
+        : null;
     const questions = validateQuestions(body.questions);
     return {
         title: cleanText(body.title, 'title', 255),
@@ -201,6 +232,10 @@ const validateQuizPayload = (body) => {
         passingScore,
         timeLimit,
         maxAttempts,
+        negativeMarking,
+        startDate,
+        endDate,
+        examKind,
         questions,
         selectionConfig: validateSelectionConfig(body.selectionConfig ?? body.selection_config, questions),
     };
@@ -227,6 +262,10 @@ const serializeQuiz = (quiz, { includeQuestions = true, includeAnswers = false, 
         passingScore: quiz.passing_score,
         timeLimit: quiz.time_limit,
         maxAttempts: quiz.max_attempts ?? 0,
+        negativeMarking: Number(quiz.negative_marking ?? 0),
+        startDate: quiz.start_date ? new Date(quiz.start_date).toISOString() : null,
+        endDate: quiz.end_date ? new Date(quiz.end_date).toISOString() : null,
+        examKind: quiz.exam_kind ?? null,
         selectionConfig: config,
         bankSize: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
         questionCount: effectiveCount,
@@ -245,6 +284,15 @@ const answersMatch = (question, answer) => {
         const actual = [...new Set(answer.map(String))].sort();
         const expected = [...question.correctAnswer].map(String).sort();
         return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+    }
+    // Free-text questions (SHORT_ANSWER / FILL_BLANK) are matched case- and
+    // whitespace-insensitively; short answers accept multiple correct spellings.
+    if (question.type === 'SHORT_ANSWER') {
+        const accepted = [question.correctAnswer, ...(question.options || [])]
+            .filter(Boolean)
+            .map(String);
+        const given = String(answer ?? '').trim().toLowerCase();
+        return accepted.some(a => given === String(a).trim().toLowerCase());
     }
     if (typeof answer !== 'string' || answer.length > 500) return false;
     return String(answer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase();

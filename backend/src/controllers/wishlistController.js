@@ -19,7 +19,7 @@ const getWishlist = async (req, res) => {
                cat.name as "categoryName", cat.id as "categoryId"
         FROM wishlist w
         JOIN courses c ON w.course_id = c.id
-        JOIN users u ON c.instructor_id = u.id
+        LEFT JOIN users u ON c.instructor_id = u.id
         LEFT JOIN categories cat ON c.category_id = cat.id
         WHERE w.user_id = $1
         ORDER BY w.added_at DESC

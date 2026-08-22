@@ -1,6 +1,13 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { getDepartmentScope } = require('../utils/scope');
+const { assertCourseEditable, assertChildEditable } = require('../utils/courseAuth');
+
+// A live session resolves to its course; editing/marking/deleting it is limited
+// to the course's instructor, an in-scope department admin, or SUPER_ADMIN.
+const sessionToCourseSql = `
+    SELECT course_id FROM live_sessions WHERE id = $1
+`;
 
 // ── LIVE SESSIONS CRUD ────────────────────────────────────────────────────────
 
@@ -12,26 +19,7 @@ const createSession = async (req, res) => {
     }
 
     // Verify course ownership (instructor) or scope (admin)
-    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [courseId]);
-    if (!course.rows.length) throw createError('Course not found', 404);
-
-    if (req.user.role === 'INSTRUCTOR' && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Not authorized to manage sessions for this course', 403);
-    }
-    if (req.user.role === 'ADMIN') {
-        const { scoped, departmentId } = getDepartmentScope(req);
-        if (scoped) {
-            const catCheck = await query(
-                `SELECT cat.department_id FROM courses c
-                 LEFT JOIN categories cat ON c.category_id = cat.id
-                 WHERE c.id = $1`,
-                [courseId]
-            );
-            if (catCheck.rows.length && catCheck.rows[0].department_id !== departmentId) {
-                throw createError('Course is outside your department', 403);
-            }
-        }
-    }
+    await assertCourseEditable(req, courseId);
 
     const result = await query(
         `INSERT INTO live_sessions (course_id, instructor_id, title, session_date, start_time, end_time, meeting_link, academic_session_id)
@@ -52,8 +40,14 @@ const getSessions = async (req, res) => {
     const values = [];
     let i = 1;
 
-    // Department scope for admins
-    if (req.user.role === 'ADMIN') {
+    // Instructors only see sessions for courses they teach; scoped admins only
+    // see sessions in their department's courses.
+    if (req.user.role === 'INSTRUCTOR') {
+        conditions.push(`ls.course_id IN (
+            SELECT c.id FROM courses c WHERE c.instructor_id = $${i++}
+        )`);
+        values.push(req.user.id);
+    } else if (req.user.role === 'ADMIN') {
         const { scoped, departmentId } = getDepartmentScope(req);
         if (scoped) {
             conditions.push(`ls.course_id IN (
@@ -78,6 +72,7 @@ const getSessions = async (req, res) => {
 
 // PUT /api/attendance/sessions/:id
 const updateSession = async (req, res) => {
+    await assertChildEditable(req, { sql: sessionToCourseSql, id: req.params.id, notFound: 'Session not found' });
     const { id } = req.params;
     const fields = ['title', 'session_date', 'start_time', 'end_time', 'meeting_link', 'academic_session_id'];
     const updates = [];
@@ -104,6 +99,7 @@ const updateSession = async (req, res) => {
 
 // DELETE /api/attendance/sessions/:id
 const deleteSession = async (req, res) => {
+    await assertChildEditable(req, { sql: sessionToCourseSql, id: req.params.id, notFound: 'Session not found' });
     const { id } = req.params;
     const session = await query('DELETE FROM live_sessions WHERE id = $1 RETURNING id, title, course_id', [id]);
     if (!session.rows.length) throw createError('Session not found', 404);
@@ -128,9 +124,8 @@ const markAttendance = async (req, res) => {
         throw createError('records array is required', 400);
     }
 
-    // Verify session exists
-    const session = await query('SELECT * FROM live_sessions WHERE id = $1', [sessionId]);
-    if (!session.rows.length) throw createError('Session not found', 404);
+    // Verify session exists + the caller may manage it
+    await assertChildEditable(req, { sql: sessionToCourseSql, id: sessionId, notFound: 'Session not found' });
 
     const validStatuses = ['present', 'absent', 'late', 'excused'];
     const client = await query.pool.connect();
@@ -178,6 +173,8 @@ const markSingleAttendance = async (req, res) => {
         throw createError('Invalid status', 400);
     }
 
+    await assertChildEditable(req, { sql: sessionToCourseSql, id: sessionId, notFound: 'Session not found' });
+
     const result = await query(
         `INSERT INTO attendance (session_id, student_id, status, marked_by)
          VALUES ($1, $2, $3, $4)
@@ -194,14 +191,19 @@ const markSingleAttendance = async (req, res) => {
 const getAttendance = async (req, res) => {
     const { sessionId } = req.params;
 
-    const session = await query(
+    // Gate access (instructor owns the session's course / admin in scope),
+    // then fetch the FULL session row for the response — the resolver only
+    // returns course_id, so we re-select the complete joined row.
+    await assertChildEditable(req, { sql: sessionToCourseSql, id: sessionId, notFound: 'Session not found' });
+    const sessionRes = await query(
         `SELECT ls.*, u.name as instructor_name
          FROM live_sessions ls
          JOIN users u ON ls.instructor_id = u.id
          WHERE ls.id = $1`,
         [sessionId]
     );
-    if (!session.rows.length) throw createError('Session not found', 404);
+    if (!sessionRes.rows.length) throw createError('Session not found', 404);
+    const session = sessionRes.rows[0];
 
     // Get enrolled students
     const students = await query(
@@ -210,7 +212,7 @@ const getAttendance = async (req, res) => {
          JOIN users u ON e.student_id = u.id
          WHERE e.course_id = $1 AND u.active = true
          ORDER BY u.name ASC`,
-        [session.rows[0].course_id]
+        [session.course_id]
     );
 
     // Get existing attendance records
@@ -234,7 +236,7 @@ const getAttendance = async (req, res) => {
     }));
 
     res.json({
-        session: session.rows[0],
+        session,
         records,
     });
 };
@@ -242,6 +244,7 @@ const getAttendance = async (req, res) => {
 // GET /api/attendance/course/:courseId/stats — Attendance stats for a course
 const getCourseAttendanceStats = async (req, res) => {
     const { courseId } = req.params;
+    await assertCourseEditable(req, courseId);
 
     const stats = await query(
         `SELECT
@@ -282,6 +285,23 @@ const getMyAttendance = async (req, res) => {
     const studentId = req.params.studentId || req.user.id;
     if (req.user.role === 'STUDENT' && String(studentId) !== String(req.user.id)) {
         throw createError('Forbidden', 403);
+    }
+    // Instructors may only view attendance of students in their own courses;
+    // scoped admins only of students in their department.
+    if (req.user.role === 'INSTRUCTOR') {
+        const check = await query(`
+            SELECT 1 FROM enrollments e
+            JOIN courses c ON e.course_id = c.id
+            WHERE e.student_id = $1 AND c.instructor_id = $2
+            LIMIT 1
+        `, [studentId, req.user.id]);
+        if (!check.rows.length) throw createError('You can only view attendance for students in your courses', 403);
+    } else if (req.user.role === 'ADMIN') {
+        const { scoped, departmentId } = getDepartmentScope(req);
+        if (scoped) {
+            const check = await query('SELECT 1 FROM users WHERE id = $1 AND department_id = $2', [studentId, departmentId]);
+            if (!check.rows.length) throw createError('This student is outside your department', 403);
+        }
     }
 
     const result = await query(

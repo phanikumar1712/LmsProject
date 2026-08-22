@@ -1,14 +1,33 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Mail, Shield, Bell, AlertTriangle, Loader2 } from 'lucide-react';
+import { Settings, Save, Globe, Mail, Bell, AlertTriangle, Loader2, Building2, BookOpen, Lock } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
 const SECTIONS = [
     { id: 'general', label: 'General', icon: Globe },
+    { id: 'college', label: 'College', icon: Building2 },
+    { id: 'lms', label: 'LMS', icon: BookOpen },
     { id: 'email', label: 'Email', icon: Mail },
-    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'security', label: 'Security', icon: Lock },
     { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
+
+// Reusable toggle row used across sections
+const Toggle = ({ label, desc, checked, onChange, danger }) => (
+    <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer ${danger && checked ? 'border-rose-200 bg-rose-50' : 'border-border hover:bg-muted/40'}`}>
+        <div className="relative flex-shrink-0">
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
+            <div onClick={() => onChange(!checked)} className={`w-11 h-6 rounded-full transition-colors cursor-pointer ${checked ? (danger ? 'bg-rose-500' : 'bg-indigo-600') : 'bg-muted'}`}>
+                <div className={`w-5 h-5 bg-card rounded-full shadow-sm transform transition-transform m-0.5 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+            </div>
+        </div>
+        <div>
+            <p className={`text-sm font-bold ${danger && checked ? 'text-rose-700' : 'text-foreground'}`}>{label}</p>
+            {desc && <p className="text-xs text-muted-foreground font-medium">{desc}</p>}
+        </div>
+        {danger && checked && <AlertTriangle size={16} className="text-rose-500 ml-auto flex-shrink-0" />}
+    </label>
+);
 
 export default function PlatformSettings() {
     const [active, setActive] = useState('general');
@@ -118,24 +137,108 @@ export default function PlatformSettings() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-4 pt-2">
-                                    {[
-                                        { key: 'requireApproval', label: 'Require admin approval for new courses', desc: 'Courses must be reviewed before being published' },
-                                        { key: 'maintenanceMode', label: 'Maintenance Mode', desc: 'Show maintenance page to all non-admin users', danger: true },
-                                    ].map(({ key, label, desc, danger }) => (
-                                        <label key={key} className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer ${danger && settings[key] ? 'border-rose-200 bg-rose-50' : 'border-border hover:bg-muted/40'}`}>
-                                            <div className="relative flex-shrink-0">
-                                                <input type="checkbox" checked={settings[key]} onChange={e => update(key, e.target.checked)} className="sr-only" />
-                                                <div onClick={() => update(key, !settings[key])} className={`w-11 h-6 rounded-full transition-colors cursor-pointer ${settings[key] ? (danger ? 'bg-rose-500' : 'bg-indigo-600') : 'bg-muted'}`}>
-                                                    <div className={`w-5 h-5 bg-card rounded-full shadow-sm transform transition-transform m-0.5 ${settings[key] ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className={`text-sm font-bold ${danger && settings[key] ? 'text-rose-700' : 'text-foreground'}`}>{label}</p>
-                                                <p className="text-xs text-muted-foreground font-medium">{desc}</p>
-                                            </div>
-                                            {danger && settings[key] && <AlertTriangle size={16} className="text-rose-500 ml-auto flex-shrink-0" />}
-                                        </label>
-                                    ))}
+                                    <Toggle
+                                        label="Maintenance Mode"
+                                        desc="Show maintenance page to all non-admin users"
+                                        danger
+                                        checked={!!settings.maintenanceMode}
+                                        onChange={v => update('maintenanceMode', v)}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {active === 'college' && (
+                        <>
+                            <h2 className="text-lg font-extrabold text-foreground border-b border-border pb-4">College Settings</h2>
+                            <div className="space-y-5">
+                                <div className="flex items-start gap-5">
+                                    <div className="w-24 h-24 rounded-2xl border border-border bg-muted/40 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                        {settings.collegeLogo ? (
+                                            <img src={settings.collegeLogo} alt="College logo" className="w-full h-full object-contain p-2" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                                        ) : (
+                                            <Building2 size={32} className="text-muted-foreground/50" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">College Logo URL</label>
+                                        <input className={inputCls} placeholder="https://example.com/logo.png" value={settings.collegeLogo} onChange={e => update('collegeLogo', e.target.value)} />
+                                        <p className="text-xs text-muted-foreground font-medium mt-1.5">A square logo is recommended — shown on login page, certificates, and emails.</p>
+                                    </div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">College Name</label>
+                                        <input className={inputCls} value={settings.collegeName} onChange={e => update('collegeName', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Website</label>
+                                        <input type="url" className={inputCls} placeholder="https://college.edu" value={settings.collegeWebsite} onChange={e => update('collegeWebsite', e.target.value)} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Address</label>
+                                    <textarea rows={2} className={`${inputCls} resize-none`} value={settings.collegeAddress} onChange={e => update('collegeAddress', e.target.value)} />
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Contact Email</label>
+                                        <input type="email" className={inputCls} value={settings.collegeContactEmail} onChange={e => update('collegeContactEmail', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Contact Number</label>
+                                        <input className={inputCls} value={settings.collegeContactNumber} onChange={e => update('collegeContactNumber', e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {active === 'lms' && (
+                        <>
+                            <h2 className="text-lg font-extrabold text-foreground border-b border-border pb-4">LMS Settings</h2>
+                            <div className="space-y-4">
+                                <Toggle
+                                    label="Course approval required"
+                                    desc="New courses stay Pending until a department admin or super admin approves them"
+                                    checked={!!settings.requireApproval}
+                                    onChange={v => update('requireApproval', v)}
+                                />
+                                <Toggle
+                                    label="Enrollment approval required"
+                                    desc="Admin/instructor must accept a student's enrollment request before it takes effect"
+                                    checked={!!settings.enrollmentApprovalRequired}
+                                    onChange={v => update('enrollmentApprovalRequired', v)}
+                                />
+                                <Toggle
+                                    label="Certificates enabled"
+                                    desc="Generate certificates for students who complete a course"
+                                    checked={settings.certificateEnabled !== false}
+                                    onChange={v => update('certificateEnabled', v)}
+                                />
+                                <Toggle
+                                    label="Student self-enrollment"
+                                    desc="Students may enroll themselves in published courses without admin help"
+                                    checked={settings.studentSelfEnrollment !== false}
+                                    onChange={v => update('studentSelfEnrollment', v)}
+                                />
+                                <Toggle
+                                    label="Instructor course creation"
+                                    desc="Instructors may create their own courses (otherwise only admins create them)"
+                                    checked={settings.instructorCourseCreation !== false}
+                                    onChange={v => update('instructorCourseCreation', v)}
+                                />
+                                <div className="grid sm:grid-cols-2 gap-5 pt-2">
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Maximum Course Capacity</label>
+                                        <input type="number" min={0} className={inputCls} value={settings.maxCourseCapacity ?? ''} onChange={e => update('maxCourseCapacity', e.target.value)} />
+                                        <p className="text-xs text-muted-foreground font-medium mt-1.5">Max students per course. Leave empty for unlimited.</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Default Max Students / Department</label>
+                                        <input type="number" min={0} className={inputCls} value={settings.defaultMaxStudentsPerAdmin ?? ''} onChange={e => update('defaultMaxStudentsPerAdmin', e.target.value)} />
+                                    </div>
                                 </div>
                             </div>
                         </>
@@ -172,23 +275,50 @@ export default function PlatformSettings() {
                             <div className="space-y-5">
                                 <div className="grid sm:grid-cols-2 gap-5">
                                     <div>
-                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">JWT Token Expiry (days)</label>
-                                        <input type="number" className={inputCls} value={settings.jwtExpiryDays} onChange={e => update('jwtExpiryDays', e.target.value)} />
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Password Policy — Minimum Length</label>
+                                        <input type="number" min={4} max={64} className={inputCls} value={settings.passwordMinLength ?? ''} onChange={e => update('passwordMinLength', e.target.value)} />
                                     </div>
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Session Timeout (minutes)</label>
+                                        <input type="number" min={5} className={inputCls} value={settings.sessionTimeoutMinutes ?? ''} onChange={e => update('sessionTimeoutMinutes', e.target.value)} />
+                                        <p className="text-xs text-muted-foreground font-medium mt-1.5">Auto sign-out after inactivity.</p>
+                                    </div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-5">
                                     <div>
                                         <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Max Login Attempts</label>
-                                        <input type="number" className={inputCls} value={settings.maxLoginAttempts} onChange={e => update('maxLoginAttempts', e.target.value)} />
+                                        <input type="number" min={1} className={inputCls} value={settings.maxLoginAttempts ?? ''} onChange={e => update('maxLoginAttempts', e.target.value)} />
                                     </div>
-                                </div>
-                                <div className="flex items-center justify-between p-5 border border-border rounded-xl">
                                     <div>
-                                        <p className="text-foreground font-bold">Require 2FA for Admins</p>
-                                        <p className="text-muted-foreground text-sm font-medium">Force all admin and super-admin accounts to use two-factor auth</p>
-                                    </div>
-                                    <div onClick={() => update('twoFactorRequired', !settings.twoFactorRequired)} className={`w-11 h-6 rounded-full transition-colors cursor-pointer ${settings.twoFactorRequired ? 'bg-indigo-600' : 'bg-muted'}`}>
-                                        <div className={`w-5 h-5 bg-card rounded-full shadow-sm transform transition-transform m-0.5 ${settings.twoFactorRequired ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Account Lockout — Failed Attempts</label>
+                                        <input type="number" min={1} className={inputCls} value={settings.accountLockoutAttempts ?? ''} onChange={e => update('accountLockoutAttempts', e.target.value)} />
+                                        <p className="text-xs text-muted-foreground font-medium mt-1.5">Lock the account after this many failed attempts.</p>
                                     </div>
                                 </div>
+                                <div className="grid sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">JWT Token Expiry (days)</label>
+                                        <input type="number" className={inputCls} value={settings.jwtExpiryDays ?? ''} onChange={e => update('jwtExpiryDays', e.target.value)} />
+                                    </div>
+                                </div>
+                                <Toggle
+                                    label="Require strong password"
+                                    desc="Passwords must include upper/lowercase, a number, and a symbol"
+                                    checked={!!settings.passwordComplexityRequired}
+                                    onChange={v => update('passwordComplexityRequired', v)}
+                                />
+                                <Toggle
+                                    label="Require 2FA for Admins"
+                                    desc="Force all admin and super-admin accounts to use two-factor auth"
+                                    checked={!!settings.twoFactorRequired}
+                                    onChange={v => update('twoFactorRequired', v)}
+                                />
+                                <Toggle
+                                    label="Account lockout enabled"
+                                    desc="Temporarily lock accounts that exceed the failed-attempt limit"
+                                    checked={!!settings.accountLockoutEnabled}
+                                    onChange={v => update('accountLockoutEnabled', v)}
+                                />
                             </div>
                         </>
                     )}

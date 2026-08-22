@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Trash2, Edit2, FileText, X, Save, Search, Lock } from 'lucide-react';
-import { coursesAPI, statsAPI, departmentsAPI } from '../../../services/api';
+import { CheckCircle, XCircle, AlertTriangle, Trash2, Edit2, FileText, X, Save, Search, Lock, Users, UserPlus } from 'lucide-react';
+import { coursesAPI, statsAPI, departmentsAPI, enrollmentsAPI, usersAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
+import RejectCourseModal from '../../../components/ui/RejectCourseModal';
 import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function AdminCourses() {
-    const { isSuperAdmin } = useAuth();
+    const { isSuperAdmin, can } = useAuth();
     const [searchParams] = useSearchParams();
     // Seed the status filter from the URL (?status=PENDING) so the dashboard's
     // "Pending Approvals" card lands on the right tab.
@@ -45,6 +46,14 @@ export default function AdminCourses() {
     const [courseOverrides, setCourseOverrides] = useState({});
     const [saving, setSaving] = useState(false);
 
+    // Assign Instructor + View Enrolled Students state
+    const [assignCourse, setAssignCourse] = useState(null);
+    const [assigningId, setAssigningId] = useState(null);
+    const [instructorOptions, setInstructorOptions] = useState([]);
+    const [enrolledCourse, setEnrolledCourse] = useState(null);
+    const [enrolledStudents, setEnrolledStudents] = useState([]);
+    const [studentsLoading, setStudentsLoading] = useState(false);
+
     const handleApprove = async (courseId) => {
         try {
             await coursesAPI.approve(courseId);
@@ -56,28 +65,26 @@ export default function AdminCourses() {
         }
     };
 
-    const handleReject = async (courseId) => {
-        const reason = window.prompt('Provide a reason for rejecting this course. This will be sent to the instructor:');
-        if (reason === null) return; // cancelled
+    // ── Rejection modal state ────────────────────────────────────────────────
+    const [rejectTarget, setRejectTarget] = useState(null); // course to review
+
+    const handleReject = async (courseId, reason) => {
         try {
             await coursesAPI.reject(courseId, reason);
             reload();
             toast.success('Course rejected. Instructor notified with the reason.');
-        } catch {
-            toast.error('Failed to reject course');
+        } catch (err) {
+            toast.error(err.message || 'Failed to reject course');
         }
     };
 
-    const handleMoveToDraft = async (courseId) => {
-        const reason = window.prompt('Provide a reason for moving this course back to Draft. This will be sent to the instructor:');
-        if (reason === null) return; // cancelled
-
+    const handleMoveToDraft = async (courseId, reason) => {
         try {
             await coursesAPI.update(courseId, { status: 'DRAFT', reviewNote: reason });
             reload();
             toast.success('Course moved to Draft and instructor notified.');
-        } catch {
-            toast.error('Failed to update course status');
+        } catch (err) {
+            toast.error(err.message || 'Failed to update course status');
         }
     };
 
@@ -89,6 +96,54 @@ export default function AdminCourses() {
             toast.success('Course deleted.');
         } catch {
             toast.error('Failed to delete course');
+        }
+    };
+
+    const handleUnpublish = async (courseId, title) => {
+        if (!window.confirm(`Unpublish "${title}"? It will be hidden from students and moved back to Draft.`)) return;
+        try {
+            await coursesAPI.unpublish(courseId);
+            reload();
+            toast.success('Course unpublished — moved back to Draft.');
+        } catch (err) {
+            toast.error(err.message || 'Failed to unpublish course');
+        }
+    };
+
+    const openAssignInstructor = async (course) => {
+        setAssignCourse(course);
+        setAssigningId(course.instructorId ?? null);
+        try {
+            const list = await usersAPI.getAll({ role: 'INSTRUCTOR', limit: 500 });
+            setInstructorOptions(Array.isArray(list) ? list : []);
+        } catch {
+            setInstructorOptions([]);
+        }
+    };
+
+    const handleAssignInstructor = async (instructorId) => {
+        try {
+            await coursesAPI.assignInstructor(assignCourse.id, instructorId);
+            await reload();
+            toast.success(instructorId ? 'Instructor assigned to course' : 'Instructor removed from course');
+            setAssignCourse(null);
+        } catch (err) {
+            toast.error(err.message || 'Failed to assign instructor');
+        }
+    };
+
+    const openEnrolledStudents = async (course) => {
+        setEnrolledCourse(course);
+        setEnrolledStudents([]);
+        setStudentsLoading(true);
+        try {
+            const list = await enrollmentsAPI.getCourseStudents(course.id);
+            setEnrolledStudents(Array.isArray(list) ? list : []);
+        } catch {
+            setEnrolledStudents([]);
+            toast.error('Failed to load enrolled students');
+        } finally {
+            setStudentsLoading(false);
         }
     };
 
@@ -148,6 +203,7 @@ export default function AdminCourses() {
         if (status === 'PUBLISHED') return <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm text-[11px] font-bold px-3 py-1.5 rounded-lg w-full text-center flex items-center justify-center gap-1.5"><CheckCircle size={14} /> Published</span>;
         if (status === 'DRAFT') return <span className="bg-muted text-muted-foreground border border-border shadow-sm text-[11px] font-bold px-3 py-1.5 rounded-lg w-full text-center">Draft</span>;
         if (status === 'REJECTED') return <span className="bg-rose-50 text-rose-600 border border-rose-200 shadow-sm text-[11px] font-bold px-3 py-1.5 rounded-lg w-full text-center flex items-center justify-center gap-1.5"><XCircle size={14} /> Rejected</span>;
+        if (status === 'ARCHIVED') return <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 shadow-sm text-[11px] font-bold px-3 py-1.5 rounded-lg w-full text-center flex items-center justify-center gap-1.5"><FileText size={14} /> Archived</span>;
         return <span className="bg-muted text-muted-foreground border border-border text-[11px] font-bold px-3 py-1.5 rounded-lg w-full text-center">{status}</span>;
     };
 
@@ -181,9 +237,10 @@ export default function AdminCourses() {
                         <Lock size={18} className="text-amber-600 dark:text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="font-bold text-amber-800 dark:text-amber-200 text-sm">Course limit reached ({deptCapacity.courseCount}/{deptCapacity.maxCourses})</p>
+                        <p className="font-bold text-amber-800 dark:text-amber-200 text-sm">Course limit reached</p>
                         <p className="text-xs font-medium text-amber-700/80 dark:text-amber-300/80 mt-0.5">
-                            Approving new courses is blocked until a Super Admin raises the limit for {deptCapacity.departmentName}.
+                            {deptCapacity.departmentName} has {deptCapacity.courseCount} courses but the limit is {deptCapacity.maxCourses}.
+                            You can't approve more courses until a Super Admin raises the limit.
                         </p>
                     </div>
                 </div>
@@ -192,7 +249,7 @@ export default function AdminCourses() {
             <div className="bg-card border border-border shadow-sm rounded-2xl p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col gap-4 mb-8">
                     <div className="flex flex-wrap gap-3">
-                        {['ALL', 'PUBLISHED', 'PENDING', 'DRAFT', 'REJECTED'].map(f => (
+                        {['ALL', 'PUBLISHED', 'PENDING', 'DRAFT', 'REJECTED', 'ARCHIVED'].map(f => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
@@ -304,42 +361,73 @@ export default function AdminCourses() {
                                         {statusBadge(course.status)}
                                     </div>
 
-                                    {/* Approve/Reject for PENDING */}
+                                    {/* Approve/Reject for PENDING — gated by course.approve */}
                                     {course.status === 'PENDING' && (
                                         <div className="flex flex-col gap-2 w-full mt-1">
-                                            <button
-                                                onClick={() => handleApprove(course.id)}
-                                                disabled={courseLimitReached}
-                                                title={courseLimitReached ? 'Course limit reached — ask a Super Admin to raise it' : undefined}
-                                                className={`${courseLimitReached ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-[12px] py-2 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm`}
-                                            >
-                                                {courseLimitReached ? <Lock size={14} /> : <CheckCircle size={14} />} Approve
-                                            </button>
-                                            <button onClick={() => handleReject(course.id)} className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm">
-                                                <XCircle size={14} /> Reject
-                                            </button>
+                                            {can('course.approve') && (
+                                                <button
+                                                    onClick={() => handleApprove(course.id)}
+                                                    disabled={courseLimitReached}
+                                                    title={courseLimitReached ? 'Course limit reached: you can\'t approve more courses until a Super Admin raises the limit' : undefined}
+                                                    className={`${courseLimitReached ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-[12px] py-2 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm`}
+                                                >
+                                                    {courseLimitReached ? <Lock size={14} /> : <CheckCircle size={14} />} Approve
+                                                </button>
+                                            )}
+                                            {can('course.approve') && (
+                                                <button onClick={() => setRejectTarget(course)} className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm">
+                                                    <XCircle size={14} /> Reject
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
-                                    {/* Edit/Delete/Draft for ALL statuses */}
+                                    {/* Edit/Delete/Draft for ALL statuses — gated by course.update / course.delete */}
                                     <div className="flex flex-col gap-2 w-full mt-1">
+                                        {can('course.update') && (
+                                            <button
+                                                onClick={() => openEdit(course)}
+                                                className="bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
+                                            >
+                                                <Edit2 size={13} /> Edit
+                                            </button>
+                                        )}
+
+                                        {can('course.update') && (
+                                            <button
+                                                onClick={() => openAssignInstructor(course)}
+                                                className="bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
+                                            >
+                                                <UserPlus size={13} /> Assign Instructor
+                                            </button>
+                                        )}
+
                                         <button
-                                            onClick={() => openEdit(course)}
-                                            className="bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
+                                            onClick={() => openEnrolledStudents(course)}
+                                            className="bg-cyan-50 text-cyan-600 border border-cyan-200 hover:bg-cyan-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
                                         >
-                                            <Edit2 size={13} /> Edit
+                                            <Users size={13} /> Students
                                         </button>
 
-                                        {(course.status === 'PUBLISHED' || course.status === 'REJECTED') && (
+                                        {course.status === 'PUBLISHED' && can('course.approve') && (
                                             <button
-                                                onClick={() => handleMoveToDraft(course.id)}
+                                                onClick={() => handleUnpublish(course.id, course.title)}
+                                                className="bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
+                                            >
+                                                <FileText size={13} /> Unpublish
+                                            </button>
+                                        )}
+
+                                        {(course.status === 'REJECTED' || course.status === 'PENDING') && can('course.update') && (
+                                            <button
+                                                onClick={() => setRejectTarget(course)}
                                                 className="bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
                                             >
                                                 <FileText size={13} /> Move to Draft
                                             </button>
                                         )}
 
-                                        {course.status === 'DRAFT' && (
+                                        {course.status === 'DRAFT' && can('course.approve') && (
                                             <button
                                                 onClick={() => handleApprove(course.id)}
                                                 className="bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
@@ -348,12 +436,14 @@ export default function AdminCourses() {
                                             </button>
                                         )}
 
-                                        <button
-                                            onClick={() => handleDelete(course.id, course.title)}
-                                            className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
-                                        >
-                                            <Trash2 size={13} /> Delete
-                                        </button>
+                                        {can('course.delete') && (
+                                            <button
+                                                onClick={() => handleDelete(course.id, course.title)}
+                                                className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-[12px] py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-bold transition-colors shadow-sm"
+                                            >
+                                                <Trash2 size={13} /> Delete
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -361,6 +451,105 @@ export default function AdminCourses() {
                     </div>
                 )}
             </div>
+
+            {/* Assign Instructor Modal */}
+            {assignCourse && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-lg border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <UserPlus size={20} className="text-indigo-600" /> Assign Instructor
+                            </h3>
+                            <button onClick={() => setAssignCourse(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-sm font-semibold text-muted-foreground mb-4">
+                                <span className="font-black text-foreground">{assignCourse.title}</span> — current instructor:{' '}
+                                {assignCourse.instructorName || 'None'}
+                            </p>
+                            <label className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-1 block">Instructor</label>
+                            <select
+                                value={assigningId ?? ''}
+                                onChange={e => setAssigningId(e.target.value || null)}
+                                className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium mb-5"
+                            >
+                                <option value="">— No instructor (unassigned) —</option>
+                                {instructorOptions.map(inst => (
+                                    <option key={inst.id} value={inst.id}>
+                                        {inst.name} · {inst.email}{inst.designation ? ` · ${inst.designation}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setAssignCourse(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleAssignInstructor(assigningId)}
+                                    disabled={assigningId === null && !assignCourse.instructorId}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all"
+                                >
+                                    {assigningId === null && !assignCourse.instructorId ? 'Unassigned Already' : assigningId === null ? 'Remove Instructor' : 'Assign Instructor'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View Enrolled Students Modal */}
+            {enrolledCourse && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-2xl border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <Users size={20} className="text-indigo-600" /> Enrolled Students
+                            </h3>
+                            <button onClick={() => setEnrolledCourse(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            <p className="text-sm font-semibold text-muted-foreground mb-4">
+                                <span className="font-black text-foreground">{enrolledCourse.title}</span> — {enrolledStudents.length} student{enrolledStudents.length === 1 ? '' : 's'} enrolled
+                            </p>
+                            {studentsLoading ? (
+                                <LoadingContainer height="h-48" />
+                            ) : enrolledStudents.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground font-medium">No students enrolled in this course yet.</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {enrolledStudents.map(s => (
+                                        <div key={s.id} className="flex items-center gap-3 bg-muted/40 border border-border rounded-xl p-3">
+                                            <img
+                                                src={s.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&background=6366f1&color=fff`}
+                                                alt={s.name}
+                                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-foreground truncate">{s.name}</p>
+                                                <p className="text-[11px] font-semibold text-muted-foreground truncate">{s.email}{s.rollNo ? ` · ${s.rollNo}` : ''}</p>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <span className={`text-[11px] font-bold px-2 py-1 rounded-lg ${s.active ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                    {s.active ? 'Active' : 'Suspended'}
+                                                </span>
+                                                <p className="text-[10px] font-bold text-muted-foreground mt-1">{s.progress || 0}% complete</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Course Modal */}
             {editingCourse && (
@@ -436,6 +625,15 @@ export default function AdminCourses() {
                     </div>
                 </div>
             )}
+
+            {/* ── Reject / Move-to-Draft Modal ─────────────────────────── */}
+            <RejectCourseModal
+                course={rejectTarget}
+                open={!!rejectTarget}
+                onClose={() => setRejectTarget(null)}
+                onReject={handleReject}
+                onMoveToDraft={handleMoveToDraft}
+            />
         </div>
     );
 }

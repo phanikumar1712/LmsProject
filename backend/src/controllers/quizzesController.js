@@ -2,6 +2,8 @@ const { query, getClient } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapQuizAttempt } = require('../utils/formatters');
 const { validateQuizPayload, serializeQuiz, answersMatch, drawQuestions } = require('../utils/quiz');
+const { assertCourseEditable } = require('../utils/courseAuth');
+const { getDepartmentScope } = require('../utils/scope');
 
 const MAX_ATTEMPTS_PER_DAY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -10,6 +12,29 @@ const isAdmin = (user) => ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
 const requireUuid = (value, field = 'id') => {
     if (!UUID_PATTERN.test(String(value || ''))) throw createError(`Invalid ${field}`, 400);
     return value;
+};
+
+// Department-scoped admins may only view/act on users in their own department
+// (mirrors usersController.assertUserInScope). Unscoped callers pass through.
+const assertUserInDepartmentScope = async (req, userId) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (!scoped) return;
+    const r = await query('SELECT department_id FROM users WHERE id = $1', [userId]);
+    if (!r.rows.length) throw createError('User not found', 404);
+    if (r.rows[0].department_id !== departmentId) {
+        throw createError('This user is outside your department', 403);
+    }
+};
+
+// Quiz management/analytics gate: only the course's instructor, a department-
+// scoped admin of the course's department, or a SUPER_ADMIN may access quiz
+// analytics/management endpoints. Students never pass (assertCourseEditable
+// alone would let them through — it only blocks wrong instructors/admins).
+const assertQuizEditor = async (req, courseId) => {
+    if (req.user.role !== 'INSTRUCTOR' && !isAdmin(req.user)) {
+        throw createError('Forbidden', 403);
+    }
+    await assertCourseEditable(req, courseId);
 };
 
 const loadCourse = async (courseId) => {
@@ -35,7 +60,13 @@ const loadQuiz = async (id) => {
 };
 
 const assertCourseAccess = async (course, user) => {
-    if (isAdmin(user)) return 'EDITOR';
+    if (isAdmin(user)) {
+        // Department isolation: a scoped ADMIN may only access quizzes of
+        // courses in their own department — the same gate used for editing
+        // courses (assertCourseEditable). SUPER_ADMIN / unscoped admins pass.
+        await assertCourseEditable({ user }, course.id);
+        return 'EDITOR';
+    }
     if (user.role === 'INSTRUCTOR') {
         if (course.instructor_id !== user.id) throw createError('Not your course', 403);
         return 'EDITOR';
@@ -47,13 +78,12 @@ const assertCourseAccess = async (course, user) => {
     const courseId = course.course_id || course.id;
 
     // Department isolation: a student may only access assessments of courses
-    // whose department matches their own (course → category → department).
+    // whose department matches their own (courses.department_id).
     if (user.department_id) {
         const deptRes = await query(
-            `SELECT cat.department_id AS "departmentId"
-             FROM courses c
-             LEFT JOIN categories cat ON c.category_id = cat.id
-             WHERE c.id = $1`,
+            `SELECT department_id AS "departmentId"
+             FROM courses
+             WHERE id = $1`,
             [courseId]
         );
         const courseDeptId = deptRes.rows[0]?.departmentId || null;
@@ -112,11 +142,12 @@ const createQuiz = async (req, res) => {
 
     const values = [courseId, lessonId, payload.title, payload.description, payload.passingScore,
         payload.timeLimit, payload.maxAttempts, JSON.stringify(payload.questions),
-        payload.selectionConfig ? JSON.stringify(payload.selectionConfig) : null];
+        payload.selectionConfig ? JSON.stringify(payload.selectionConfig) : null,
+        payload.negativeMarking, payload.startDate, payload.endDate, payload.examKind];
     const result = lessonId
         ? await query(`
-            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, max_attempts, questions, selection_config)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, max_attempts, questions, selection_config, negative_marking, start_date, end_date, exam_kind)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
             ON CONFLICT (lesson_id) DO UPDATE SET
                 title = EXCLUDED.title,
                 description = EXCLUDED.description,
@@ -124,13 +155,17 @@ const createQuiz = async (req, res) => {
                 time_limit = EXCLUDED.time_limit,
                 max_attempts = EXCLUDED.max_attempts,
                 questions = EXCLUDED.questions,
-                selection_config = EXCLUDED.selection_config
+                selection_config = EXCLUDED.selection_config,
+                negative_marking = EXCLUDED.negative_marking,
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
+                exam_kind = EXCLUDED.exam_kind
             WHERE quizzes.course_id = EXCLUDED.course_id
             RETURNING *, xmax
         `, values)
         : await query(`
-            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, max_attempts, questions, selection_config)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *, xmax
+            INSERT INTO quizzes (course_id, lesson_id, title, description, passing_score, time_limit, max_attempts, questions, selection_config, negative_marking, start_date, end_date, exam_kind)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *, xmax
         `, values);
 
     if (!result.rows.length) throw createError('Quiz course mismatch', 409);
@@ -161,6 +196,7 @@ const createQuiz = async (req, res) => {
 const getInstructorQuizzes = async (req, res) => {
     const instructorId = requireUuid(req.params.instructorId, 'instructorId');
     if (req.user.role === 'INSTRUCTOR' && instructorId !== req.user.id) throw createError('Forbidden', 403);
+    if (req.user.role === 'ADMIN') await assertUserInDepartmentScope(req, instructorId);
 
     const result = await query(`
         SELECT q.id, q.title, q.description, q.passing_score, q.time_limit, q.max_attempts, q.created_at,
@@ -200,11 +236,7 @@ const getInstructorQuizzes = async (req, res) => {
 // Instructors see every student's best attempt, ordered by score then time.
 const getQuizPerformance = async (req, res) => {
     const quiz = await loadQuiz(req.params.id);
-    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [quiz.course_id]);
-    if (!course.rows.length) throw createError('Course not found', 404);
-    if (!isAdmin(req.user) && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Forbidden', 403);
-    }
+    await assertQuizEditor(req, quiz.course_id);
 
     const [summary, attempts] = await Promise.all([
         query(`
@@ -315,9 +347,11 @@ const getQuizPerformance = async (req, res) => {
 const getAvailableExams = async (req, res) => {
     if (req.user.role !== 'STUDENT' && !isAdmin(req.user)) throw createError('Forbidden', 403);
     const studentId = req.user.role === 'STUDENT' ? req.user.id : (req.query.studentId || req.user.id);
+    if (req.user.role === 'ADMIN') await assertUserInDepartmentScope(req, studentId);
 
     const result = await query(`
-        SELECT q.id, q.title, q.description, q.passing_score, q.time_limit, q.max_attempts, q.created_at,
+        SELECT q.id, q.title, q.description, q.passing_score, q.time_limit, q.max_attempts,
+               q.negative_marking, q.start_date, q.end_date, q.created_at,
                c.id AS course_id, c.title AS course_title, c.thumbnail AS course_thumbnail,
                jsonb_array_length(q.questions)::int AS question_count,
                (SELECT COUNT(*)::int FROM quiz_attempts qa
@@ -327,12 +361,11 @@ const getAvailableExams = async (req, res) => {
         FROM quizzes q
         JOIN courses c ON c.id = q.course_id
         JOIN enrollments e ON e.course_id = c.id AND e.student_id = $1
-        LEFT JOIN categories cat ON c.category_id = cat.id
         WHERE c.status = 'PUBLISHED'
         -- Department isolation: students only see exams from their own
-        -- department's courses (course → category → department). Courses with
-        -- no category (no department) remain visible to everyone.
-        ${req.user.department_id ? `AND (cat.department_id IS NULL OR cat.department_id = $2)` : ''}
+        -- department's courses (courses.department_id, kept in sync with the
+        -- category). Courses with no department remain visible to everyone.
+        ${req.user.department_id ? `AND (c.department_id IS NULL OR c.department_id = $2)` : ''}
         ORDER BY q.created_at DESC
     `, req.user.department_id ? [studentId, req.user.department_id] : [studentId]);
 
@@ -343,6 +376,9 @@ const getAvailableExams = async (req, res) => {
         passingScore: r.passing_score,
         timeLimit: r.time_limit,
         maxAttempts: r.max_attempts ?? 0,
+        negativeMarking: Number(r.negative_marking ?? 0),
+        startDate: r.start_date ? new Date(r.start_date).toISOString() : null,
+        endDate: r.end_date ? new Date(r.end_date).toISOString() : null,
         attemptsUsed: r.attempts_used ?? 0,
         attemptsLeft: r.max_attempts > 0 ? Math.max(0, r.max_attempts - (r.attempts_used ?? 0)) : null,
         createdAt: r.created_at,
@@ -359,6 +395,15 @@ const getAvailableExams = async (req, res) => {
 const startAttempt = async (req, res) => {
     const quiz = await loadQuiz(req.params.id);
     await assertCourseAccess({ ...quiz, id: quiz.course_id }, req.user);
+
+    // Availability window (start_date / end_date) — hard gate on starting.
+    const now = Date.now();
+    if (quiz.start_date && now < new Date(quiz.start_date).getTime()) {
+        throw createError('This assessment is not available yet', 403);
+    }
+    if (quiz.end_date && now > new Date(quiz.end_date).getTime()) {
+        throw createError('This assessment has closed', 403);
+    }
 
     // Reconstruct the exact question set pinned to a session (order preserved)
     const questionsForIds = (ids) => {
@@ -509,7 +554,15 @@ const submitAttempt = async (req, res) => {
             if (correct) correctCount++;
             return { questionId: question.id, correct };
         });
-        const score = attemptQuestions.length ? Math.round((correctCount / attemptQuestions.length) * 100) : 0;
+        // Score with optional negative marking: each wrong answer costs a fraction
+        // of one question's marks (0 = none, 1 = full question marks). Floor at 0.
+        const negativeMarking = Number(quiz.negative_marking ?? 0);
+        const perQuestion = attemptQuestions.length ? 100 / attemptQuestions.length : 0;
+        let score = correctCount * perQuestion;
+        if (negativeMarking > 0) {
+            score -= (attemptQuestions.length - correctCount) * perQuestion * negativeMarking;
+        }
+        score = Math.max(0, Math.round(score));
         const passed = score >= quiz.passing_score;
         const elapsedSeconds = Math.max(0, Math.round(
             (Date.now() - new Date(session.rows[0].started_at).getTime()) / 1000
@@ -544,6 +597,7 @@ const submitAttempt = async (req, res) => {
 const getAttempts = async (req, res) => {
     const studentId = requireUuid(req.params.studentId, 'studentId');
     if (req.user.role === 'STUDENT' && studentId !== req.user.id) throw createError('Forbidden', 403);
+    if (req.user.role === 'ADMIN') await assertUserInDepartmentScope(req, studentId);
 
     const values = [studentId];
     let ownershipFilter = '';
@@ -571,11 +625,7 @@ const getAttempts = async (req, res) => {
 // student's attempts on one assessment (instructor/admin only).
 const getStudentAttemptDetails = async (req, res) => {
     const quiz = await loadQuiz(req.params.id);
-    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [quiz.course_id]);
-    if (!course.rows.length) throw createError('Course not found', 404);
-    if (!isAdmin(req.user) && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Forbidden', 403);
-    }
+    await assertQuizEditor(req, quiz.course_id);
     const studentId = requireUuid(req.params.studentId, 'studentId');
 
     const [student, attempts] = await Promise.all([
@@ -642,11 +692,7 @@ const getStudentAttemptDetails = async (req, res) => {
 //   - otherwise → remind all enrolled students of the quiz's course
 const remindStudents = async (req, res) => {
     const quiz = await loadQuiz(req.params.id);
-    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [quiz.course_id]);
-    if (!course.rows.length) throw createError('Course not found', 404);
-    if (!isAdmin(req.user) && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Forbidden', 403);
-    }
+    await assertQuizEditor(req, quiz.course_id);
 
     const { studentId, message } = req.body || {};
     if (studentId) requireUuid(studentId, 'studentId');
@@ -672,10 +718,13 @@ const remindStudents = async (req, res) => {
         targetIds = enrolled.rows.map(r => r.id);
     }
 
-    for (const id of targetIds) {
+    // Batch-insert reminders in a single statement (was N+1 for large cohorts).
+    if (targetIds.length) {
         await query(
-            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, 'quiz', $3)`,
-            [id, custom, link]
+            `INSERT INTO notifications (user_id, message, type, link)
+             SELECT t.id, $1, 'quiz', $2
+             FROM unnest($3::uuid[]) AS t(id)`,
+            [custom, link, targetIds]
         ).catch(() => { });
     }
 

@@ -2,6 +2,7 @@ require('dotenv').config();
 const { pool } = require('./pool');
 
 const createTables = async () => {
+    const isProduction = process.env.NODE_ENV === 'production';
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -22,6 +23,14 @@ const createTables = async () => {
                 CREATE TYPE lesson_type AS ENUM ('video', 'document', 'quiz', 'text');
             EXCEPTION WHEN duplicate_object THEN null; END $$;
         `);
+        // Extend lesson_type with the richer content types from the course-builder
+        // spec (idempotent; PG12+ allows ADD VALUE IF NOT EXISTS). Kept on separate
+        // statements so a failure in one never blocks the others.
+        await client.query(`ALTER TYPE lesson_type ADD VALUE IF NOT EXISTS 'audio'`);
+        await client.query(`ALTER TYPE lesson_type ADD VALUE IF NOT EXISTS 'pdf'`);
+        await client.query(`ALTER TYPE lesson_type ADD VALUE IF NOT EXISTS 'external'`);
+        await client.query(`ALTER TYPE lesson_type ADD VALUE IF NOT EXISTS 'coding'`);
+        await client.query(`ALTER TYPE lesson_type ADD VALUE IF NOT EXISTS 'assignment'`);
 
         // ── USERS ──────────────────────────────────────────────────────────────
         await client.query(`
@@ -368,6 +377,36 @@ const createTables = async () => {
             ALTER TABLE quizzes
             ADD COLUMN IF NOT EXISTS max_attempts INT NOT NULL DEFAULT 0;
         `);
+        // Negative marking: fraction of one question's marks deducted per wrong
+        // answer (0 = none, 1 = full question marks). Applied at submit time.
+        await client.query(`
+            ALTER TABLE quizzes
+            ADD COLUMN IF NOT EXISTS negative_marking NUMERIC NOT NULL DEFAULT 0;
+        `);
+        // Availability window: the assessment can only be started inside
+        // [start_date, end_date]. NULL means always available.
+        await client.query(`
+            ALTER TABLE quizzes
+            ADD COLUMN IF NOT EXISTS start_date TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ;
+        `);
+        // Assessment type: NULL/'quiz' = regular quiz, 'mid' = mid exam,
+        // 'final' = final exam. Drives the student Grades page breakdown
+        // (assignments 20%, quizzes 20%, mid 20%, final 40%).
+        await client.query(`
+            ALTER TABLE quizzes
+            ADD COLUMN IF NOT EXISTS exam_kind VARCHAR(10) DEFAULT NULL;
+        `);
+        // Assignments: instructors may allow students to resubmit after grading
+        // (and send a submission back for revision → resubmission_requested).
+        await client.query(`
+            ALTER TABLE assignments
+            ADD COLUMN IF NOT EXISTS allow_resubmit BOOLEAN NOT NULL DEFAULT false;
+        `);
+        await client.query(`
+            ALTER TABLE submissions
+            ADD COLUMN IF NOT EXISTS resubmission_requested BOOLEAN NOT NULL DEFAULT false;
+        `);
         await client.query(`
             ALTER TABLE quiz_attempt_sessions
             ADD COLUMN IF NOT EXISTS question_ids TEXT[] DEFAULT NULL;
@@ -402,6 +441,110 @@ const createTables = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_categories_department ON categories(department_id); `);
+
+        // -- COURSES.DEPARTMENT_ID: direct denormalized department column so course
+        // rows can be filtered with a plain `WHERE department_id = $1` (the README's
+        // department-isolation model) instead of joining through categories. It is
+        // backfilled from the course's category, falling back to the instructor's
+        // department for uncategorized courses — the same COALESCE the scoping
+        // queries derive, so the column always matches them.
+        await client.query(`
+            ALTER TABLE courses
+            ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL;
+        `);
+        await client.query(`
+            UPDATE courses c
+            SET department_id = sub.department_id
+            FROM (
+                SELECT c2.id,
+                       COALESCE(cat.department_id, u.department_id) AS department_id
+                FROM courses c2
+                LEFT JOIN categories cat ON c2.category_id = cat.id
+                LEFT JOIN users u ON u.id = c2.instructor_id
+            ) sub
+            WHERE sub.id = c.id
+              AND c.department_id IS DISTINCT FROM sub.department_id;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_department ON courses(department_id); `);
+
+        // Triggers keep courses.department_id in sync with its source of truth:
+        //   1. On course INSERT or category/instructor change → re-derive from the
+        //      new category (falling back to the instructor's department). Also
+        //      covers FK cascade SET NULL (category deleted → uncategorized) and
+        //      the bulk course import.
+        //   2. On a category's department change → push the new department to
+        //      every course in that category.
+        //   3. On an instructor's department change → re-derive their
+        //      uncategorized courses (so the stored column never goes stale).
+        await client.query(`
+            CREATE OR REPLACE FUNCTION sync_course_department()
+            RETURNS TRIGGER AS $$
+            DECLARE
+                new_dept UUID;
+            BEGIN
+                -- Start from the instructor (always present) and LEFT JOIN the
+                -- category so an uncategorized course (category_id NULL) still
+                -- resolves to the instructor's department.
+                SELECT COALESCE(cat.department_id, u.department_id)
+                INTO new_dept
+                FROM users u
+                LEFT JOIN categories cat ON cat.id = NEW.category_id
+                WHERE u.id = NEW.instructor_id;
+                NEW.department_id := new_dept;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await client.query(`
+            DROP TRIGGER IF EXISTS trg_courses_sync_department ON courses;
+        `);
+        await client.query(`
+            CREATE TRIGGER trg_courses_sync_department
+            BEFORE INSERT OR UPDATE OF category_id, instructor_id ON courses
+            FOR EACH ROW EXECUTE FUNCTION sync_course_department();
+        `);
+        await client.query(`
+            CREATE OR REPLACE FUNCTION sync_courses_on_category_department()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF NEW.department_id IS DISTINCT FROM OLD.department_id THEN
+                    UPDATE courses SET department_id = NEW.department_id
+                    WHERE category_id = NEW.id
+                      AND department_id IS DISTINCT FROM NEW.department_id;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await client.query(`
+            DROP TRIGGER IF EXISTS trg_categories_sync_courses ON categories;
+        `);
+        await client.query(`
+            CREATE TRIGGER trg_categories_sync_courses
+            AFTER UPDATE OF department_id ON categories
+            FOR EACH ROW EXECUTE FUNCTION sync_courses_on_category_department();
+        `);
+        await client.query(`
+            CREATE OR REPLACE FUNCTION sync_course_department_on_instructor()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF NEW.department_id IS DISTINCT FROM OLD.department_id THEN
+                    UPDATE courses SET department_id = NEW.department_id
+                    WHERE instructor_id = NEW.id AND category_id IS NULL
+                      AND department_id IS DISTINCT FROM NEW.department_id;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await client.query(`
+            DROP TRIGGER IF EXISTS trg_users_sync_courses_dept ON users;
+        `);
+        await client.query(`
+            CREATE TRIGGER trg_users_sync_courses_dept
+            AFTER UPDATE OF department_id ON users
+            FOR EACH ROW EXECUTE FUNCTION sync_course_department_on_instructor();
+        `);
 
         // -- ADMIN QUOTAS: per-admin override on how many students/courses their
         // department may hold. NULL => inherit the global default from platform_settings.
@@ -627,6 +770,7 @@ const createTables = async () => {
                 student_name    VARCHAR(255) NOT NULL,
                 course_title    VARCHAR(255) NOT NULL,
                 instructor_name VARCHAR(255) NOT NULL,
+                department_name VARCHAR(255) NOT NULL DEFAULT '',
                 issue_date      DATE NOT NULL DEFAULT CURRENT_DATE,
                 created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE(student_id, course_id)
@@ -634,6 +778,7 @@ const createTables = async () => {
         `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_certificates_student ON certificates(student_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_certificates_cert_id ON certificates(cert_id); `);
+        await client.query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS department_name VARCHAR(255) NOT NULL DEFAULT '';`);
 
 
         // -- COURSE SCHEDULING: start/end dates and multi-step review level --
@@ -702,6 +847,46 @@ const createTables = async () => {
             ADD COLUMN IF NOT EXISTS max_courses  INT;
         `);
 
+        // ── DEPARTMENT MANAGEMENT FIELDS: code, contact info, HOD, status ───────
+        // Code is a short unique identifier (e.g. CSE); NULL allowed so existing
+        // rows don't force a value. `active` drives the Activate/Deactivate toggle
+        // in the Super Admin department manager.
+        await client.query(`
+            ALTER TABLE departments
+            ADD COLUMN IF NOT EXISTS code VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '',
+            ADD COLUMN IF NOT EXISTS hod VARCHAR(255) DEFAULT '',
+            ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255) DEFAULT '',
+            ADD COLUMN IF NOT EXISTS contact_number VARCHAR(30) DEFAULT '',
+            ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+        `);
+        await client.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_code
+            ON departments(code) WHERE code IS NOT NULL;
+        `);
+        // Backfill: existing departments (CSE, ECE, ...) get their name as the code
+        // so the new column is never empty on pre-existing data. Names that differ
+        // only by case ('cse' vs 'CSE') would otherwise collide on the unique index,
+        // so later duplicates get a numeric suffix ('CSE-1').
+        await client.query(`
+            UPDATE departments d
+            SET code = sub.code
+            FROM (
+                SELECT id,
+                       UPPER(TRIM(name)) ||
+                         CASE WHEN rn > 1 THEN '-' || (rn - 1)::text ELSE '' END AS code
+                FROM (
+                    SELECT id, name,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY UPPER(TRIM(name)) ORDER BY created_at, id
+                           ) AS rn
+                    FROM departments
+                    WHERE code IS NULL OR code = ''
+                ) t
+            ) sub
+            WHERE d.id = sub.id;
+        `);
+
         // ── LIVE SESSIONS & ATTENDANCE ────────────────────────────────────────
         await client.query(`
             DO $$ BEGIN
@@ -740,6 +925,38 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(session_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id); `);
 
+        // ── STUDENT NOTES & BOOKMARKS ─────────────────────────────────────────
+        // Personal study notes students attach to lessons of an enrolled course,
+        // and lesson bookmarks (one per student+lesson). Both are private to the
+        // student who created them.
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS course_notes (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                lesson_id   UUID REFERENCES lessons(id) ON DELETE SET NULL,
+                content     TEXT NOT NULL DEFAULT '',
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_course_notes_user ON course_notes(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_course_notes_course ON course_notes(course_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_course_notes_lesson ON course_notes(lesson_id); `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS lesson_bookmarks (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                lesson_id   UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(user_id, lesson_id)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_lesson_bookmarks_user ON lesson_bookmarks(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_lesson_bookmarks_course ON lesson_bookmarks(course_id); `);
+
         // -- ROLL NO: unique student identifier per department --
         await client.query(`
             ALTER TABLE users
@@ -759,6 +976,124 @@ const createTables = async () => {
             CREATE UNIQUE INDEX IF NOT EXISTS idx_users_roll_no_dept
             ON users(roll_no, COALESCE(department_id, '00000000-0000-0000-0000-000000000000'))
             WHERE role = 'STUDENT' AND roll_no IS NOT NULL;
+        `);
+
+        // -- USERNAME: optional public identifier (e.g. "jsmith"). Nullable, and
+        // unique case-insensitively when present (stored lowercased by callers).
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS username VARCHAR(60);
+        `);
+        await client.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower
+            ON users(LOWER(username)) WHERE username IS NOT NULL;
+        `);
+
+        // -- LAST LOGIN: updated on every successful login (NULL until first login).
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
+        `);
+
+        // -- INSTRUCTOR PROFILE: academic details used by instructor management.
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS designation VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS qualification VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS specialization VARCHAR(255);
+        `);
+
+        //        -- COURSE INSTRUCTOR may be null: an admin can remove a course from an
+        // instructor via drag-and-drop (it becomes "unassigned" until reassigned).
+        // Display queries LEFT JOIN users so unassigned courses stay visible.
+        await client.query(`
+            ALTER TABLE courses ALTER COLUMN instructor_id DROP NOT NULL;
+        `);
+
+        // -- COURSE SEMESTER: academic term bucket used by the drag-and-drop
+        // course → semester assignment page. Nullable; only informational.
+        // NOTE: kept as a legacy single-value column for compatibility; the
+        // drag pages now use the many-to-many course_semesters / course_years
+        // tables below so one course can be copied into several buckets.
+        await client.query(`
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS semester INT;
+        `);
+
+        // -- COURSE SEMESTERS / COURSE YEARS: many-to-many assignments so a
+        // course can be copied into MULTIPLE semester and year buckets at once
+        // (used by the drag-and-drop assign pages). Backfill semester from the
+        // legacy courses.semester column so existing data survives.
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS course_semesters (
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                semester    INT  NOT NULL CHECK (semester > 0),
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (course_id, semester)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_course_semesters_semester ON course_semesters(semester); `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS course_years (
+                course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                year        INT  NOT NULL CHECK (year > 0),
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (course_id, year)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_course_years_year ON course_years(year); `);
+        await client.query(`
+            INSERT INTO course_semesters (course_id, semester)
+            SELECT id, semester FROM courses WHERE semester IS NOT NULL
+            ON CONFLICT (course_id, semester) DO NOTHING;
+        `);
+
+        // -- STUDENT COHORT: academic grouping used by department-admin student
+        // management and the department dashboard charts. Nullable — only set
+        // for STUDENT accounts (or set manually for others, harmless).
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS year INT,
+            ADD COLUMN IF NOT EXISTS semester INT,
+            ADD COLUMN IF NOT EXISTS section VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS batch VARCHAR(30);
+        `);
+
+        // ── GRANULAR PERMISSIONS ──────────────────────────────────────────────
+        // Per-user permission overrides on top of the role matrix (see
+        // src/utils/permissions.js). A SUPER_ADMIN can grant/revoke individual
+        // permissions for a specific user — e.g. explicitly granting an
+        // instructor grade.update. `granted` false = revoke from the role's
+        // default set; true = grant beyond it. Overrides never apply to
+        // SUPER_ADMIN (that role implicitly holds every permission).
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS user_permissions (
+                user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                permission  VARCHAR(100) NOT NULL,
+                granted     BOOLEAN NOT NULL DEFAULT true,
+                granted_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (user_id, permission)
+            );
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions(user_id); `);
+
+        // ── AUDIT LOG ENRICHMENT: old/new values + device fingerprint ─────────
+        // old_value / new_value capture the before/after state of the mutated
+        // record (e.g. { active: true } → { active: false }), and device stores
+        // the parsed User-Agent { browser, os, device }. Existing rows keep NULL.
+        await client.query(`
+            ALTER TABLE audit_logs
+            ADD COLUMN IF NOT EXISTS old_value JSONB,
+            ADD COLUMN IF NOT EXISTS new_value JSONB,
+            ADD COLUMN IF NOT EXISTS device JSONB;
+        `);
+
+        // ── FORCE PASSWORD CHANGE ─────────────────────────────────────────────
+        // Set when a Super Admin force-resets a password; the user must change
+        // their password at next login before continuing.
+        await client.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
         `);
 
         // ── SEED DEFAULT CATEGORIES ───────────────────────────────────────────
@@ -801,10 +1136,13 @@ const createTables = async () => {
             }
         }
         // Assign the demo admin to CSE so department isolation is testable out of the box.
-        await client.query(`
-            UPDATE users SET department_id = (SELECT id FROM departments WHERE name = 'CSE')
-            WHERE email = 'admin@demo.com' AND department_id IS NULL;
-        `);
+        // Demo-only — never touched in production.
+        if (!isProduction) {
+            await client.query(`
+                UPDATE users SET department_id = (SELECT id FROM departments WHERE name = 'CSE')
+                WHERE email = 'admin@demo.com' AND department_id IS NULL;
+            `);
+        }
 
         // ── SEED DEFAULT SETTINGS ─────────────────────────────────────────────
         const defaultSettings = {
@@ -823,6 +1161,22 @@ const createTables = async () => {
             jwtExpiryDays: 1,
             maxLoginAttempts: 5,
             twoFactorRequired: false,
+            accountLockoutEnabled: true,
+            accountLockoutAttempts: 5,
+            passwordMinLength: 8,
+            passwordComplexityRequired: false,
+            sessionTimeoutMinutes: 60,
+            collegeName: 'EduNexus College',
+            collegeLogo: '',
+            collegeAddress: '',
+            collegeContactEmail: '',
+            collegeContactNumber: '',
+            collegeWebsite: '',
+            enrollmentApprovalRequired: false,
+            certificateEnabled: true,
+            studentSelfEnrollment: true,
+            instructorCourseCreation: true,
+            maxCourseCapacity: 0,
             newEnrollmentNotif: true,
             newReviewNotif: true,
             weeklyReportEmail: true,
@@ -835,12 +1189,12 @@ const createTables = async () => {
             ON CONFLICT(key) DO NOTHING;
         `, [JSON.stringify(defaultSettings)]);
 
-        // Idempotent backfill: ensure the two admin-quota defaults exist on the
+        // Idempotent backfill: ensure the new settings keys exist on the
         // already-seeded 'global' row without clobbering other settings. jsonb `||`
         // puts existing keys last so we never overwrite an admin-tuned value.
         await client.query(`
             UPDATE platform_settings
-            SET value = '{"defaultMaxStudentsPerAdmin":500,"defaultMaxCoursesPerAdmin":100}'::jsonb || value
+            SET value = '{"defaultMaxStudentsPerAdmin":500,"defaultMaxCoursesPerAdmin":100,"accountLockoutEnabled":true,"accountLockoutAttempts":5,"passwordMinLength":8,"passwordComplexityRequired":false,"sessionTimeoutMinutes":60,"collegeName":"EduNexus College","collegeLogo":"","collegeAddress":"","collegeContactEmail":"","collegeContactNumber":"","collegeWebsite":"","enrollmentApprovalRequired":false,"certificateEnabled":true,"studentSelfEnrollment":true,"instructorCourseCreation":true,"maxCourseCapacity":0}'::jsonb || value
             WHERE key = 'global';
         `);
 
@@ -851,6 +1205,16 @@ const createTables = async () => {
         const { seedSuperAdmin } = require('./seedSuperAdmin');
         await seedSuperAdmin(client);
 
+        // ── DEMO DATA: cleanup + user seeding (dev/test only) ────────────────
+        // Demo accounts and their cleanup are intentionally skipped in production:
+        // real deployments must provision real users via the admin UI instead of
+        // shipping known demo passwords. The DELETE below would also be a
+        // data-loss hazard in production — it removes ANY department-less
+        // STUDENT/INSTRUCTOR on every migration run.
+        // Declared at function scope so the post-commit demo-account summary
+        // (printed after COMMIT) can read it — it's populated in the seed block.
+        const deptUsers = {};
+        if (!isProduction) {
         // ── CLEANUP: Remove dummy / departmentless users ──────────────────────
         // Delete any existing STUDENT or INSTRUCTOR that has no department_id.
         // These are legacy seeded rows (student@demo.com, instructor@demo.com)
@@ -876,7 +1240,7 @@ const createTables = async () => {
         const bcrypt = require('bcryptjs');
         const demoPass = await bcrypt.hash('demo123', 12);
 
-        const deptUsers = {
+        Object.assign(deptUsers, {
             CSE: {
                 admin:   { name: 'CSE Admin',       email: 'cse.admin@demo.com' },
                 instructor: { name: 'Dr. Arjun Patel', email: 'cse.instructor@demo.com' },
@@ -914,7 +1278,7 @@ const createTables = async () => {
                     { name: 'Anjali Mehta', email: 'civil.student1@demo.com', rollNo: 'CE22001' },
                 ],
             },
-        };
+        });
 
         for (const [deptName, users] of Object.entries(deptUsers)) {
             // Fetch the department ID (seeded already above)
@@ -951,38 +1315,52 @@ const createTables = async () => {
                 );
             }
         }
+        } // end if (!isProduction) — demo user seeding
+
+        // ── PRODUCTION CLEANUP: purge pre-existing demo accounts ─────────────
+        // A database migrated BEFORE this security fix may still contain the
+        // hardcoded demo accounts (all *@demo.com users with password 'demo123').
+        // In production those known credentials remain usable via normal login,
+        // so remove them on the next migrate run. Narrowly scoped to the demo
+        // email pattern — never touches real users. The super admin is handled
+        // separately by seedSuperAdmin above (re-seeded from SUPER_ADMIN_PASSWORD).
+        if (isProduction) {
+            await client.query(`DELETE FROM users WHERE email LIKE '%@demo.com';`);
+        }
 
         // ── CLEANUP: blank out any legacy DiceBear cartoon avatars ────────────
         await client.query(`UPDATE users SET avatar = '' WHERE avatar LIKE '%api.dicebear.com%';`);
 
         await client.query('COMMIT');
         console.log('✅ Database migrated successfully!');
-        console.log('');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📋  DEMO ACCOUNTS — Password: demo123');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('');
-        console.log('👑 SUPER ADMIN');
-        console.log('   superadmin@lms.com / superadmin');
-        console.log('');
-        console.log('🏛️  DEPARTMENT ADMINS (1 per dept)');
-        for (const deptName of Object.keys(deptUsers)) {
-            console.log(`   ${deptName}: ${deptUsers[deptName].admin.email} / demo123`);
-        }
-        console.log('');
-        console.log('👨‍🏫  INSTRUCTORS (1 per dept)');
-        for (const deptName of Object.keys(deptUsers)) {
-            const inst = deptUsers[deptName].instructor;
-            console.log(`   ${deptName}: ${inst.email} / demo123  (${inst.name})`);
-        }
-        console.log('');
-        console.log('🎓  STUDENTS');
-        for (const deptName of Object.keys(deptUsers)) {
-            for (const s of deptUsers[deptName].students) {
-                console.log(`   ${deptName}: ${s.email} / demo123  roll:${s.rollNo}`);
+        if (!isProduction) {
+            console.log('');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📋  DEMO ACCOUNTS — Password: demo123');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('');
+            console.log('👑 SUPER ADMIN');
+            console.log('   superadmin@lms.com / superadmin');
+            console.log('');
+            console.log('🏛️  DEPARTMENT ADMINS (1 per dept)');
+            for (const deptName of Object.keys(deptUsers)) {
+                console.log(`   ${deptName}: ${deptUsers[deptName].admin.email} / demo123`);
             }
+            console.log('');
+            console.log('👨‍🏫  INSTRUCTORS (1 per dept)');
+            for (const deptName of Object.keys(deptUsers)) {
+                const inst = deptUsers[deptName].instructor;
+                console.log(`   ${deptName}: ${inst.email} / demo123  (${inst.name})`);
+            }
+            console.log('');
+            console.log('🎓  STUDENTS');
+            for (const deptName of Object.keys(deptUsers)) {
+                for (const s of deptUsers[deptName].students) {
+                    console.log(`   ${deptName}: ${s.email} / demo123  roll:${s.rollNo}`);
+                }
+            }
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('❌ Migration failed:', err);

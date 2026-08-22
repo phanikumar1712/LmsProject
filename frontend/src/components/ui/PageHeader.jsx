@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 /**
  * PageHeader – consistent page title block used across all dashboard pages.
  *
@@ -7,7 +9,7 @@
  * @param {boolean} [border]      - Add a bottom border (admin-style)
  * @param {string} [className]
  */
-export function PageHeader({ title, subtitle, action, border = false, className = '' }) {
+export const PageHeader = memo(function PageHeader({ title, subtitle, action, border = false, className = '' }) {
     return (
         <div
             className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${border ? 'border-b border-border pb-5' : ''} ${className}`}
@@ -19,7 +21,7 @@ export function PageHeader({ title, subtitle, action, border = false, className 
             {action && <div className="flex items-center gap-4 shrink-0 flex-wrap">{action}</div>}
         </div>
     );
-}
+});
 
 /**
  * SectionHeader – smaller heading used inside dashboard sections.
@@ -29,7 +31,7 @@ export function PageHeader({ title, subtitle, action, border = false, className 
  * @param {React.ReactNode} [link] - Optional right-side link/action
  * @param {string} [className]
  */
-export function SectionHeader({ title, icon, link, className = '' }) {
+export const SectionHeader = memo(function SectionHeader({ title, icon, link, className = '' }) {
     return (
         <div className={`flex items-center justify-between mb-4 ${className}`}>
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -39,4 +41,4 @@ export function SectionHeader({ title, icon, link, className = '' }) {
             {link}
         </div>
     );
-}
+});

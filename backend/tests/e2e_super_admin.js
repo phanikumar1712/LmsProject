@@ -102,10 +102,11 @@ const check = (label, ok, detail = '') => {
         const audit = await fetchJSON('GET', '/stats/audit-logs', sa.token);
         check('GET /stats/audit-logs returns 200', audit.status === 200,
             `got ${audit.status} ${JSON.stringify(audit.data?.error)}`);
-        check('Audit logs is an array', Array.isArray(audit.data));
+        // The endpoint paginates: { data: [...], total, limit, offset }
+        check('Audit logs is an array', Array.isArray(audit.data?.data));
         check('Audit entries have expected fields',
-            (audit.data || []).every(l => l.id && l.action && l.timestamp),
-            JSON.stringify(audit.data?.[0]));
+            (audit.data?.data || []).every(l => l.id && l.action && l.timestamp),
+            JSON.stringify(audit.data?.data?.[0]));
 
         // ── 6. System health ──────────────────────────────────────────
         console.log('\n─── 6. /stats/system-health ───');

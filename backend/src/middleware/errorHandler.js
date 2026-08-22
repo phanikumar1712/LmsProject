@@ -3,7 +3,17 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 
 // Global error handler
 const errorHandler = (err, req, res, next) => {
-    console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+    const statusCode = err.statusCode || 500;
+
+    // Client errors (4xx) are expected outcomes — validation failures, auth
+    // denials, department-scope 403s, missing resources. Log them as a one-line
+    // WARN so security denials don't spam the log with stack traces. Only real
+    // server errors (5xx) get the full ERROR + stack.
+    if (statusCode >= 500) {
+        console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+    } else {
+        console.warn(`[WARN] ${req.method} ${req.path} -> ${statusCode}: ${err.message}`);
+    }
 
     // PostgreSQL invalid input syntax (e.g. invalid UUID)
     if (err.code === '22P02') {
@@ -22,7 +32,6 @@ const errorHandler = (err, req, res, next) => {
         return res.status(400).json({ error: 'Validation failed' });
     }
 
-    const statusCode = err.statusCode || 500;
     res.status(statusCode).json({
         error: err.message || 'Internal Server Error',
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),

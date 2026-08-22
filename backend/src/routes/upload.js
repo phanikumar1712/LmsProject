@@ -16,9 +16,19 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
 
 const storage = multer.memoryStorage();
 
+// Reject payloads that are dangerous to host/serve (HTML, JS, executables,
+// shell scripts). Media + documents pass through; videos keep the 100MB cap.
+const dangerousMime = /^(text\/html|application\/xhtml\+xml|text\/javascript|application\/javascript|application\/x-msdownload|application\/x-executable|application\/x-sh|application\/vnd\.microsoft\.portable-executable|text\/ecmascript)/i;
+
 const uploadGeneral = multer({
     storage,
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit for general uploads (videos)
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for general uploads (videos)
+    fileFilter: (req, file, cb) => {
+        if (dangerousMime.test(file.mimetype)) {
+            return cb(new Error('This file type is not allowed'), false);
+        }
+        cb(null, true);
+    }
 });
 
 const uploadProfilePhoto = multer({

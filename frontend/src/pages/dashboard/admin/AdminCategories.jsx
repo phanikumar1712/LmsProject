@@ -3,7 +3,7 @@ import { statsAPI, departmentsAPI, coursesAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { LoadingContainer } from '../../../components/ui/Feedback';
-import { Plus, Edit2, Trash2, Upload, X, Search, Filter, ChevronDown, RefreshCw, BookOpen, Building2, Hash, Download, LayoutGrid, List, Calendar, ArrowRight, ExternalLink, Eye, CheckCircle, User, TrendingUp, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Upload, X, Search, RefreshCw, BookOpen, Building2, LayoutGrid, List, Calendar, Eye, User, TrendingUp, Save } from 'lucide-react';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -13,13 +13,13 @@ const EMOJI_LIST = ['💻', '📊', '📈', '🎨', '📚', '🔬', '🏥', '⚖
 
 export default function AdminCategories() {
     const navigate = useNavigate();
-    const { isSuperAdmin } = useAuth();
+    const { isSuperAdmin, can } = useAuth();
     const { data, loading, reload } = useAsyncData(() => statsAPI.getCategories(), []);
     const { data: departments } = useAsyncData(
         () => isSuperAdmin() ? departmentsAPI.list() : Promise.resolve([]),
         [isSuperAdmin]
     );
-    const categories = data ?? [];
+    const categories = useMemo(() => data ?? [], [data]);
 
     // UI state
     const [search, setSearch] = useState('');
@@ -178,7 +178,7 @@ export default function AdminCategories() {
         if (!renameName.trim()) { toast.error('Name is required'); return; }
         setRenaming(true);
         try {
-            const updated = await statsAPI.updateCategory(detailCat.id, {
+            await statsAPI.updateCategory(detailCat.id, {
                 name: renameName.trim(),
                 icon: detailCat.icon,
             });
@@ -335,23 +335,27 @@ export default function AdminCategories() {
                 >
                     <Eye size={12} /> Details
                 </button>
-                <button
-                    onClick={() => openEdit(cat)}
-                    className="flex items-center justify-center p-2 rounded-xl text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 transition-colors"
-                >
-                    <Edit2 size={12} />
-                </button>
-                <button
-                    onClick={() => handleDelete(cat)}
-                    disabled={deleting === cat.id}
-                    className="flex items-center justify-center p-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50"
-                >
-                    {deleting === cat.id ? (
-                        <div className="w-3 h-3 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                        <Trash2 size={12} />
-                    )}
-                </button>
+                {can('category.manage') && (
+                    <button
+                        onClick={() => openEdit(cat)}
+                        className="flex items-center justify-center p-2 rounded-xl text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 transition-colors"
+                    >
+                        <Edit2 size={12} />
+                    </button>
+                )}
+                {can('category.manage') && (
+                    <button
+                        onClick={() => handleDelete(cat)}
+                        disabled={deleting === cat.id}
+                        className="flex items-center justify-center p-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50"
+                    >
+                        {deleting === cat.id ? (
+                            <div className="w-3 h-3 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Trash2 size={12} />
+                        )}
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -386,23 +390,27 @@ export default function AdminCategories() {
                 >
                     <Eye size={13} /> View
                 </button>
-                <button
-                    onClick={() => openEdit(cat)}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                >
-                    <Edit2 size={14} />
-                </button>
-                <button
-                    onClick={() => handleDelete(cat)}
-                    disabled={deleting === cat.id}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-50"
-                >
-                    {deleting === cat.id ? (
-                        <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                        <Trash2 size={14} />
-                    )}
-                </button>
+                {can('category.manage') && (
+                    <button
+                        onClick={() => openEdit(cat)}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                )}
+                {can('category.manage') && (
+                    <button
+                        onClick={() => handleDelete(cat)}
+                        disabled={deleting === cat.id}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-50"
+                    >
+                        {deleting === cat.id ? (
+                            <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Trash2 size={14} />
+                        )}
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -417,18 +425,22 @@ export default function AdminCategories() {
                 subtitle="Organize courses into categories for easy browsing and filtering."
                 action={
                     <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                            onClick={() => { setShowImport(true); setImportResults(null); setImportFile(null); }}
-                            className="bg-card border border-border text-foreground/80 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted/60 transition-colors"
-                        >
-                            <Upload size={16} /> Import
-                        </button>
-                        <button
-                            onClick={openCreate}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none transition-all"
-                        >
-                            <Plus size={16} /> Add Category
-                        </button>
+                        {can('category.manage') && (
+                            <button
+                                onClick={() => { setShowImport(true); setImportResults(null); setImportFile(null); }}
+                                className="bg-card border border-border text-foreground/80 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted/60 transition-colors"
+                            >
+                                <Upload size={16} /> Import
+                            </button>
+                        )}
+                        {can('category.manage') && (
+                            <button
+                                onClick={openCreate}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none transition-all"
+                            >
+                                <Plus size={16} /> Add Category
+                            </button>
+                        )}
                     </div>
                 }
             />
@@ -548,9 +560,11 @@ export default function AdminCategories() {
                         <>
                             <BookOpen size={48} className="mx-auto text-muted-foreground/30 mb-4" />
                             <p className="text-muted-foreground font-medium">No categories yet</p>
-                            <button onClick={openCreate} className="text-indigo-600 text-sm font-bold mt-2 hover:text-indigo-700">
-                                Create your first category
-                            </button>
+                            {can('category.manage') && (
+                                <button onClick={openCreate} className="text-indigo-600 text-sm font-bold mt-2 hover:text-indigo-700">
+                                    Create your first category
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
@@ -824,12 +838,14 @@ export default function AdminCategories() {
                                     ) : (
                                         <div className="flex items-center gap-2 group">
                                             <h3 className="text-2xl font-extrabold text-foreground tracking-tight">{detailCat.name}</h3>
-                                            <button onClick={startRename}
-                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all opacity-0 group-hover:opacity-100"
-                                                title="Rename"
-                                            >
-                                                <Edit2 size={14} />
-                                            </button>
+                                            {can('category.manage') && (
+                                                <button onClick={startRename}
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Rename"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                     <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -961,17 +977,19 @@ export default function AdminCategories() {
                             >
                                 <BookOpen size={14} /> View Courses
                             </button>
-                            <button
-                                onClick={handleDeleteFromDetail}
-                                disabled={deleting === detailCat.id}
-                                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50"
-                            >
-                                {deleting === detailCat.id ? (
-                                    <><div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> Deleting...</>
-                                ) : (
-                                    <><Trash2 size={14} /> Delete</>
-                                )}
-                            </button>
+                            {can('category.manage') && (
+                                <button
+                                    onClick={handleDeleteFromDetail}
+                                    disabled={deleting === detailCat.id}
+                                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50"
+                                >
+                                    {deleting === detailCat.id ? (
+                                        <><div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" /> Deleting...</>
+                                    ) : (
+                                        <><Trash2 size={14} /> Delete</>
+                                    )}
+                                </button>
+                            )}
                             <button
                                 onClick={() => setDetailCat(null)}
                                 className="flex-1 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted transition-colors"

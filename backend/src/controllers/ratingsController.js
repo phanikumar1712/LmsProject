@@ -1,6 +1,8 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { mapRating } = require('../utils/formatters');
+const { writeAudit } = require('../utils/audit');
+const { getDepartmentScope } = require('../utils/scope');
 
 const ratingFields = `
     r.id, r.course_id, r.student_id, r.stars, r.comment, r.instructor_reply,
@@ -17,15 +19,50 @@ const recalcCourseRating = (courseId) =>
         WHERE id = $1
     `, [courseId]);
 
-// GET /api/ratings — admin only
+// Department-scoped admins may only view/act on users in their own department
+// (mirrors usersController.assertUserInScope). Unscoped callers pass through.
+const assertUserInDepartmentScope = async (req, userId) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (!scoped) return;
+    const r = await query('SELECT department_id FROM users WHERE id = $1', [userId]);
+    if (!r.rows.length) throw createError('User not found', 404);
+    if (r.rows[0].department_id !== departmentId) {
+        throw createError('This user is outside your department', 403);
+    }
+};
+
+// Resolve a rating to its course's department, then 403 a scoped ADMIN whose
+// department doesn't match (mirrors assertCourseInScope used for course edits).
+// Uses the denormalized courses.department_id column, kept in sync by triggers.
+const assertRatingInScope = async (req, ratingId) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    if (!scoped) return;
+    const r = await query(
+        `SELECT c.department_id FROM ratings r
+         JOIN courses c ON r.course_id = c.id
+         WHERE r.id = $1`,
+        [ratingId]
+    );
+    if (!r.rows.length) throw createError('Rating not found', 404);
+    if (r.rows[0].department_id !== departmentId) {
+        throw createError('This review is outside your department', 403);
+    }
+};
+
+// GET /api/ratings — admin only. Department isolation: a scoped ADMIN only
+// moderates reviews for courses in their own department.
 const getAll = async (req, res) => {
+    const { scoped, departmentId } = getDepartmentScope(req);
+    const where = scoped ? 'WHERE c.department_id = $1' : '';
+    const values = scoped ? [departmentId] : [];
     const result = await query(`
         SELECT ${ratingFields}, c.id as "courseId", c.title as "courseTitle"
         FROM ratings r
         JOIN users u ON r.student_id = u.id
         JOIN courses c ON r.course_id = c.id
+        ${where}
         ORDER BY r.created_at DESC
-    `);
+    `, values);
     res.json(result.rows.map(r => ({ ...mapRating(r), courseTitle: r.courseTitle })));
 };
 
@@ -35,6 +72,7 @@ const getByInstructor = async (req, res) => {
     if (req.user.role === 'INSTRUCTOR' && req.user.id !== instructorId) {
         throw createError('Forbidden', 403);
     }
+    if (req.user.role === 'ADMIN') await assertUserInDepartmentScope(req, instructorId);
     const result = await query(`
         SELECT ${ratingFields}, c.title as "courseTitle"
         FROM ratings r
@@ -116,7 +154,7 @@ const replyToReview = async (req, res) => {
 
     // Verify the instructor owns the course being reviewed
     const rating = await query(
-        `SELECT c.instructor_id FROM ratings r
+        `SELECT c.instructor_id, r.course_id, r.student_id FROM ratings r
          JOIN courses c ON r.course_id = c.id
          WHERE r.id = $1`,
         [req.params.id]
@@ -125,12 +163,21 @@ const replyToReview = async (req, res) => {
     if (req.user.role === 'INSTRUCTOR' && rating.rows[0].instructor_id !== req.user.id) {
         throw createError('Not authorized to reply to this review', 403);
     }
+    if (req.user.role === 'ADMIN') await assertRatingInScope(req, req.params.id);
 
     const result = await query(
         `UPDATE ratings SET instructor_reply = $1 WHERE id = $2 RETURNING id`,
         [reply, req.params.id]
     );
     if (!result.rows.length) throw createError('Rating not found', 404);
+
+    await writeAudit(req, {
+        action: 'REVIEW_REPLIED',
+        resource: 'ratings',
+        resourceId: req.params.id,
+        newValue: { instructorReply: reply },
+        details: { courseId: rating.rows[0].course_id, studentId: rating.rows[0].student_id },
+    });
 
     const full = await query(`
         SELECT ${ratingFields} FROM ratings r JOIN users u ON r.student_id = u.id
@@ -189,6 +236,7 @@ const likeReview = async (req, res) => {
 
 // DELETE /api/ratings/:id
 const deleteRating = async (req, res) => {
+    await assertRatingInScope(req, req.params.id);
     const result = await query(
         `DELETE FROM ratings WHERE id = $1 RETURNING course_id, stars`,
         [req.params.id]
@@ -196,11 +244,14 @@ const deleteRating = async (req, res) => {
     if (!result.rows.length) throw createError('Rating not found', 404);
     await recalcCourseRating(result.rows[0].course_id);
 
-    await query(
-        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
-        [req.user.id, 'RATING_DELETED', 'ratings', req.params.id,
-         JSON.stringify({ courseId: result.rows[0].course_id, stars: result.rows[0].stars })]
-    ).catch(() => {});
+    await writeAudit(req, {
+        action: 'RATING_DELETED',
+        resource: 'ratings',
+        resourceId: req.params.id,
+        oldValue: { stars: result.rows[0].stars },
+        newValue: null,
+        details: { courseId: result.rows[0].course_id, stars: result.rows[0].stars },
+    });
 
     res.json({ success: true });
 };
@@ -211,6 +262,7 @@ const getByStudent = async (req, res) => {
     if (req.user.role === 'STUDENT' && req.user.id !== studentId) {
         throw createError('Forbidden', 403);
     }
+    if (req.user.role === 'ADMIN') await assertUserInDepartmentScope(req, studentId);
     const result = await query(`
         SELECT ${ratingFields}, c.title as "courseTitle"
         FROM ratings r

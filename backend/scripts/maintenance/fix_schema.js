@@ -1,17 +1,10 @@
+// One-off migration helper: backfill missing columns on courses/users.
+// Uses DATABASE_URL from backend/.env — never hardcode credentials.
+require('dotenv').config();
 const { Client } = require('pg');
 
 async function fix() {
-    const config = {
-        host: '54.209.204.248',
-        port: 5432,
-        user: 'neondb_owner',
-        password: 'REDACTED',
-        database: 'neondb',
-        ssl: {
-            rejectUnauthorized: false,
-            servername: 'ep-withered-mode-am2a8xup-pooler.c-5.us-east-1.aws.neon.tech'
-        }
-    };
+    const config = { connectionString: process.env.DATABASE_URL };
 
     let client;
     let success = false;
@@ -23,7 +16,7 @@ async function fix() {
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS short_desc TEXT DEFAULT '';
               ALTER TABLE courses ADD COLUMN IF NOT EXISTS certificate BOOLEAN DEFAULT true;
-              
+
               ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';
               ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
               ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;

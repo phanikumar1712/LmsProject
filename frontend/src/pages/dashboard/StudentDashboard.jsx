@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Award, Play, ClipboardList, Flame, ChevronRight, Target } from 'lucide-react';
+import { BookOpen, Award, Play, ClipboardList, Flame, ChevronRight, Target, FileText, Megaphone, CalendarClock, CheckCircle, CalendarCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { enrollmentsAPI, quizzesAPI, statsAPI } from '../../services/api';
+import { enrollmentsAPI, quizzesAPI, statsAPI, assignmentsAPI, announcementsAPI, attendanceAPI } from '../../services/api';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { StatCard, StatCardGrid, StatCardSkeleton } from '../../components/ui/StatCard';
 import { PageHeader, SectionHeader } from '../../components/ui/PageHeader';
@@ -18,11 +18,77 @@ export default function StudentDashboard() {
         () => enrollmentsAPI.getByStudent(user.id),
         () => quizzesAPI.getAttempts(user.id),
         () => statsAPI.getStudentStreak(),
+        () => assignmentsAPI.getStudentOverview().catch(() => ({ upcoming: [], recentGrades: [] })),
+        () => quizzesAPI.getAvailableExams().catch(() => []),
+        () => announcementsAPI.list().catch(() => []),
+        () => attendanceAPI.getMyAttendance(user.id).catch(() => []),
     ], [user?.id]);
 
-    const [enrollments, attempts, streakData] = results;
+    const [enrollments, attempts, streakData, assignOverview, availableExams, announcements, attendanceData] = results;
     const safeEnrollments = enrollments ?? [];
     const safeAttempts = attempts ?? [];
+    const upcomingAssignments = assignOverview?.upcoming || [];
+    const recentGrades = assignOverview?.recentGrades || [];
+    const safeAnnouncements = announcements ?? [];
+
+    // Attendance percentage per course — computed from the student's own
+    // per-session records (present counts toward the %, matching the instructor
+    // report formula: present / marked sessions).
+    const attendanceByCourse = (() => {
+        const map = {};
+        (attendanceData ?? []).forEach(r => {
+            if (!map[r.course_id]) {
+                map[r.course_id] = { courseId: r.course_id, courseTitle: r.course_title || 'Course', present: 0, total: 0 };
+            }
+            map[r.course_id].total += 1;
+            if (r.status === 'present') map[r.course_id].present += 1;
+        });
+        return Object.values(map)
+            .map(c => ({ ...c, pct: c.total > 0 ? Math.round((c.present / c.total) * 100) : 0 }))
+            .sort((a, b) => b.pct - a.pct);
+    })();
+
+    // Assessments that are upcoming (starts in the future) or still open (not
+    // yet attempted / within the availability window).
+    const now = Date.now();
+    const upcomingQuizzes = (availableExams || [])
+        .filter(q => {
+            if (q.startDate && new Date(q.startDate).getTime() > now) return true; // not started yet
+            if (q.endDate && new Date(q.endDate).getTime() < now) return false;     // window closed
+            return !q.attempted;                                                     // open & unattempted
+        })
+        .sort((a, b) => new Date(a.startDate || a.createdAt) - new Date(b.startDate || b.createdAt))
+        .slice(0, 4);
+
+    // Most recent grades: quiz scores first, then assignment marks.
+    const recentQuizGrades = safeAttempts.slice(0, 3).map(a => ({
+        key: `q-${a.id}`,
+        label: a.quiz?.title || 'Quiz',
+        course: a.course?.title || '',
+        score: a.score,
+        passed: a.passed,
+        at: a.completedAt,
+        type: 'quiz',
+    }));
+    const recentAssignmentGrades = (recentGrades || []).slice(0, 4).map(g => ({
+        key: `a-${g.assignmentId}`,
+        label: g.title,
+        course: g.courseTitle || '',
+        score: Math.round((g.marks / (g.maxMarks || 1)) * 100),
+        passed: g.marks >= ((g.maxMarks || 1) * 0.5),
+        at: g.gradedAt,
+        type: 'assignment',
+        detail: `${g.marks}/${g.maxMarks}`,
+    }));
+    const recentGradeItems = [...recentAssignmentGrades, ...recentQuizGrades].slice(0, 6);
+
+    const ASSIGN_STATUS = {
+        GRADED: { label: 'Graded', cls: 'bg-emerald-50 text-emerald-600' },
+        SUBMITTED: { label: 'Submitted', cls: 'bg-blue-50 text-blue-600' },
+        LATE: { label: 'Late', cls: 'bg-rose-50 text-rose-600' },
+        NOT_STARTED: { label: 'Not Started', cls: 'bg-muted text-muted-foreground' },
+        RESUBMISSION_REQUIRED: { label: 'Resubmission Required', cls: 'bg-amber-50 text-amber-700' },
+    };
     const safeStreak = streakData ?? { streakDays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], activeStreak: [false, false, false, false, false, false, false], currentStreak: 0 };
 
     const completedCourses = safeEnrollments.filter(e => e.progress === 100);
@@ -152,6 +218,30 @@ export default function StudentDashboard() {
                         </div>
                     </div>
 
+                    {/* Attendance per course */}
+                    {attendanceByCourse.length > 0 && (
+                        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 shadow-sm">
+                            <SectionHeader title="Attendance" icon={<CalendarCheck size={16} className="text-cyan-500" />} />
+                            <div className="space-y-3.5">
+                                {attendanceByCourse.map(c => (
+                                    <div key={c.courseId}>
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <p className="text-xs font-bold text-foreground truncate">{c.courseTitle}</p>
+                                            <span className={`text-xs font-black shrink-0 ${c.pct >= 75 ? 'text-emerald-600' : c.pct >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{c.pct}%</span>
+                                        </div>
+                                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${c.pct >= 75 ? 'bg-emerald-500' : c.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                                style={{ width: `${c.pct}%` }}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground mt-1">{c.present}/{c.total} sessions attended</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Recent Quizzes */}
                     {safeAttempts.length > 0 && (
                         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -179,6 +269,138 @@ export default function StudentDashboard() {
                     )}
                 </div>
             </div>
+
+            {/* Upcoming Assignments + Upcoming Quizzes */}
+            {(upcomingAssignments.length > 0 || upcomingQuizzes.length > 0) && (
+                <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6 pt-2">
+                    {upcomingAssignments.length > 0 && (
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <SectionHeader
+                                title="Upcoming Assignments"
+                                icon={<FileText size={16} className="text-orange-500" />}
+                                link={
+                                    <Link to="/courses" className="text-indigo-600 text-sm font-medium hover:text-indigo-700 flex items-center gap-1 transition-colors">
+                                        View all <ChevronRight size={16} />
+                                    </Link>
+                                }
+                            />
+                            <div className="space-y-2.5">
+                                {upcomingAssignments.slice(0, 4).map(a => {
+                                    const st = ASSIGN_STATUS[a.status] || ASSIGN_STATUS.NOT_STARTED;
+                                    const overdue = a.dueDate && new Date(a.dueDate) < new Date() && a.status === 'NOT_STARTED';
+                                    return (
+                                        <div key={a.id} onClick={() => navigate('/student/assignments')} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-xl hover:bg-muted/70 transition-colors cursor-pointer">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-foreground text-sm font-bold truncate">{a.title}</p>
+                                                <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                                    {a.courseTitle} · Due {new Date(a.dueDate).toLocaleDateString()}
+                                                    {overdue && <span className="text-rose-500 font-bold"> (overdue)</span>}
+                                                </p>
+                                            </div>
+                                            <span className={`px-2.5 py-1 text-[10px] font-black rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {upcomingQuizzes.length > 0 && (
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <SectionHeader
+                                title="Upcoming Quizzes"
+                                icon={<CalendarClock size={16} className="text-purple-500" />}
+                                link={
+                                    <Link to="/student/quizzes" className="text-indigo-600 text-sm font-medium hover:text-indigo-700 flex items-center gap-1 transition-colors">
+                                        View all <ChevronRight size={16} />
+                                    </Link>
+                                }
+                            />
+                            <div className="space-y-2.5">
+                                {upcomingQuizzes.map(q => (
+                                    <div key={q.id} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-xl hover:bg-muted/70 transition-colors">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-foreground text-sm font-bold truncate">{q.title}</p>
+                                            <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                                {q.courseTitle}
+                                                {q.startDate && new Date(q.startDate).getTime() > now
+                                                    ? ` · Opens ${new Date(q.startDate).toLocaleDateString()}`
+                                                    : q.endDate ? ` · Open until ${new Date(q.endDate).toLocaleDateString()}` : ''}
+                                            </p>
+                                        </div>
+                                        <span className="px-2.5 py-1 text-[10px] font-black rounded-full bg-purple-50 text-purple-600 flex-shrink-0">
+                                            {q.questionCount} Q
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Recent Grades + Recent Announcements */}
+            {(recentGradeItems.length > 0 || safeAnnouncements.length > 0) && (
+                <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6 pt-2">
+                    {recentGradeItems.length > 0 && (
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <SectionHeader
+                                title="Recent Grades"
+                                icon={<CheckCircle size={16} className="text-emerald-500" />}
+                                link={
+                                    <Link to="/student/quizzes" className="text-indigo-600 text-sm font-medium hover:text-indigo-700 flex items-center gap-1 transition-colors">
+                                        View all <ChevronRight size={16} />
+                                    </Link>
+                                }
+                            />
+                            <div className="space-y-2.5">
+                                {recentGradeItems.map(g => (
+                                    <div key={g.key} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-xl hover:bg-muted/70 transition-colors">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-foreground text-sm font-bold truncate">{g.label}</p>
+                                            <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                                {g.course} · {g.type === 'assignment' ? 'Assignment' : 'Quiz'}
+                                                {g.at ? ` · ${new Date(g.at).toLocaleDateString()}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <p className={`text-sm font-black ${g.passed ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                {g.detail ? `${g.detail} (${g.score}%)` : `${g.score}%`}
+                                            </p>
+                                            <p className={`text-[10px] font-bold uppercase tracking-wide ${g.passed ? 'text-emerald-500' : 'text-rose-400'}`}>
+                                                {g.passed ? 'Passed' : 'Needs work'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {safeAnnouncements.length > 0 && (
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <SectionHeader
+                                title="Recent Announcements"
+                                icon={<Megaphone size={16} className="text-amber-500" />}
+                                link={
+                                    <Link to="/announcements" className="text-indigo-600 text-sm font-medium hover:text-indigo-700 flex items-center gap-1 transition-colors">
+                                        View all <ChevronRight size={16} />
+                                    </Link>
+                                }
+                            />
+                            <div className="space-y-2.5">
+                                {safeAnnouncements.slice(0, 4).map(a => (
+                                    <div key={a.id} className="p-3 bg-muted/40 rounded-xl hover:bg-muted/70 transition-colors">
+                                        <p className="text-foreground text-sm font-bold truncate">{a.title}</p>
+                                        {a.content && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{a.content}</p>}
+                                        <p className="text-[10px] text-muted-foreground/70 mt-1 font-medium">{new Date(a.createdAt || a.created_at).toLocaleDateString()}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Completed Courses */}
             {completedCourses.length > 0 && (

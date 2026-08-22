@@ -23,6 +23,7 @@ export default function AnnouncementsPage() {
         if (readSet.has(focusId)) return; // already marked
 
         announcementsAPI.markRead(focusId).catch(() => {});
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setReadSet(prev => new Set(prev).add(focusId));
     }, [focusId, announcements, dismissedFocus, readSet]);
 

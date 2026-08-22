@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
     BookOpen, Users, Star, PlusCircle, TrendingUp,
-    ChevronRight, BarChart2, Eye
+    ChevronRight, BarChart2, Eye, Clock, HelpCircle, FileText, Megaphone,
+    ClipboardCheck, Calendar, Gauge, CalendarCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { statsAPI, coursesAPI } from '../../services/api';
@@ -19,6 +20,7 @@ import PullToRefresh from '../../components/ui/PullToRefresh';
 
 export default function InstructorDashboard() {
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     const { results, loading, reload } = useMultipleAsync([
         () => statsAPI.getInstructor(user.id),
@@ -29,10 +31,10 @@ export default function InstructorDashboard() {
     const courses = results[1] || [];
 
     const statCards = stats ? [
-        { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: '#4f46e5', bg: 'bg-indigo-50', change: `+${stats.thisMonth?.newCourses || 0} this month`, showTrend: (stats.thisMonth?.newCourses > 0) },
-        { label: 'Total Students', value: stats.totalEnrollments?.toLocaleString(), icon: Users, color: '#0891b2', bg: 'bg-cyan-50', change: `+${stats.thisMonth?.enrollments || 0} this month`, showTrend: (stats.thisMonth?.enrollments > 0) },
-        { label: 'Avg Rating', value: `${stats.avgRating}/5`, icon: Star, color: '#d97706', bg: 'bg-amber-50', change: 'Live rating', showTrend: false },
-        { label: 'Total Enrollments', value: stats.totalEnrollments?.toLocaleString(), icon: Users, color: '#059669', bg: 'bg-emerald-50', change: `+${stats.thisMonth?.enrollments || 0} this month`, showTrend: (stats.thisMonth?.enrollments > 0) },
+        { label: 'My Courses', value: stats.totalCourses, icon: BookOpen, color: '#4f46e5', bg: 'bg-indigo-50', change: `${stats.publishedCourses || 0} published · ${stats.pendingCourses || 0} pending`, showTrend: false, onClick: () => navigate('/instructor/courses') },
+        { label: 'Total Students', value: stats.totalEnrollments?.toLocaleString(), icon: Users, color: '#0891b2', bg: 'bg-cyan-50', change: `+${stats.thisMonth?.enrollments || 0} this month`, showTrend: (stats.thisMonth?.enrollments > 0), onClick: () => navigate('/instructor/students') },
+        { label: 'Pending Assignments', value: stats.pendingAssignments ?? 0, icon: ClipboardCheck, color: '#d97706', bg: 'bg-amber-50', change: stats.pendingAssignments ? 'Submissions awaiting grading' : 'All caught up', showTrend: (stats.pendingAssignments > 0), onClick: () => navigate('/instructor/assessments') },
+        { label: 'Avg Course Completion', value: `${stats.avgCompletion ?? 0}%`, icon: Gauge, color: '#059669', bg: 'bg-emerald-50', change: 'Across all your students', showTrend: false },
     ] : [];
 
     return (
@@ -114,6 +116,7 @@ export default function InstructorDashboard() {
                             {[
                                 { to: '/instructor/create-course', icon: PlusCircle, label: 'Create New Course', color: 'text-indigo-600' },
                                 { to: '/instructor/students', icon: Users, label: 'Manage Students', color: 'text-cyan-600' },
+                                { to: '/instructor/live-sessions', icon: CalendarCheck, label: 'Take Attendance', color: 'text-emerald-600' },
                                 { to: '/instructor/reviews', icon: Star, label: 'Course Reviews', color: 'text-amber-500' },
                             ].map(({ to, icon: Icon, label, color }) => (
                                 <Link
@@ -127,6 +130,123 @@ export default function InstructorDashboard() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Upcoming Classes + Quizzes */}
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
+                <Card>
+                    <CardHeader title="Upcoming Classes" icon={<Calendar size={20} className="text-indigo-600" />} />
+                    <div className="space-y-3">
+                        {loading ? (
+                            <div className="h-24 animate-pulse bg-muted rounded-xl" />
+                        ) : (stats?.upcomingSessions || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground/70 py-8 text-center font-medium">No upcoming live classes scheduled.</p>
+                        ) : stats.upcomingSessions.map(s => (
+                            <div key={s.id} className="flex items-center gap-3 bg-muted/40 border border-border rounded-xl p-3 hover:bg-muted transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0">
+                                    <Clock size={18} className="text-indigo-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate">{s.title}</p>
+                                    <p className="text-[11px] font-semibold text-muted-foreground truncate">{s.courseTitle}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-xs font-bold text-indigo-600">{s.session_date}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground">{s.start_time || 'TBA'}{s.end_time ? ` – ${s.end_time}` : ''}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+
+                <Card>
+                    <CardHeader title="Upcoming Quizzes" icon={<HelpCircle size={20} className="text-amber-600" />} />
+                    <div className="space-y-3">
+                        {loading ? (
+                            <div className="h-24 animate-pulse bg-muted rounded-xl" />
+                        ) : (stats?.upcomingQuizzes || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground/70 py-8 text-center font-medium">No quizzes created in your courses yet.</p>
+                        ) : stats.upcomingQuizzes.map(q => (
+                            <div key={q.id} className="flex items-center gap-3 bg-muted/40 border border-border rounded-xl p-3 hover:bg-muted transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                                    <HelpCircle size={18} className="text-amber-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate">{q.title}</p>
+                                    <p className="text-[11px] font-semibold text-muted-foreground truncate">{q.courseTitle}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-xs font-bold text-amber-600">{q.timeLimit} min</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground">Pass: {q.passingScore}% · {q.attempts} attempts</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            </div>
+
+            {/* Recent Submissions + Announcements */}
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
+                <Card>
+                    <CardHeader
+                        title="Recent Submissions"
+                        right={
+                            <Link to="/instructor/assessments" className="text-indigo-600 text-xs font-bold hover:text-indigo-700 flex items-center gap-1">
+                                Review all <ChevronRight size={14} />
+                            </Link>
+                        }
+                    />
+                    <div className="space-y-3">
+                        {loading ? (
+                            <div className="h-24 animate-pulse bg-muted rounded-xl" />
+                        ) : (stats?.recentSubmissions || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground/70 py-8 text-center font-medium">No submissions yet — students will appear here.</p>
+                        ) : stats.recentSubmissions.map(s => (
+                            <div key={s.id} className="flex items-center gap-3 bg-muted/40 border border-border rounded-xl p-3 hover:bg-muted transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
+                                    <FileText size={18} className="text-emerald-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate">{s.studentName}</p>
+                                    <p className="text-[11px] font-semibold text-muted-foreground truncate">{s.assignmentTitle} · {s.courseTitle}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    {s.marks != null ? (
+                                        <p className="text-xs font-bold text-emerald-600">{s.marks} pts</p>
+                                    ) : (
+                                        <p className="text-xs font-bold text-amber-600">Needs grading</p>
+                                    )}
+                                    <p className="text-[10px] font-bold text-muted-foreground">{new Date(s.submitted_at).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+
+                <Card>
+                    <CardHeader title="Recent Announcements" icon={<Megaphone size={20} className="text-rose-500" />} />
+                    <div className="space-y-3">
+                        {loading ? (
+                            <div className="h-24 animate-pulse bg-muted rounded-xl" />
+                        ) : (stats?.recentAnnouncements || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground/70 py-8 text-center font-medium">No announcements for your department yet.</p>
+                        ) : stats.recentAnnouncements.map(a => (
+                            <div key={a.id} className="flex items-start gap-3 bg-muted/40 border border-border rounded-xl p-3 hover:bg-muted transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0">
+                                    <Megaphone size={18} className="text-rose-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-foreground truncate">{a.title}</p>
+                                    <p className="text-[11px] font-semibold text-muted-foreground line-clamp-1">{a.content}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-[10px] font-bold text-muted-foreground">{new Date(a.created_at).toLocaleDateString()}</p>
+                                    {a.pinned && <p className="text-[10px] font-bold text-rose-500 mt-0.5">📌 Pinned</p>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
             </div>
 
             {/* Recent Courses */}

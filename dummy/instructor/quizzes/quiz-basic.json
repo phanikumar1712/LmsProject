@@ -1,0 +1,78 @@
+{
+  "courseId": "1c8dd607-5b0e-42ef-b3ec-b0b2327f693e",
+  "title": "Dummy Quiz – Mixed Types",
+  "instructions": "Answer all questions. Negative marking applies. You have 15 minutes.",
+  "timeLimit": 15,
+  "passingScore": 60,
+  "maxAttempts": 0,
+  "negativeMarking": 0.25,
+  "startDate": null,
+  "endDate": null,
+  "examKind": null,
+  "selectionConfig": null,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "MCQ_SINGLE",
+      "text": "What does HTML stand for?",
+      "options": [
+        "HyperText Markup Language",
+        "HighText Machine Language",
+        "Hyperlink Text Mode Language"
+      ],
+      "correctAnswer": "HyperText Markup Language",
+      "difficulty": "EASY",
+      "category": "Web"
+    },
+    {
+      "id": "q2",
+      "type": "MCQ_MULTI",
+      "text": "Which of these are JavaScript frameworks?",
+      "options": [
+        "React",
+        "Django",
+        "Vue",
+        "Flask"
+      ],
+      "correctAnswer": [
+        "React",
+        "Vue"
+      ],
+      "difficulty": "MEDIUM",
+      "category": "Web"
+    },
+    {
+      "id": "q3",
+      "type": "TRUE_FALSE",
+      "text": "HTTP is stateless by design.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correctAnswer": "True",
+      "difficulty": "MEDIUM",
+      "category": "Web"
+    },
+    {
+      "id": "q4",
+      "type": "FILL_BLANK",
+      "text": "CSS stands for Cascading Style ______.",
+      "options": [],
+      "correctAnswer": "Sheets",
+      "difficulty": "EASY",
+      "category": "Web"
+    },
+    {
+      "id": "q5",
+      "type": "SHORT_ANSWER",
+      "text": "Name the sorting algorithm with an average case of O(n log n).",
+      "options": [
+        "quicksort",
+        "merge sort"
+      ],
+      "correctAnswer": "quicksort",
+      "difficulty": "HARD",
+      "category": "Algorithms"
+    }
+  ]
+}

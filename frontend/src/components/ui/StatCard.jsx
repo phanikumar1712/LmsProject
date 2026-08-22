@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TrendingUp } from 'lucide-react';
 
 /**
@@ -14,7 +15,7 @@ import { TrendingUp } from 'lucide-react';
  * @param {string} [className] - Extra wrapper classes
  * @param {() => void} [onClick] - If provided, renders as a clickable button (navigates to detail page)
  */
-export function StatCard({
+export const StatCard = memo(function StatCard({
     label,
     value,
     icon: Icon,
@@ -62,13 +63,13 @@ export function StatCard({
             )}
         </Tag>
     );
-}
+});
 
 /**
  * Grid wrapper for a row of stat cards.
  * Defaults to 2 cols on mobile, 4 cols on lg.
  */
-export function StatCardGrid({ children, cols = 4, className = '' }) {
+export const StatCardGrid = memo(function StatCardGrid({ children, cols = 4, className = '' }) {
     const colClass = {
         2: 'grid-cols-1 sm:grid-cols-2',
         3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
@@ -80,7 +81,7 @@ export function StatCardGrid({ children, cols = 4, className = '' }) {
             {children}
         </div>
     );
-}
+});
 
 /** Skeleton placeholders while stats load */
 export function StatCardSkeleton({ count = 4 }) {

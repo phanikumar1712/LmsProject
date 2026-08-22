@@ -16,6 +16,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-countup": "^6.5.3",
     "react-dom": "^19.2.5",
@@ -29,7 +30,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
     "uuid": "^14.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

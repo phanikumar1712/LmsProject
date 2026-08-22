@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
 import { attendanceAPI, coursesAPI } from '../../../services/api';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { Calendar, Plus, X, Save, Trash2, Video, Users, Clock, Loader2, ExternalLink, BarChart3, Search } from 'lucide-react';
+import { Calendar, Plus, X, Save, Trash2, Video, Users, Clock, Loader2, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AdminLiveSessions() {
-    const { user } = useAuth();
     const [sessions, setSessions] = useState([]);
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,11 +18,7 @@ export default function AdminLiveSessions() {
     const [attendanceLoading, setAttendanceLoading] = useState(false);
     const [search, setSearch] = useState('');
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const [sessionsData, coursesData] = await Promise.all([
@@ -38,7 +32,11 @@ export default function AdminLiveSessions() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleCreate = async (e) => {
         e.preventDefault();

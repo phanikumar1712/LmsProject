@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info, EyeOff, CheckCircle, Calendar, User, Clock, Building2, ShieldCheck } from 'lucide-react';
+import { Megaphone, Plus, Pin, Trash2, Edit2, X, Users, Bell, Send, AlertTriangle, Info, EyeOff, CheckCircle, User, Clock, Building2 } from 'lucide-react';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import toast from 'react-hot-toast';
@@ -88,7 +88,7 @@ export default function AdminAnnouncements() {
         try {
             const data = await http('GET', `/announcements/${ann.id}/reads`);
             setReadsData(data);
-        } catch (err) {
+        } catch {
             toast.error('Failed to load readers');
         } finally {
             setReadsLoading(false);

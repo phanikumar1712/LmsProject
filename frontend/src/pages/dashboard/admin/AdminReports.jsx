@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Download, Layers, Building2 } from 'lucide-react';
+import { BarChart3, Download, Layers, Building2 } from 'lucide-react';
 import { statsAPI, departmentsAPI } from '../../../services/api';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { CHART_COLORS, CHART_AXIS_STYLE, CHART_MARGIN } from '../../../lib/constants';

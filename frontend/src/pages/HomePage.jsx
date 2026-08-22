@@ -22,6 +22,7 @@ import {
     Sparkles, Compass, RefreshCw
 } from 'lucide-react';
 import { coursesAPI, statsAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import studentImg from '../assets/student.jpg';
 
 // ─── Animated stat: counts up on scroll, preserves prefix/suffix ──────────────
@@ -79,6 +80,7 @@ function CourseSkeleton() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function HomePage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -96,8 +98,17 @@ export default function HomePage() {
     const heroGlowY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 140]);
 
     useEffect(() => {
-        // Fetch live courses from backend
-        coursesAPI.getAll({ status: 'PUBLISHED', sort: 'popular', limit: 8 })
+        // Fetch live courses from backend. Department isolation: scoped admins
+        // and students only see courses from their own department (mirrors the
+        // catalog), so the homepage never surfaces a course whose discussion or
+        // enrollment is blocked server-side for that user.
+        const popularFilters = { status: 'PUBLISHED', sort: 'popular', limit: 8 };
+        const scoped = user?.departmentId && (user.role === 'ADMIN' || user.role === 'STUDENT');
+        if (scoped) {
+            popularFilters.departmentId = user.departmentId;
+            if (user.role === 'ADMIN') popularFilters.admin = true;
+        }
+        coursesAPI.getAll(popularFilters)
             .then(data => {
                 setCourses(Array.isArray(data) ? data : []);
                 setLoading(false);
@@ -116,7 +127,7 @@ export default function HomePage() {
         statsAPI.getCategories()
             .then(data => setCategories(Array.isArray(data) ? data : []))
             .catch(() => { });
-    }, []);
+    }, [user]);
 
     return (
         <>
@@ -1107,6 +1118,42 @@ export default function HomePage() {
                     </div>
                 </section>
 
+                {/* ── Testimonials ───────────────────────────── */}
+                <section className="hp-section hp-testimonials">
+                    <div className="hp-section__inner">
+                        <div className="hp-section__header" style={{ justifyContent: 'center', textAlign: 'center' }}>
+                            <div>
+                                <div className="hp-section__label">Testimonials</div>
+                                <h2 className="hp-section__title">Loved by learners worldwide</h2>
+                                <p className="hp-section__subtitle" style={{ margin: '0 auto' }}>
+                                    See what our students have to say about their learning experience.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="hp-testimonial-stage">
+                            <div className="hp-testimonial-card">
+                                <div className="hp-testimonial-card__quote-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" /><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z" /></svg>
+                                </div>
+                                <div className="hp-testimonial-card__stars">
+                                    {'★★★★★'.split('').map((s, i) => <span key={i}>{s}</span>)}
+                                </div>
+                                <p className="hp-testimonial-card__text">
+                                    "EduNexus completely transformed my career. The project-based courses and expert instructors helped me land my dream job in just 3 months. The certificates are recognized by top companies."
+                                </p>
+                                <div className="hp-testimonial-card__person">
+                                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>S</div>
+                                    <div style={{ textAlign: 'left' }}>
+                                        <div className="hp-testimonial-card__name">Sarah Chen</div>
+                                        <div className="hp-testimonial-card__role">Software Engineer at Google</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* ── CTA Banner ─────────────────────────────────── */}
                 <section className="hp-cta-banner">
                     <div className="hp-cta-banner__inner">
@@ -1136,14 +1183,14 @@ export default function HomePage() {
                 <footer className="hp-footer">
                     <div className="hp-footer__inner">
                         <div>
-                            <Link to="/" className="hp-nav__brand" style={{ textDecoration: 'none' }}>
+                            <Link to="/" className="hp-nav__brand" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                                 <div className="hp-nav__logo-icon">
                                     <GraduationCap size={18} />
                                 </div>
                                 <span className="hp-nav__logo-text">EduNexus</span>
                             </Link>
                             <p className="hp-footer__brand-text">
-                                Empowering the next generation of professionals through accessible, premium education.
+                                Empowering the next generation of professionals through accessible, premium education. Learn at your own pace, earn certificates, and advance your career.
                             </p>
                         </div>
                         <div className="hp-footer__col">
@@ -1152,11 +1199,14 @@ export default function HomePage() {
                                 <li><Link to="/courses">All Courses</Link></li>
                                 <li><Link to="/register">Sign Up</Link></li>
                                 <li><Link to="/login">Log In</Link></li>
+                                <li><Link to="/become-instructor">Teach on EduNexus</Link></li>
                             </ul>
                         </div>
                         <div className="hp-footer__col">
-                            <h4>Legal</h4>
+                            <h4>Company</h4>
                             <ul>
+                                <li><Link to="/about">About Us</Link></li>
+                                <li><Link to="/contact">Contact</Link></li>
                                 <li><Link to="/terms">Terms of Service</Link></li>
                                 <li><Link to="/privacy">Privacy Policy</Link></li>
                             </ul>

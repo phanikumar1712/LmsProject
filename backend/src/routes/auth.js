@@ -6,7 +6,7 @@ const { authLimiter, otpLimiter } = require('../middleware/rateLimiter');
 
 router.post('/register', authLimiter, asyncHandler(ctrl.register));
 router.post('/login', authLimiter, asyncHandler(ctrl.login));
-router.post('/demo', asyncHandler(ctrl.demoLogin));
+router.post('/demo', authLimiter, asyncHandler(ctrl.demoLogin));
 router.post('/reset-password/request', otpLimiter, asyncHandler(ctrl.requestPasswordReset));
 router.post('/verify-otp', otpLimiter, asyncHandler(ctrl.verifyOTP));
 router.post('/reset-password', authLimiter, asyncHandler(ctrl.resetPasswordByEmail));

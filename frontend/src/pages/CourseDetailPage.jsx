@@ -3,12 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     BookOpen, Clock, Users, Star, Award, Play, CheckCircle, ChevronDown,
     ChevronRight, ArrowLeft, FileText, ShoppingCart, Heart, HelpCircle, Sparkles,
-    BadgeCheck, MessageCircle, Target, Layers, Globe, BarChart3
+    BadgeCheck, MessageCircle, Target, Layers, Globe, BarChart3,
+    Headphones, Type, ExternalLink, Code2, ClipboardList, X
 } from 'lucide-react';
-import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI, quizzesAPI } from '../services/api';
+import { getYouTubeEmbedUrl } from '../lib/video';
+import { coursesAPI, enrollmentsAPI, ratingsAPI, wishlistAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { RatingDisplay, RatingStars } from '../components/ui/RatingStars';
-import { ProgressBar } from '../components/ui/ProgressBar';
+import { RatingDisplay } from '../components/ui/RatingStars';
 import { CourseThumbnail } from '../components/ui/CourseThumbnail';
 import DiscussionSection from '../components/ui/DiscussionSection';
 import toast from 'react-hot-toast';
@@ -61,10 +62,15 @@ function SectionCard({ section, lessons, isExpanded, onToggle, index, canFullPre
 
             {isExpanded && (
                 <div className="border-t border-border divide-y divide-border/50 animate-in slide-in-from-top-1 duration-200">
-                    {sectionLessons.map((lesson, lIdx) => (
-                        <div key={lesson.id} className="flex items-center gap-3 px-6 py-3.5 hover:bg-muted/20 transition-colors group">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${lesson.type === 'video' ? 'bg-rose-50 text-rose-500 border border-rose-200/50' : lesson.type === 'quiz' ? 'bg-amber-50 text-amber-500 border border-amber-200/50' : 'bg-sky-50 text-sky-500 border border-sky-200/50'}`}>
-                                {lesson.type === 'video' ? <Play size={14} /> : lesson.type === 'quiz' ? <HelpCircle size={14} /> : <FileText size={14} />}
+                    {sectionLessons.map(lesson => {
+                        // Previewable when it's a preview-marked lesson, or the
+                        // caller has full access (admin / owning instructor).
+                        const playable = lesson.preview || canFullPreview;
+                        return (
+                        <div key={lesson.id} onClick={playable ? () => onPlay?.(lesson) : undefined}
+                            className={`flex items-center gap-3 px-6 py-3.5 hover:bg-muted/20 transition-colors group ${playable ? 'cursor-pointer' : ''}`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${lesson.type === 'video' ? 'bg-rose-50 text-rose-500 border border-rose-200/50' : lesson.type === 'quiz' ? 'bg-amber-50 text-amber-500 border border-amber-200/50' : lesson.type === 'audio' ? 'bg-cyan-50 text-cyan-500 border border-cyan-200/50' : lesson.type === 'coding' ? 'bg-rose-50 text-rose-500 border border-rose-200/50' : lesson.type === 'assignment' ? 'bg-orange-50 text-orange-500 border border-orange-200/50' : lesson.type === 'external' ? 'bg-indigo-50 text-indigo-500 border border-indigo-200/50' : lesson.type === 'text' ? 'bg-slate-100 text-slate-500 border border-slate-200' : 'bg-sky-50 text-sky-500 border border-sky-200/50'}`}>
+                                {lesson.type === 'video' ? <Play size={14} /> : lesson.type === 'quiz' ? <HelpCircle size={14} /> : lesson.type === 'audio' ? <Headphones size={14} /> : lesson.type === 'coding' ? <Code2 size={14} /> : lesson.type === 'assignment' ? <ClipboardList size={14} /> : lesson.type === 'external' ? <ExternalLink size={14} /> : lesson.type === 'text' ? <Type size={14} /> : <FileText size={14} />}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
@@ -80,14 +86,15 @@ function SectionCard({ section, lessons, isExpanded, onToggle, index, canFullPre
                                     </p>
                                 )}
                             </div>
-                            {lesson.preview && canFullPreview && (
-                                <button onClick={() => onPlay?.(lesson)}
+                            {playable && (
+                                <button onClick={(e) => { e.stopPropagation(); onPlay?.(lesson); }}
                                     className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-all border border-indigo-200/50 flex items-center gap-1.5">
-                                    <Play size={12} /> Preview
+                                    <Play size={12} /> {canFullPreview ? 'Play' : 'Preview'}
                                 </button>
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                     {sectionLessons.length === 0 && (
                         <div className="px-6 py-4 text-sm text-muted-foreground/60 font-medium italic">No lessons in this section yet</div>
                     )}
@@ -136,6 +143,120 @@ function ReviewCard({ review }) {
     );
 }
 
+// ─── Lesson Preview Modal ──────────────────────────────────────────────────────
+// Plays/renders a single lesson inline (video, audio, pdf, text, external).
+// Interactive types (quiz/assignment) can't be previewed — full-access users get
+// a link into the course player, everyone else a hint to enroll.
+function LessonPreviewModal({ lesson, courseId, canFullPreview, onClose }) {
+    const embedUrl = lesson.type === 'video' ? getYouTubeEmbedUrl(lesson.contentUrl) : null;
+    const hasContent = !!lesson.contentUrl;
+    const isLink = lesson.type === 'external' || lesson.type === 'coding';
+    const isPdf = lesson.type === 'pdf' || lesson.type === 'document';
+    const isInteractive = lesson.type === 'quiz' || lesson.type === 'assignment';
+
+    const Empty = ({ text }) => (
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <Play size={36} className="text-slate-700 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm font-medium">{text}</p>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+            <div className="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3 px-5 py-3 bg-slate-950/80 border-b border-white/10">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                        <Play size={16} className="text-indigo-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-white truncate">{lesson.title}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                            {lesson.type} · Preview
+                        </p>
+                    </div>
+                    {hasContent && (isPdf || isLink) && (
+                        <a href={lesson.contentUrl} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-300 hover:text-indigo-200 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 whitespace-nowrap">
+                            <ExternalLink size={12} /> Open in new tab
+                        </a>
+                    )}
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-slate-300 transition-colors">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-slate-900">
+                    {lesson.type === 'video' ? (
+                        hasContent ? (
+                            embedUrl ? (
+                                <iframe src={embedUrl} className="w-full aspect-video border-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen title={lesson.title} />
+                            ) : (
+                                <video controls className="w-full aspect-video bg-black" src={lesson.contentUrl} />
+                            )
+                        ) : <Empty text="No video configured for this lesson." />
+                    ) : lesson.type === 'audio' ? (
+                        hasContent ? (
+                            <div className="flex items-center justify-center py-24 px-6">
+                                <audio controls className="w-full max-w-lg" src={lesson.contentUrl} />
+                            </div>
+                        ) : <Empty text="No audio configured for this lesson." />
+                    ) : isPdf ? (
+                        hasContent ? (
+                            <iframe src={lesson.contentUrl} className="w-full h-[60vh] border-0 bg-white" title={lesson.title} />
+                        ) : <Empty text="No document configured for this lesson." />
+                    ) : lesson.type === 'text' ? (
+                        <div className="p-6 sm:p-12">
+                            <div className="max-w-3xl mx-auto bg-slate-800/60 border border-slate-600/40 rounded-2xl p-6 sm:p-10">
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center">
+                                        <Type size={18} className="text-slate-200" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white">{lesson.title}</h3>
+                                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Text Lesson</p>
+                                    </div>
+                                </div>
+                                <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-[15px]">
+                                    {hasContent ? lesson.contentUrl : 'No content provided for this lesson.'}
+                                </div>
+                            </div>
+                        </div>
+                    ) : isLink ? (
+                        hasContent ? (
+                            <iframe src={lesson.contentUrl} className="w-full h-[60vh] border-0" title={lesson.title} />
+                        ) : <Empty text="No link configured for this lesson." />
+                    ) : isInteractive ? (
+                        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+                                <HelpCircle size={28} className="text-amber-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">{lesson.title}</h3>
+                            <p className="text-slate-400 text-sm max-w-sm mb-6">
+                                {lesson.type === 'quiz'
+                                    ? 'This assessment runs inside the course player.'
+                                    : 'This assignment opens inside the course player.'}
+                            </p>
+                            {canFullPreview ? (
+                                <Link to={`/courses/${courseId}/learn`}
+                                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors">
+                                    <Play size={14} /> Open course player
+                                </Link>
+                            ) : (
+                                <p className="text-slate-400 text-sm font-medium">Enroll in this course to access it.</p>
+                            )}
+                        </div>
+                    ) : (
+                        <Empty text="This lesson type can't be previewed here." />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function CourseDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -150,13 +271,12 @@ export default function CourseDetailPage() {
     const [enrolling, setEnrolling] = useState(false);
     const [expandedSections, setExpandedSections] = useState({});
     const [activeTab, setActiveTab] = useState('overview');
-    const [quizzes, setQuizzes] = useState([]);
-    const [quizzesLoading, setQuizzesLoading] = useState(false);
     const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
     const [submittingRating, setSubmittingRating] = useState(false);
     const [editingRating, setEditingRating] = useState(false);
     const [wishlisted, setWishlisted] = useState(false);
     const [previewVideo, setPreviewVideo] = useState(null);
+    const [previewLesson, setPreviewLesson] = useState(null);
 
     useEffect(() => {
         Promise.all([
@@ -176,14 +296,19 @@ export default function CourseDetailPage() {
             console.error(err);
         }).finally(() => setLoading(false));
 
-        if (user?.role === 'STUDENT') {
+        if (user) {
+            // Admins/instructors can enroll too (department-scoped server-side), so
+            // fetch the current user's enrollment state for any role — it drives
+            // the Enroll / Continue Learning button.
             enrollmentsAPI.getByStudent(user.id).then(enrolls => {
                 const e = enrolls.find(e => e.courseId === id);
                 if (e) setEnrollment(e);
-            });
-            ratingsAPI.getMyRating(id).then(existing => {
-                if (existing) setMyRating({ stars: existing.stars, comment: existing.comment || '' });
             }).catch(() => {});
+            if (user.role === 'STUDENT') {
+                ratingsAPI.getMyRating(id).then(existing => {
+                    if (existing) setMyRating({ stars: existing.stars, comment: existing.comment || '' });
+                }).catch(() => {});
+            }
         }
     }, [id, user]);
 
@@ -193,13 +318,7 @@ export default function CourseDetailPage() {
     const isOwnerInstructor = user?.role === 'INSTRUCTOR' && course?.instructorId === user?.id;
     const canFullPreview = isAdminPreview || isOwnerInstructor;
 
-    useEffect(() => {
-        if (!isAdminPreview) return;
-        setQuizzesLoading(true);
-        quizzesAPI.getByCourse(id).then(qs => setQuizzes(qs || [])).catch(() => setQuizzes([])).finally(() => setQuizzesLoading(false));
-    }, [id, isAdminPreview]);
-
-    const isEnrolled = user?.role === 'STUDENT' && !!enrollment;
+    const isEnrolled = !!enrollment;
     const hasRated = Array.isArray(ratings) ? ratings.some(r => r.studentId === user?.id) : false;
 
     const handleEnroll = async () => {
@@ -235,8 +354,6 @@ export default function CourseDetailPage() {
         } catch (err) { toast.error(err.message); }
         finally { setSubmittingRating(false); }
     };
-
-    const getLessonsForSection = (sectionId) => lessons.filter(l => l.sectionId === sectionId);
 
     // Compute aggregated stats
     const stats = useMemo(() => course ? [
@@ -338,7 +455,7 @@ export default function CourseDetailPage() {
                             <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-6 shadow-2xl space-y-5">
                                 <div className="aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-indigo-800/50 to-violet-800/50 border border-white/10 flex items-center justify-center">
                                     {previewVideo ? (
-                                        <button onClick={() => window.open(course.thumbnail || '#', '_blank')}
+                                        <button onClick={() => setPreviewLesson(previewVideo)}
                                             className="flex flex-col items-center gap-2 text-white/70 hover:text-white transition-colors">
                                             <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
                                                 <Play size={28} className="ml-1" />
@@ -472,17 +589,25 @@ export default function CourseDetailPage() {
                                 <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                                     <Users size={16} className="text-indigo-600" /> Instructor
                                 </h3>
-                                <Link to={`/instructor/${course.instructorId}`} className="flex items-center gap-3 group">
-                                    {course.instructorAvatar ? (
-                                        <img src={course.instructorAvatar} alt={course.instructorName} className="w-12 h-12 rounded-xl object-cover border-2 border-border" />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                                            <span className="text-white font-bold">{course.instructorName?.charAt(0)?.toUpperCase()}</span>
+                                <Link to={`/instructor/${course.instructorId}`} className="block group">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        {course.instructorAvatar ? (
+                                            <img src={course.instructorAvatar} alt={course.instructorName} className="w-14 h-14 rounded-xl object-cover border-2 border-border" />
+                                        ) : (
+                                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                                                <span className="text-white font-bold text-lg">{course.instructorName?.charAt(0)?.toUpperCase()}</span>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-bold text-foreground group-hover:text-indigo-600 transition-colors">{course.instructorName}</p>
+                                            <p className="text-xs text-muted-foreground font-medium">{course.instructorRole === 'INSTRUCTOR' ? 'Course Instructor' : course.instructorRole}</p>
                                         </div>
+                                    </div>
+                                    {course.instructorBio && (
+                                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-3">{course.instructorBio}</p>
                                     )}
-                                    <div>
-                                        <p className="font-bold text-foreground text-sm group-hover:text-indigo-600 transition-colors">{course.instructorName}</p>
-                                        <p className="text-xs text-muted-foreground/60 font-medium">{course.instructorBio?.slice(0, 60) || 'Instructor'}</p>
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
+                                        View profile <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                                     </div>
                                 </Link>
                             </div>
@@ -511,7 +636,7 @@ export default function CourseDetailPage() {
                                 onToggle={() => setExpandedSections(prev => ({ ...prev, [i]: !prev[i] }))}
                                 index={i}
                                 canFullPreview={canFullPreview}
-                                onPlay={(l) => setPreviewVideo(l)}
+                                onPlay={(l) => setPreviewLesson(l)}
                             />
                         ))}
                         {sections.length === 0 && (
@@ -526,15 +651,39 @@ export default function CourseDetailPage() {
 
                 {activeTab === 'reviews' && (
                     <div className="max-w-3xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h2 className="text-2xl font-black text-foreground tracking-tight">Student Reviews</h2>
-                                <p className="text-muted-foreground font-medium text-sm mt-1">{ratings.length} review{ratings.length !== 1 ? 's' : ''}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <RatingDisplay rating={course.rating} count={course.reviewCount} />
-                            </div>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tight">Student Reviews</h2>
+                            <p className="text-muted-foreground font-medium text-sm mt-1">{ratings.length} review{ratings.length !== 1 ? 's' : ''}</p>
                         </div>
+
+                        {/* Rating Distribution */}
+                        {ratings.length > 0 && (
+                            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm mb-6">
+                                <div className="flex items-center gap-8 flex-wrap">
+                                    <div className="text-center">
+                                        <p className="text-4xl font-black text-foreground">{parseFloat(course.rating || 0).toFixed(1)}</p>
+                                        <RatingDisplay rating={course.rating} size="sm" />
+                                        <p className="text-xs text-muted-foreground font-medium mt-1">{course.reviewCount || ratings.length} ratings</p>
+                                    </div>
+                                    <div className="flex-1 min-w-[200px] space-y-1.5">
+                                        {[5, 4, 3, 2, 1].map(star => {
+                                            const count = ratings.filter(r => r.stars === star).length;
+                                            const pct = ratings.length > 0 ? Math.round((count / ratings.length) * 100) : 0;
+                                            return (
+                                                <div key={star} className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-muted-foreground w-3">{star}</span>
+                                                    <Star size={12} className="text-amber-400 fill-amber-400" />
+                                                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                                        <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground font-medium w-8 text-right">{count}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Rating form */}
                         {user?.role === 'STUDENT' && isEnrolled && !editingRating && (
@@ -589,6 +738,15 @@ export default function CourseDetailPage() {
                     </div>
                 )}
             </div>
+
+            {previewLesson && (
+                <LessonPreviewModal
+                    lesson={previewLesson}
+                    courseId={id}
+                    canFullPreview={canFullPreview}
+                    onClose={() => setPreviewLesson(null)}
+                />
+            )}
         </div>
     );
 }

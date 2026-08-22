@@ -5,15 +5,15 @@ import { usersAPI, departmentsAPI, statsAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { SearchInput, FilterBar, FilterSelect } from '../../../components/ui/SearchInput';
+import { FilterBar, FilterSelect } from '../../../components/ui/SearchInput';
 import { DataTable, UserCell } from '../../../components/ui/DataTable';
+import { DataGrid, ConfirmDialog, Breadcrumbs } from '../../../components/ui';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function AdminUsers() {
-    const { isSuperAdmin, user: currentUser } = useAuth();
+    const { isSuperAdmin, user: currentUser, can } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('users');
-    const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({ role: '', status: '', from: '', to: '', departmentId: '' });
 
     const { data: users, loading, reload: reloadUsers } = useAsyncData(
@@ -131,26 +131,60 @@ export default function AdminUsers() {
         }
     };
 
-    const handleResetPassword = async (user) => {
-        if (!window.confirm(`Reset password for ${user.name}? A new temporary password will be generated.`)) return;
+    // Force password reset: opens a confirm modal (instead of window.confirm)
+    // so the operator can opt into "must change password on next login".
+    const [resetTarget, setResetTarget] = useState(null); // user awaiting reset confirmation
+    const [forceReset, setForceReset] = useState(false);
+    const [resetting, setResetting] = useState(false);
+
+    const handleResetPassword = (user) => {
+        setResetTarget(user);
+        setForceReset(false);
+    };
+
+    const confirmResetPassword = async () => {
+        if (!resetTarget) return;
+        setResetting(true);
         try {
-            const res = await usersAPI.resetPassword(user.id);
-            setResetResult({ name: user.name, tempPassword: res.tempPassword });
-            toast.success('Password reset');
+            const res = await usersAPI.resetPassword(resetTarget.id, undefined, forceReset);
+            setResetResult({ name: resetTarget.name, tempPassword: res.tempPassword, mustChange: res.mustChangePassword });
+            setResetTarget(null);
+            toast.success(forceReset ? 'Password reset — user must change it on next login' : 'Password reset');
         } catch (err) {
             toast.error(err.message || 'Failed to reset password');
+        } finally {
+            setResetting(false);
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (!window.confirm('Are you sure you want to permanently delete this user?')) return;
-        try {
-            await usersAPI.delete(userId);
-            reloadUsers();
-            toast.success('User deleted');
-        } catch (err) {
-            toast.error(err.message || 'Failed to delete user. They might be tied to existing courses/data.');
+    // Delete confirmation (single user or bulk selection) via ConfirmDialog.
+    const [deleteTarget, setDeleteTarget] = useState(null); // single user
+    const [bulkDeleteRows, setBulkDeleteRows] = useState(null); // array for bulk selection
+    const [deleting, setDeleting] = useState(false);
+
+    const requestDeleteUser = (user) => setDeleteTarget(user);
+    const requestBulkDelete = (rows) => setBulkDeleteRows(rows);
+
+    const confirmDelete = async () => {
+        const targets = bulkDeleteRows || (deleteTarget ? [deleteTarget] : []);
+        if (!targets.length) return;
+        setDeleting(true);
+        let deleted = 0;
+        for (const u of targets) {
+            try { await usersAPI.delete(u.id); deleted++; } catch { /* keep going — collect failures */ }
         }
+        if (deleted === targets.length) {
+            toast.success(`${deleted} user${deleted > 1 ? 's' : ''} deleted`);
+        } else if (deleted > 0) {
+            toast.success(`${deleted} deleted — ${targets.length - deleted} failed (tied to courses/data?)`);
+        } else {
+            toast.error('No users deleted. They may be tied to existing courses/data.');
+        }
+        setDeleting(false);
+        setDeleteTarget(null);
+        setBulkDeleteRows(null);
+        setSelectedKeys([]);
+        reloadUsers();
     };
 
     const handleAddInstructor = async (e) => {
@@ -235,10 +269,12 @@ export default function AdminUsers() {
     };
 
     const safeUsers = users ?? [];
-    const filteredUsers = safeUsers.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+
+    // Rows currently visible in the DataGrid (post search/sort) — drives the CSV export.
+    const [exportRows, setExportRows] = useState([]);
+
+    // Controlled bulk-selection state for the DataGrid.
+    const [selectedKeys, setSelectedKeys] = useState([]);
 
     // Users eligible for student↔instructor conversion in the dedicated tab.
     const convertibleUsers = (roleUsers || []).filter(u => ['STUDENT', 'INSTRUCTOR'].includes(u.role));
@@ -261,33 +297,43 @@ export default function AdminUsers() {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
+            <Breadcrumbs
+                items={[{ label: 'Dashboard', to: '/admin' }, { label: 'User Management' }]}
+                className="mb-1"
+            />
             <PageHeader
                 title="User Management"
                 subtitle="Manage roles, statuses, departments, and instructor onboarding."
                 action={
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => { setShowImport(true); setImportResults(null); setImportFile(null); }}
-                            className="bg-card border border-border text-foreground px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted transition-colors"
-                        >
-                            <Upload size={16} /> Import Instructors
-                        </button>
-                        <button
-                            onClick={() => { setShowStudentImport(true); setStudentImportResults(null); setStudentImportFile(null); }}
-                            className="bg-card border border-border text-foreground px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted transition-colors"
-                        >
-                            <Upload size={16} /> Import Students
-                        </button>
-                        <button
-                            onClick={() => { setShowAdd(true); setAddResult(null); }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"
-                        >
-                            <UserPlus size={16} /> Add Instructor
-                        </button>
+                        {can('instructor.create') && (
+                            <button
+                                onClick={() => { setShowImport(true); setImportResults(null); setImportFile(null); }}
+                                className="bg-card border border-border text-foreground px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted transition-colors"
+                            >
+                                <Upload size={16} /> Import Instructors
+                            </button>
+                        )}
+                        {can('student.create') && (
+                            <button
+                                onClick={() => { setShowStudentImport(true); setStudentImportResults(null); setStudentImportFile(null); }}
+                                className="bg-card border border-border text-foreground px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-muted transition-colors"
+                            >
+                                <Upload size={16} /> Import Students
+                            </button>
+                        )}
+                        {can('instructor.create') && (
+                            <button
+                                onClick={() => { setShowAdd(true); setAddResult(null); }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"
+                            >
+                                <UserPlus size={16} /> Add Instructor
+                            </button>
+                        )}
                         <button
                             onClick={() => {
                                 const csv = "Name,Email,Role,Department,Joined,Status\n" +
-                                    filteredUsers.map(u => `"${u.name}","${u.email}","${u.role}","${deptName(u.departmentId)}","${new Date(u.createdAt).toLocaleDateString()}",${u.active !== false ? 'Active' : 'Suspended'}`).join("\n");
+                                    exportRows.map(u => `"${u.name}","${u.email}","${u.role}","${deptName(u.departmentId)}","${new Date(u.createdAt).toLocaleDateString()}",${u.active !== false ? 'Active' : 'Suspended'}`).join("\n");
                                 const blob = new Blob([csv], { type: 'text/csv' });
                                 const url = window.URL.createObjectURL(blob);
                                 const a = document.createElement('a');
@@ -344,11 +390,6 @@ export default function AdminUsers() {
             {activeTab === 'users' && (
                 <>
                     <FilterBar className="mb-6">
-                        <SearchInput
-                            value={searchTerm}
-                            onChange={setSearchTerm}
-                            placeholder="Search users by name or email..."
-                        />
                         <FilterSelect value={filters.role} onChange={v => setFilter('role', v)}>
                             <option value="">All Roles</option>
                             <option value="STUDENT">Student</option>
@@ -375,53 +416,41 @@ export default function AdminUsers() {
                             className="bg-card border border-border text-foreground font-medium rounded-xl py-3 px-4 text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-200" />
                     </FilterBar>
 
-                    <DataTable
-                        columns={['User', 'Roll No', 'Role', 'Department', 'Joined Date', 'Status', 'Actions']}
-                        loading={loading}
-                        loadingText="Loading users..."
-                        empty={!loading && filteredUsers.length === 0}
-                        emptyText="No users found matching your filters."
-                    >
-                        {filteredUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-muted/40 transition-colors cursor-pointer" onClick={() => navigate(`/admin/users/${user.id}`)}>
-                                <td className="py-4 px-4">
-                                    <UserCell name={user.name} email={user.email} avatar={user.avatar} />
-                                </td>
-                                <td className="py-4 px-4">
-                                    {user.rollNo ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold">
-                                            {user.rollNo}
-                                        </span>
-                                    ) : (
-                                        <span className="text-muted-foreground/40 text-xs">—</span>
-                                    )}
-                                </td>
-                                <td className="py-4 px-4">
-                                    {roleBadge(user.role)}
-                                </td>
-                                <td className="py-4 px-4">
-                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                                        <Building2 size={12} /> {deptName(user.departmentId)}
-                                    </span>
-                                </td>
-                                <td className="py-4 px-4 text-muted-foreground font-medium text-[13px]">
-                                    {new Date(user.createdAt).toLocaleDateString()}
-                                </td>
-                                <td className="py-4 px-4">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleToggleStatus(user.id); }}
-                                        disabled={user.id === currentUser?.id}
-                                        title={user.id === currentUser?.id ? "You can't change your own status" : undefined}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${user.active !== false
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100'
-                                            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-200 dark:border-rose-700 hover:bg-rose-100'}`}
-                                    >
-                                        {user.active !== false
-                                            ? <><CheckCircle size={14} /> Active</>
-                                            : <><Ban size={14} /> Suspended</>}
-                                    </button>
-                                </td>
-                                <td className="py-4 px-4 text-right">
+                    <DataGrid
+                        columns={[
+                            { key: 'name', header: 'User', sortable: true, render: (user) => <UserCell name={user.name} email={user.email} avatar={user.avatar} /> },
+                            { key: 'rollNo', header: 'Roll No', sortable: true, render: (user) => user.rollNo ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold">
+                                    {user.rollNo}
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground/40 text-xs">—</span>
+                            ) },
+                            { key: 'role', header: 'Role', sortable: true, render: (user) => roleBadge(user.role) },
+                            { key: 'departmentId', header: 'Department', sortable: true, value: (user) => deptName(user.departmentId), render: (user) => (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                                    <Building2 size={12} /> {deptName(user.departmentId)}
+                                </span>
+                            ) },
+                            { key: 'createdAt', header: 'Joined Date', sortable: true, value: (user) => new Date(user.createdAt).getTime(), render: (user) => (
+                                <span className="text-muted-foreground font-medium text-[13px]">{new Date(user.createdAt).toLocaleDateString()}</span>
+                            ) },
+                            { key: 'status', header: 'Status', sortable: true, value: (user) => user.active !== false ? 'Active' : 'Suspended', render: (user) => (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleToggleStatus(user.id); }}
+                                    disabled={user.id === currentUser?.id}
+                                    title={user.id === currentUser?.id ? "You can't change your own status" : undefined}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${user.active !== false
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100'
+                                        : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-200 dark:border-rose-700 hover:bg-rose-100'}`}
+                                >
+                                    {user.active !== false
+                                        ? <><CheckCircle size={14} /> Active</>
+                                        : <><Ban size={14} /> Suspended</>}
+                                </button>
+                            ) },
+                            { key: 'actions', header: 'Actions', align: 'right', render: (user) => (
+                                <>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleResetPassword(user); }}
                                         disabled={user.id === currentUser?.id}
@@ -431,17 +460,32 @@ export default function AdminUsers() {
                                         <RotateCcw size={18} />
                                     </button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteUser(user.id); }}
+                                        onClick={(e) => { e.stopPropagation(); requestDeleteUser(user); }}
                                         disabled={user.id === currentUser?.id}
                                         className="p-2 text-rose-500 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                         title={user.id === currentUser?.id ? "You can't delete your own account" : 'Delete User'}
                                     >
                                         <Trash2 size={18} />
                                     </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </DataTable>
+                                </>
+                            ) },
+                        ]}
+                        rows={safeUsers}
+                        rowKey="id"
+                        searchable
+                        searchPlaceholder="Search users by name, email, roll no, or department..."
+                        selectable
+                        selectedKeys={selectedKeys}
+                        onSelectionChange={setSelectedKeys}
+                        bulkActions={[
+                            { label: 'Delete selected', icon: Trash2, onClick: requestBulkDelete },
+                        ]}
+                        onRowClick={(user) => navigate(`/admin/users/${user.id}`)}
+                        onFilteredChange={setExportRows}
+                        loading={loading}
+                        loadingText="Loading users..."
+                        emptyText="No users found matching your filters."
+                    />
                 </>
             )}
 
@@ -807,6 +851,70 @@ export default function AdminUsers() {
                 </div>
             )}
 
+            {/* Password Reset Confirm Modal */}
+            {resetTarget && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden">
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <RotateCcw size={20} className="text-violet-600" /> Reset Password
+                            </h3>
+                            <button onClick={() => setResetTarget(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-muted-foreground font-medium">
+                                Reset the password for <span className="font-bold text-foreground">{resetTarget.name}</span>?
+                                A new temporary password will be generated.
+                            </p>
+                            <label className="flex items-start gap-3 p-4 rounded-2xl border border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={forceReset}
+                                    onChange={e => setForceReset(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded accent-violet-600"
+                                />
+                                <span>
+                                    <span className="block text-sm font-bold text-foreground">Force password change on next login</span>
+                                    <span className="block text-xs text-muted-foreground mt-0.5">
+                                        The user must set a new password before they can continue using the platform.
+                                    </span>
+                                </span>
+                            </label>
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    onClick={() => setResetTarget(null)}
+                                    className="flex-1 px-4 py-2.5 bg-muted hover:bg-muted/70 rounded-2xl font-bold text-sm text-foreground transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmResetPassword}
+                                    disabled={resetting}
+                                    className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-2xl font-bold text-sm transition-colors"
+                                >
+                                    {resetting ? 'Resetting...' : 'Yes, Reset Password'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation (single or bulk) */}
+            <ConfirmDialog
+                open={!!deleteTarget || !!bulkDeleteRows}
+                title={bulkDeleteRows ? `Delete ${bulkDeleteRows.length} selected users?` : `Delete "${deleteTarget?.name}"?`}
+                message={bulkDeleteRows
+                    ? 'The selected users will be permanently removed. Users tied to existing courses or data cannot be deleted.'
+                    : 'This user will be permanently removed. This cannot be undone.'}
+                confirmLabel="Delete"
+                loading={deleting}
+                onConfirm={confirmDelete}
+                onCancel={() => { if (!deleting) { setDeleteTarget(null); setBulkDeleteRows(null); } }}
+            />
+
             {/* Password Reset Result Modal */}
             {resetResult && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -824,6 +932,11 @@ export default function AdminUsers() {
                                 New temporary password for <span className="font-bold text-foreground">{resetResult.name}</span>.
                                 Share it securely — it won't be shown again.
                             </p>
+                            {resetResult.mustChange && (
+                                <p className="text-[12px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl px-3 py-2">
+                                    This user must change their password on next login.
+                                </p>
+                            )}
                             <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-2xl px-4 py-3">
                                 <code className="flex-1 font-mono text-sm font-bold text-foreground break-all">{resetResult.tempPassword}</code>
                                 <button

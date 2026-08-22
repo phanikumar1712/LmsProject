@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Mail, Filter, BookOpen, Upload, Download, Eye, Copy, X, Send } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { coursesAPI, enrollmentsAPI, usersAPI } from '../../../services/api';
+import { Mail, Filter, BookOpen, Eye, Copy, X, Send } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { coursesAPI, enrollmentsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -13,10 +13,9 @@ import toast from 'react-hot-toast';
 export default function InstructorStudents() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterCourse, setFilterCourse] = useState('All');
-    const [importing, setImporting] = useState(false);
-    const [showImport, setShowImport] = useState(false);
+    const [filterCourse, setFilterCourse] = useState(searchParams.get('course') || 'All');
     const [contactStudent, setContactStudent] = useState(null);
 
     // Only 2 API calls now — both are accessible to instructors
@@ -30,23 +29,6 @@ export default function InstructorStudents() {
 
     // Build per-course lookup for titles
     const courseMap = Object.fromEntries(myCourses.map(c => [c.id, c]));
-
-    const handleImport = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setImporting(true);
-        try {
-            const result = await usersAPI.importStudents(file);
-            toast.success(`Imported ${result.created || 0} students into ${result.departmentName || 'the global pool'}`);
-            setShowImport(false);
-            reload();
-        } catch (err) {
-            toast.error(err.message || 'Import failed');
-        } finally {
-            setImporting(false);
-        }
-        e.target.value = '';
-    };
 
     // Build rows directly from enriched enrollment stats (student info already included)
     const tableRows = enrollments

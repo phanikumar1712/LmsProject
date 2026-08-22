@@ -2,9 +2,10 @@ import { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Play, CheckCircle, FileText, ChevronLeft, ChevronRight, Menu, X,
-    HelpCircle, BookOpen, Trophy, Clock, Loader2, Lock, GitBranch, Sparkles, Star
+    HelpCircle, BookOpen, Trophy, Clock, Loader2, Lock, GitBranch, Sparkles, Star,
+    Headphones, Type, ExternalLink, Code2, ClipboardList, Bookmark, StickyNote, Plus, Trash2
 } from 'lucide-react';
-import { coursesAPI, enrollmentsAPI, ratingsAPI } from '../../../services/api';
+import { coursesAPI, enrollmentsAPI, ratingsAPI, bookmarksAPI, notesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { RatingStars } from '../../../components/ui/RatingStars';
 import { getYouTubeEmbedUrl } from '../../../lib/video';
@@ -46,6 +47,7 @@ export default function CourseLearningPlayer() {
     const [activeLesson, setActiveLesson] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [loading, setLoading] = useState(true);
+    const [courseNotFound, setCourseNotFound] = useState(false);
     const [marking, setMarking] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [myRating, setMyRating] = useState({ stars: 0, comment: '' });
@@ -54,6 +56,14 @@ export default function CourseLearningPlayer() {
     const [dripMode, setDripMode] = useState('none');
     const [versions, setVersions] = useState([]);
     const [showChangelog, setShowChangelog] = useState(false);
+    // Study aids: bookmarks (lesson ids) + per-lesson notes for this course.
+    const [bookmarks, setBookmarks] = useState([]);
+    const [notes, setNotes] = useState([]);
+    const [showNotes, setShowNotes] = useState(false);
+    const [noteDraft, setNoteDraft] = useState('');
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [savingNote, setSavingNote] = useState(false);
+    const [togglingBookmark, setTogglingBookmark] = useState(false);
 
     // Build a map of lessonId -> drip info
     const dripMap = {};
@@ -89,15 +99,19 @@ export default function CourseLearningPlayer() {
             const e = enrolls.find(en => en.courseId === courseId);
             setEnrollment(e || null);
 
-            // Fetch version history if enrolled
+            // Fetch version history + study aids if enrolled
             if (e) {
                 Promise.all([
                     coursesAPI.getVersions(courseId),
                     coursesAPI.getDripStatus(courseId),
-                ]).then(([versionData, dripData]) => {
+                    bookmarksAPI.getByCourse(courseId).catch(() => []),
+                    notesAPI.getByCourse(courseId).catch(() => []),
+                ]).then(([versionData, dripData, bmarks, nts]) => {
                     setVersions(versionData || []);
                     setDripStatus(dripData.dripStatus || []);
                     setDripMode(dripData.dripMode || 'none');
+                    setBookmarks((bmarks || []).map(b => b.lessonId));
+                    setNotes(nts || []);
                 }).catch(() => {});
             }
 
@@ -107,9 +121,13 @@ export default function CourseLearningPlayer() {
                 const next = l.find(lsn => !completedSet.has(lsn.id));
                 setActiveLesson(next || l[0]);
             }
-        }).catch(() => {
-            toast.error('Failed to load course content');
-            navigate('/student/courses');
+        }).catch((err) => {
+            if (err?.status === 404 || err?.message?.includes('not found') || err?.message?.includes('404')) {
+                setCourseNotFound(true);
+            } else {
+                toast.error('Failed to load course content');
+                navigate('/student/courses');
+            }
         }).finally(() => setLoading(false));
     }, [courseId, user, navigate]);
 
@@ -187,6 +205,66 @@ export default function CourseLearningPlayer() {
         if (currentIndex > 0) setActiveLesson(lessons[currentIndex - 1]);
     };
 
+    // ── Study aids: bookmarks + notes ────────────────────────────────────────
+    const isBookmarked = activeLesson ? bookmarks.includes(activeLesson.id) : false;
+    const lessonNotes = notes.filter(n => n.lesson_id === activeLesson?.id);
+
+    const toggleBookmark = async () => {
+        if (!activeLesson || togglingBookmark) return;
+        setTogglingBookmark(true);
+        try {
+            const res = await bookmarksAPI.toggle(courseId, activeLesson.id);
+            setBookmarks(prev => res.bookmarked
+                ? [...prev, activeLesson.id]
+                : prev.filter(id => id !== activeLesson.id));
+            toast.success(res.bookmarked ? 'Bookmarked ⭐' : 'Bookmark removed');
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setTogglingBookmark(false);
+        }
+    };
+
+    const saveNote = async () => {
+        if (!activeLesson) return;
+        const text = noteDraft.trim();
+        if (!text) { toast.error('Write something first'); return; }
+        setSavingNote(true);
+        try {
+            if (editingNoteId) {
+                await notesAPI.update(editingNoteId, text);
+                setNotes(prev => prev.map(n => n.id === editingNoteId ? { ...n, content: text } : n));
+                toast.success('Note updated');
+            } else {
+                const created = await notesAPI.create({ courseId, lessonId: activeLesson.id, content: text });
+                setNotes(prev => [{ ...created, lesson_id: activeLesson.id }, ...prev]);
+                toast.success('Note saved 📝');
+            }
+            setNoteDraft('');
+            setEditingNoteId(null);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const startEditNote = (note) => {
+        setEditingNoteId(note.id);
+        setNoteDraft(note.content);
+    };
+
+    const deleteNote = async (noteId) => {
+        try {
+            await notesAPI.remove(noteId);
+            setNotes(prev => prev.filter(n => n.id !== noteId));
+            if (editingNoteId === noteId) { setEditingNoteId(null); setNoteDraft(''); }
+            toast.success('Note deleted');
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
     const progress = enrollment?.progress ?? 0;
     const completedCount = enrollment?.completedLessons?.length ?? 0;
     const embedUrl = activeLesson?.type === 'video' ? getYouTubeEmbedUrl(activeLesson.contentUrl) : null;
@@ -204,9 +282,19 @@ export default function CourseLearningPlayer() {
 
     // Check if active lesson is locked
     const activeLocked = activeLesson && !isLessonUnlocked(activeLesson.id);
-    if (!course) return (
+    if (courseNotFound || !course) return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950">
-            <p className="text-muted-foreground">Course not found</p>
+            <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+                <BookOpen size={48} className="text-muted-foreground/40" />
+                <h2 className="text-lg font-semibold text-white">Course Not Found</h2>
+                <p className="text-muted-foreground text-sm">This course may have been removed or is no longer available.</p>
+                <button
+                    onClick={() => navigate('/student/courses')}
+                    className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                    Back to My Courses
+                </button>
+            </div>
         </div>
     );
 
@@ -257,6 +345,38 @@ export default function CourseLearningPlayer() {
                             <Sparkles size={14} />
                             <span className="hidden xs:inline">What's New?</span>
                         </button>
+                    )}
+
+                    {activeLesson && (
+                        <>
+                            {/* Bookmark toggle */}
+                            <button
+                                onClick={toggleBookmark}
+                                disabled={togglingBookmark}
+                                title={isBookmarked ? 'Remove bookmark' : 'Bookmark this lesson'}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                    isBookmarked
+                                        ? 'bg-yellow-500/15 text-yellow-400 border-yellow-400/30'
+                                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                }`}
+                            >
+                                <Bookmark size={14} fill={isBookmarked ? 'currentColor' : 'none'} />
+                                <span className="hidden sm:block">{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+                            </button>
+                            {/* Notes panel toggle */}
+                            <button
+                                onClick={() => setShowNotes(o => !o)}
+                                title="Lesson notes"
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                    showNotes
+                                        ? 'bg-indigo-500/15 text-indigo-400 border-indigo-400/30'
+                                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                }`}
+                            >
+                                <StickyNote size={14} />
+                                <span className="hidden sm:block">Notes {lessonNotes.length > 0 && `(${lessonNotes.length})`}</span>
+                            </button>
+                        </>
                     )}
 
                     <button
@@ -355,6 +475,104 @@ export default function CourseLearningPlayer() {
                                             <CheckCircle size={16} /> Quiz already completed
                                         </p>
                                     )}
+                                </div>
+                            </div>
+                        ) : activeLesson.type === 'text' ? (
+                            <div className="absolute inset-0 overflow-y-auto bg-slate-900 p-6 sm:p-10">
+                                <div className="max-w-3xl mx-auto bg-slate-800/60 border border-slate-600/40 rounded-2xl p-6 sm:p-10 my-4">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="w-11 h-11 rounded-xl bg-slate-700 flex items-center justify-center">
+                                            <Type size={22} className="text-slate-200" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">{activeLesson.title}</h3>
+                                            <p className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Text Lesson</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-[15px]">
+                                        {activeLesson.contentUrl || 'No content provided for this lesson.'}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : activeLesson.type === 'audio' ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 p-8">
+                                <div className="bg-slate-800/60 backdrop-blur-xl p-8 rounded-3xl border border-cyan-500/20 shadow-2xl max-w-lg w-full">
+                                    <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <Headphones size={32} className="text-cyan-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white text-center mb-1">{activeLesson.title}</h3>
+                                    <p className="text-slate-400 text-xs uppercase tracking-widest font-bold text-center mb-6">Audio Lesson</p>
+                                    {activeLesson.contentUrl ? (
+                                        <audio controls className="w-full" src={activeLesson.contentUrl} />
+                                    ) : (
+                                        <p className="text-slate-400 text-sm text-center bg-slate-900 rounded-xl py-4 border border-slate-700">No audio file configured.</p>
+                                    )}
+                                    <p className="text-slate-400 text-xs mt-4 text-center">After listening, click "Mark as Complete" below.</p>
+                                </div>
+                            </div>
+                        ) : activeLesson.type === 'pdf' ? (
+                            <div className="absolute inset-0 bg-slate-900">
+                                {activeLesson.contentUrl ? (
+                                    <>
+                                        <iframe src={activeLesson.contentUrl} className="w-full h-full border-0" title={activeLesson.title} />
+                                        <div className="absolute bottom-4 right-4 z-10">
+                                            <a
+                                                href={activeLesson.contentUrl} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg transition-colors"
+                                            >
+                                                <ExternalLink size={14} /> Open in new tab
+                                            </a>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <div className="text-center">
+                                            <FileText size={40} className="text-emerald-400 mx-auto mb-3" />
+                                            <p className="text-slate-300 font-semibold">No PDF configured</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : activeLesson.type === 'external' || activeLesson.type === 'coding' ? (
+                            <div className="absolute inset-0 flex flex-col bg-slate-900">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-950 border-b border-slate-800 text-xs font-bold text-slate-300">
+                                    {activeLesson.type === 'coding' ? <Code2 size={14} className="text-rose-400" /> : <ExternalLink size={14} className="text-indigo-400" />}
+                                    <span className="uppercase tracking-widest">{activeLesson.type === 'coding' ? 'Coding Exercise' : 'External Resource'}</span>
+                                    {activeLesson.contentUrl && (
+                                        <a
+                                            href={activeLesson.contentUrl} target="_blank" rel="noopener noreferrer"
+                                            className="ml-auto inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                                        >
+                                            Open in new tab <ExternalLink size={12} />
+                                        </a>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    {activeLesson.contentUrl ? (
+                                        <iframe src={activeLesson.contentUrl} className="w-full h-full border-0" title={activeLesson.title} />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <p className="text-slate-400 text-sm bg-slate-800 rounded-xl py-4 px-6 border border-slate-700">No link configured for this lesson.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : activeLesson.type === 'assignment' ? (
+                            <div className="absolute inset-0 overflow-y-auto bg-slate-900 p-6 sm:p-10">
+                                <div className="max-w-3xl mx-auto bg-slate-800/60 border border-orange-500/20 rounded-2xl p-6 sm:p-10 my-4">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="w-11 h-11 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                                            <ClipboardList size={22} className="text-orange-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">{activeLesson.title}</h3>
+                                            <p className="text-[11px] uppercase tracking-widest text-orange-300 font-bold">Assignment</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-[15px] mb-6">
+                                        {activeLesson.contentUrl || 'No instructions provided for this assignment.'}
+                                    </div>
+                                    <p className="text-slate-400 text-xs">Upload and submit your work from the <span className="text-orange-300 font-bold">Assignments</span> page (sidebar → Assignments). Click "Mark as Complete" below once finished.</p>
                                 </div>
                             </div>
                         ) : (
@@ -498,8 +716,18 @@ export default function CourseLearningPlayer() {
                                                         <CheckCircle size={16} className="text-green-500" />
                                                     ) : lesson.type === 'quiz' ? (
                                                         <HelpCircle size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
-                                                    ) : lesson.type === 'document' ? (
+                                                    ) : lesson.type === 'document' || lesson.type === 'pdf' ? (
                                                         <FileText size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
+                                                    ) : lesson.type === 'audio' ? (
+                                                        <Headphones size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
+                                                    ) : lesson.type === 'text' ? (
+                                                        <Type size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
+                                                    ) : lesson.type === 'coding' ? (
+                                                        <Code2 size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
+                                                    ) : lesson.type === 'assignment' ? (
+                                                        <ClipboardList size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
+                                                    ) : lesson.type === 'external' ? (
+                                                        <ExternalLink size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
                                                     ) : (
                                                         <Play size={16} className={active ? 'text-indigo-400' : 'text-muted-foreground'} />
                                                     )}
@@ -609,6 +837,103 @@ export default function CourseLearningPlayer() {
                                 <p className="text-xs text-muted-foreground/60">
                                     You are viewing content from your enrolled version. The latest version has updates you haven't seen yet.
                                 </p>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ── Notes Modal ─────────────────────────────────────── */}
+            <AnimatePresence>
+                {showNotes && activeLesson && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowNotes(false)}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-lg w-full relative z-10 max-h-[80vh] flex flex-col"
+                        >
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                                        <StickyNote size={20} className="text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white">My Notes</h3>
+                                        <p className="text-xs text-muted-foreground/60 truncate max-w-[220px]">{activeLesson.title}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowNotes(false)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+                                    <X size={18} className="text-muted-foreground/60" />
+                                </button>
+                            </div>
+
+                            {/* Note composer */}
+                            <div className="mb-4">
+                                <textarea
+                                    value={noteDraft}
+                                    onChange={e => setNoteDraft(e.target.value)}
+                                    placeholder="Write a note for this lesson…"
+                                    rows={3}
+                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition-all"
+                                />
+                                <div className="flex items-center justify-between mt-2 gap-3">
+                                    {editingNoteId ? (
+                                        <button
+                                            onClick={() => { setEditingNoteId(null); setNoteDraft(''); }}
+                                            className="text-xs font-bold text-muted-foreground/60 hover:text-white transition-colors"
+                                        >
+                                            Cancel edit
+                                        </button>
+                                    ) : <span />}
+                                    <button
+                                        onClick={saveNote}
+                                        disabled={savingNote || !noteDraft.trim()}
+                                        className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                                    >
+                                        {savingNote ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                                        {editingNoteId ? 'Update Note' : 'Add Note'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Note list for this lesson */}
+                            <div className="flex-1 overflow-y-auto space-y-2.5 min-h-0">
+                                {lessonNotes.length === 0 ? (
+                                    <div className="text-center py-10 text-muted-foreground/50 text-sm font-medium">
+                                        No notes for this lesson yet.
+                                    </div>
+                                ) : lessonNotes.map(note => (
+                                    <div key={note.id} className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 group">
+                                        <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{note.content}</p>
+                                        <div className="flex items-center justify-between mt-2.5">
+                                            <span className="text-[10px] text-muted-foreground/50 font-medium">
+                                                {new Date(note.updated_at || note.updatedAt || note.created_at).toLocaleString()}
+                                            </span>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => startEditNote(note)}
+                                                    className="px-2 py-1 text-[10px] font-bold text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-colors"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteNote(note.id)}
+                                                    className="px-2 py-1 text-[10px] font-bold text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </motion.div>
                     </div>

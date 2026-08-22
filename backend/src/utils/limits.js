@@ -72,8 +72,9 @@ const notifyLimitReached = async (deptId, kind, capacity = null) => {
     const label = kind === 'students' ? 'student' : 'course';
     const limit = kind === 'students' ? cap.maxStudents : cap.maxCourses;
     const count = kind === 'students' ? cap.studentCount : cap.courseCount;
-    const deptLabel = cap.deptName ? ` (${cap.deptName})` : '';
-    const message = `⚠️ Department${deptLabel} ${label} limit reached (${count}/${limit}). Review or raise the limit.`;
+    const deptLabel = cap.deptName || 'this department';
+    const action = kind === 'courses' ? 'approve more courses' : 'add more students';
+    const message = `⚠️ ${label[0].toUpperCase()}${label.slice(1)} limit reached in ${deptLabel}: ${count} of ${limit} used. You can't ${action} until a Super Admin raises the limit.`;
 
     const [admins, superAdmins] = await Promise.all([
         query(
@@ -86,16 +87,21 @@ const notifyLimitReached = async (deptId, kind, capacity = null) => {
     admins.rows.forEach(r => targets.add(r.id));
     superAdmins.rows.forEach(r => targets.add(r.id));
 
-    for (const userId of targets) {
-        const recent = await query(
-            `SELECT 1 FROM notifications WHERE user_id = $1 AND type = $2
-             AND created_at > NOW() - INTERVAL '24 hours' LIMIT 1`,
-            [userId, type]
-        );
-        if (recent.rows.length) continue;
+    // Batch the dedupe + insert into a single statement (was N+1: one
+    // SELECT + one INSERT per target). NOT EXISTS preserves the 24h
+    // per-(user, type) dedupe semantics exactly.
+    const targetIds = [...targets];
+    if (targetIds.length) {
         await query(
-            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-            [userId, message, type, '/admin']
+            `INSERT INTO notifications (user_id, message, type, link)
+             SELECT t.id, $1, $2, $3
+             FROM unnest($4::uuid[]) AS t(id)
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM notifications n
+                 WHERE n.user_id = t.id AND n.type = $2
+                   AND n.created_at > NOW() - INTERVAL '24 hours'
+             )`,
+            [message, type, '/admin', targetIds]
         ).catch(() => {});
     }
 };

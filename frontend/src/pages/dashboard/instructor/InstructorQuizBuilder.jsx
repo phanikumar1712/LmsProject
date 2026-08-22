@@ -9,6 +9,8 @@ import { parseQuestionFile, downloadQuestionTemplate } from '../../../utils/quiz
 const QUESTION_TYPES = [
     { value: 'MCQ_SINGLE', label: 'Single Choice (Radio)', icon: Circle },
     { value: 'MCQ_MULTI', label: 'Multiple Choice (Checkbox)', icon: CheckSquare },
+    { value: 'TRUE_FALSE', label: 'True / False', icon: Circle },
+    { value: 'SHORT_ANSWER', label: 'Short Answer', icon: Type },
     { value: 'FILL_BLANK', label: 'Fill in the Blank', icon: Type }
 ];
 
@@ -27,7 +29,8 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
     const [importing, setImporting] = useState(false);
 
     const [quizInfo, setQuizInfo] = useState({
-        courseId: '', title: '', instructions: '', timeLimit: 30, passingScore: 80, maxAttempts: 0
+        courseId: '', title: '', instructions: '', timeLimit: 30, passingScore: 80, maxAttempts: 0,
+        negativeMarking: 0, startDate: '', endDate: '', examKind: 'QUIZ'
     });
 
     // Selection config for random question drawing
@@ -63,8 +66,9 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
             // eslint-disable-next-line react-hooks/purity
             id: `q${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, type, text: '',
             category: presetCategory,
-            options: type.includes('MCQ') ? ['', ''] : [],
-            correctAnswers: type === 'MCQ_SINGLE' ? [0] : [],
+            options: type.includes('MCQ') ? ['', ''] : type === 'TRUE_FALSE' ? ['True', 'False'] : [],
+            correctAnswers: type === 'MCQ_SINGLE' || type === 'TRUE_FALSE' ? [0]
+                : (type === 'FILL_BLANK' || type === 'SHORT_ANSWER') ? [''] : [],
             difficulty: 'MEDIUM',
             isExpanded: true
         }]);
@@ -104,7 +108,7 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
         const newQs = [...questions];
         const q = newQs[qIdx];
 
-        if (q.type === 'MCQ_SINGLE') {
+        if (q.type === 'MCQ_SINGLE' || q.type === 'TRUE_FALSE') {
             q.correctAnswers = [optIdx];
         } else if (q.type === 'MCQ_MULTI') {
             if (q.correctAnswers.includes(optIdx)) {
@@ -183,20 +187,25 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
             if (!q.text.trim()) { toast.error(`Question ${i + 1} is missing text.`); return; }
-            if (q.type.includes('MCQ') && q.options.some(o => !o.trim())) { toast.error(`Question ${i + 1} has empty options.`); return; }
-            if (q.type.includes('MCQ') && q.correctAnswers.length === 0) { toast.error(`Question ${i + 1} has no correct answer selected.`); return; }
-            if (q.type === 'FILL_BLANK' && (!q.correctAnswers[0] || !q.correctAnswers[0].trim())) { toast.error(`Question ${i + 1} requires a valid blank answer.`); return; }
+            const isOptionType = q.type.includes('MCQ') || q.type === 'TRUE_FALSE';
+            if (isOptionType && q.options.some(o => !o.trim())) { toast.error(`Question ${i + 1} has empty options.`); return; }
+            if (isOptionType && q.correctAnswers.length === 0) { toast.error(`Question ${i + 1} has no correct answer selected.`); return; }
+            if ((q.type === 'FILL_BLANK' || q.type === 'SHORT_ANSWER') && (!q.correctAnswers[0] || !q.correctAnswers[0].trim())) { toast.error(`Question ${i + 1} requires a valid ${q.type === 'SHORT_ANSWER' ? 'answer' : 'blank answer'}.`); return; }
         }
 
         setSaving(true);
         try {
-            await quizzesAPI.createQuiz({
+            const created = await quizzesAPI.createQuiz({
                 courseId: quizInfo.courseId,
                 title: quizInfo.title,
                 instructions: quizInfo.instructions,
+                examKind: quizInfo.examKind,
                 timeLimit: parseInt(quizInfo.timeLimit),
                 passingScore: parseInt(quizInfo.passingScore),
                 maxAttempts: parseInt(quizInfo.maxAttempts) || 0,
+                negativeMarking: parseFloat(quizInfo.negativeMarking) || 0,
+                startDate: quizInfo.startDate ? new Date(quizInfo.startDate).toISOString() : null,
+                endDate: quizInfo.endDate ? new Date(quizInfo.endDate).toISOString() : null,
                 selectionConfig: buildSelectionConfig(),
                 questions: questions.map(q => ({
                     id: q.id,
@@ -205,14 +214,14 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
                     category: q.category?.trim() || '',
                     difficulty: q.difficulty || 'MEDIUM',
                     options: q.options,
-                    correctAnswer: q.type === 'MCQ_SINGLE' ? String(q.options[q.correctAnswers[0]])
+                    correctAnswer: (q.type === 'MCQ_SINGLE' || q.type === 'TRUE_FALSE') ? String(q.options[q.correctAnswers[0]])
                         : q.type === 'MCQ_MULTI' ? q.correctAnswers.map(idx => String(q.options[idx]))
-                            : q.type === 'FILL_BLANK' ? String(q.correctAnswers[0])
+                            : (q.type === 'FILL_BLANK' || q.type === 'SHORT_ANSWER') ? String(q.correctAnswers[0])
                                 : null
                 }))
             });
             toast.success('Assessment created and students notified!');
-            if (onCreated) onCreated(result);
+            if (onCreated) onCreated(created);
             else navigate(redirectTo);
         } catch (err) {
             toast.error('Failed to create quiz: ' + err.message);
@@ -270,6 +279,15 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
                         <input type="text" name="title" value={quizInfo.title} onChange={handleInfoChange} className={InputClass} placeholder="e.g. React Fundamentals Exam" />
                     </div>
                     <div>
+                        <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Assessment Type</label>
+                        <select name="examKind" value={quizInfo.examKind} onChange={handleInfoChange} className={InputClass}>
+                            <option value="QUIZ">Quiz (counts toward quiz grade)</option>
+                            <option value="mid">Mid Exam (20% of final grade)</option>
+                            <option value="final">Final Exam (40% of final grade)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1.5 font-medium leading-relaxed">Mid/Final exams feed the weighted grade breakdown on the student grades page.</p>
+                    </div>
+                    <div>
                         <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Time Limit (mins)</label>
                         <input type="number" name="timeLimit" value={quizInfo.timeLimit} onChange={handleInfoChange} className={InputClass} min="1" />
                     </div>
@@ -292,6 +310,33 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
                         <p className="text-xs text-muted-foreground mt-1.5 font-medium leading-relaxed">
                             Limit how many times each student can take this exam. <span className="font-bold text-indigo-600">0</span> means unlimited.
                             <span className="block mt-0.5 text-muted-foreground/80">Note: unlimited quizzes still respect a safety net of <span className="font-semibold">5 attempts per 24 hours</span> per student.</span>
+                        </p>
+                    </div>
+                    <div>
+                        <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Negative Marking</label>
+                        <input
+                            type="number"
+                            name="negativeMarking"
+                            value={quizInfo.negativeMarking}
+                            onChange={handleInfoChange}
+                            className={InputClass}
+                            min="0"
+                            max="1"
+                            step="0.25"
+                            placeholder="0 = none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5 font-medium leading-relaxed">
+                            Fraction of one question's marks deducted for a wrong answer. <span className="font-bold text-indigo-600">0.25</span> = a wrong answer costs a quarter of the question. Scores never go below 0.
+                        </p>
+                    </div>
+                    <div>
+                        <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Availability Window</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <input type="datetime-local" name="startDate" value={quizInfo.startDate} onChange={handleInfoChange} className={InputClass} />
+                            <input type="datetime-local" name="endDate" value={quizInfo.endDate} onChange={handleInfoChange} className={InputClass} />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1.5 font-medium leading-relaxed">
+                            Leave both empty for always-on. Students can only start the assessment between these times.
                         </p>
                     </div>
                     <div className="sm:col-span-2">
@@ -528,7 +573,7 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
                                             </div>
                                         </div>
 
-                                        {(q.type === 'MCQ_SINGLE' || q.type === 'MCQ_MULTI') && (
+                                        {(q.type === 'MCQ_SINGLE' || q.type === 'MCQ_MULTI' || q.type === 'TRUE_FALSE') && (
                                             <div className="bg-muted/40 border border-border rounded-xl p-5 space-y-4">
                                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Options & Correct Answer</label>
                                                 {q.options.map((opt, oIdx) => (
@@ -544,12 +589,19 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
                                             </div>
                                         )}
 
-                                        {q.type === 'FILL_BLANK' && (
+                                        {(q.type === 'FILL_BLANK' || q.type === 'SHORT_ANSWER') && (
                                             <div className="bg-muted/40 border border-border rounded-xl p-5">
-                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">Acceptable Answer(s) (Case-insensitive)</label>
+                                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-2">
+                                                    {q.type === 'SHORT_ANSWER' ? 'Correct Answer (case-insensitive)' : 'Acceptable Answer(s) (Case-insensitive)'}
+                                                </label>
                                                 <input type="text" value={q.correctAnswers[0] || ''} onChange={e => {
                                                     const newQs = [...questions]; newQs[qIdx].correctAnswers = [e.target.value]; setQuestions(newQs);
-                                                }} className={InputClass} placeholder="Exact valid text..." />
+                                                }} className={InputClass} placeholder={q.type === 'SHORT_ANSWER' ? 'Exact expected answer...' : 'Exact valid text...'} />
+                                                {q.type === 'SHORT_ANSWER' && (
+                                                    <p className="text-[11px] font-medium text-muted-foreground/70 mt-2">
+                                                        Tip: accept alternative spellings by adding them to the question's options (the options list is optional for short answers).
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
 

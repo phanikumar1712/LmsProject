@@ -1,0 +1,90 @@
+{
+  "title": "Dummy Course: Full-Stack Web Development",
+  "description": "Reference content to paste into the Course Builder. Covers every lesson type the player supports.",
+  "category": "Programming",
+  "level": "Beginner",
+  "duration": "8 weeks",
+  "learningOutcomes": [
+    "Build a full-stack app",
+    "Design a REST API",
+    "Deploy to production"
+  ],
+  "sections": [
+    {
+      "title": "Getting Started",
+      "lessons": [
+        {
+          "title": "Welcome & Setup",
+          "type": "video",
+          "duration": "10:00",
+          "preview": true,
+          "content": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        },
+        {
+          "title": "Course Roadmap",
+          "type": "pdf",
+          "content": "https://example.com/roadmap.pdf"
+        },
+        {
+          "title": "Read Me First",
+          "type": "text",
+          "content": "This is a text lesson body..."
+        }
+      ]
+    },
+    {
+      "title": "Core Concepts",
+      "lessons": [
+        {
+          "title": "Variables & Types",
+          "type": "video",
+          "content": "https://www.youtube.com/watch?v=abc123"
+        },
+        {
+          "title": "Hands-on Exercise",
+          "type": "coding",
+          "content": "Write a function that returns the sum of an array."
+        },
+        {
+          "title": "Chapter Quiz",
+          "type": "quiz",
+          "quiz": {
+            "title": "Core Concepts Quiz",
+            "passingScore": 60,
+            "timeLimit": 10,
+            "questions": [
+              {
+                "question": "What does HTML stand for?",
+                "options": [
+                  "HyperText Markup Language",
+                  "HighText Machine Language"
+                ],
+                "answer": 0
+              }
+            ]
+          }
+        },
+        {
+          "title": "Project: Build a Landing Page",
+          "type": "assignment",
+          "content": "Create a responsive landing page and submit it."
+        },
+        {
+          "title": "Supplementary Reading",
+          "type": "document",
+          "content": "https://example.com/notes.docx"
+        },
+        {
+          "title": "Podcast Episode",
+          "type": "audio",
+          "content": "https://example.com/episode.mp3"
+        },
+        {
+          "title": "Extra Resources",
+          "type": "external",
+          "content": "https://developer.mozilla.org"
+        }
+      ]
+    }
+  ]
+}

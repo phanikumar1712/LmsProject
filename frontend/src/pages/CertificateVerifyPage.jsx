@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { Award, CheckCircle, Download, ExternalLink, ShieldCheck, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { certificatesAPI } from '../services/api';
+import QRCode from '../components/ui/QRCode';
+import QRCodeLib from 'qrcode';
 
 export default function CertificateVerifyPage() {
     const { certId } = useParams();
@@ -13,6 +15,7 @@ export default function CertificateVerifyPage() {
 
     useEffect(() => {
         if (!certId) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         certificatesAPI.verify(certId)
             .then(data => setCert(data))
@@ -20,7 +23,15 @@ export default function CertificateVerifyPage() {
             .finally(() => setLoading(false));
     }, [certId]);
 
-    const handleDownloadPDF = () => {
+    const handleDownloadPDF = async () => {
+        // Real scannable QR for the printed certificate
+        let qrDataUrl = '';
+        try {
+            qrDataUrl = await QRCodeLib.toDataURL(verificationUrl, {
+                width: 160, margin: 1, errorCorrectionLevel: 'M',
+                color: { dark: '#0f172a', light: '#ffffff' },
+            });
+        } catch { /* fall back to text if QR generation fails */ }
         const html = `
         <!DOCTYPE html>
         <html>
@@ -53,10 +64,12 @@ export default function CertificateVerifyPage() {
                           margin-bottom: 20px; }
                 .footer { position: absolute; bottom: 30px; left: 0; right: 0;
                           text-align: center; color: #94a3b8; font-size: 10px; }
-                .qr { position: absolute; bottom: 40px; right: 40px; width: 80px;
-                      height: 80px; background: #f1f5f9; border: 1px solid #e2e8f0;
+                .qr { position: absolute; bottom: 30px; right: 40px; width: 90px;
+                      height: 90px; background: #fff; border: 1px solid #e2e8f0;
                       display: flex; align-items: center; justify-content: center;
-                      font-size: 10px; color: #64748b; text-align: center; }
+                      overflow: hidden; }
+                .qr img { width: 100%; height: 100%; object-fit: contain; }
+                .dept { color: #94a3b8; font-size: 13px; margin-top: 4px; }
             </style>
         </head>
         <body>
@@ -67,9 +80,10 @@ export default function CertificateVerifyPage() {
                 <div class="name">${cert?.student_name || ''}</div>
                 <div class="course">For completing the course<br><strong>${cert?.course_title || ''}</strong></div>
                 <div class="instructor">Instructed by ${cert?.instructor_name || ''}</div>
+                ${cert?.department_name ? `<div class="dept">Department of ${cert.department_name}</div>` : ''}
                 <div class="date">Issued on ${cert?.issue_date ? new Date(cert.issue_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</div>
                 <div class="id">Certificate ID: ${cert?.cert_id || ''}</div>
-                <div class="qr">Scan to verify<br>${verificationUrl}</div>
+                <div class="qr">${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR code" />` : `Scan to verify<br>${verificationUrl}`}</div>
                 <div class="footer">Verify at: ${verificationUrl}</div>
             </div>
             <script>window.print();</script>
@@ -147,9 +161,15 @@ export default function CertificateVerifyPage() {
                         <p className="relative text-slate-500 text-sm mb-2">For completing the course</p>
                         <p className="relative text-xl md:text-2xl font-bold text-indigo-700 mb-4">{cert.course_title}</p>
                         <p className="relative text-slate-500 text-sm">Instructed by <span className="font-semibold text-slate-700">{cert.instructor_name}</span></p>
+                        {cert.department_name && (
+                            <p className="relative text-xs text-slate-400 font-medium mt-1">Department of {cert.department_name}</p>
+                        )}
                         <div className="relative mt-auto pt-4 flex items-center justify-between text-xs text-slate-400">
                             <span>Issued: {new Date(cert.issue_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                             <span className="font-mono">ID: {cert.cert_id}</span>
+                        </div>
+                        <div className="absolute bottom-8 right-8 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                            <QRCode value={verificationUrl} size={84} />
                         </div>
                     </div>
                 </div>

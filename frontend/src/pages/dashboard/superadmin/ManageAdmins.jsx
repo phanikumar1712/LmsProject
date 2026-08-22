@@ -1,14 +1,29 @@
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Plus, Search, CheckCircle, Key, X, Mail, User, Phone, Lock, Building2, AlertTriangle, Copy, LayoutDashboard, UserX, UserCheck, KeyRound, Crown, UserMinus } from 'lucide-react';
+import { ShieldCheck, Plus, Search, CheckCircle, Key, X, Mail, Phone, Lock, Building2, AlertTriangle, Copy, LayoutDashboard, UserX, UserCheck, KeyRound, Crown, UserMinus, Edit2, Trash2, PenLine, AtSign } from 'lucide-react';
 import { usersAPI, departmentsAPI } from '../../../services/api';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAsyncData } from '../../../hooks/useAsyncData';
+import PermissionBadges from '../../../components/ui/PermissionBadges';
 
 export default function ManageAdmins() {
     const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentIds: [] });
+    const [inviteData, setInviteData] = useState({ firstName: '', lastName: '', email: '', username: '', role: 'ADMIN', phone: '', password: '', confirmPassword: '', departmentIds: [], active: true });
+
+    // Edit admin state
+    const [editingAdmin, setEditingAdmin] = useState(null);
+    const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', username: '', phone: '', active: true });
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    // Change password state
+    const [pwAdmin, setPwAdmin] = useState(null);
+    const [pwForm, setPwForm] = useState({ password: '', confirm: '' });
+    const [changingPw, setChangingPw] = useState(false);
+
+    // Delete admin state
+    const [deletingAdmin, setDeletingAdmin] = useState(null);
+    const [deletingAdminBusy, setDeletingAdminBusy] = useState(false);
     const [inviteCustomDept, setInviteCustomDept] = useState('');
     const [creatingCustomDept, setCreatingCustomDept] = useState(false);
     const [inviting, setInviting] = useState(false);
@@ -85,13 +100,28 @@ export default function ManageAdmins() {
 
     const handleInvite = async (e) => {
         e.preventDefault();
+        const name = [inviteData.firstName, inviteData.lastName].map(s => s.trim()).filter(Boolean).join(' ');
+        if (!name) { toast.error('First name is required'); return; }
         if (!inviteData.password || inviteData.password.length < 8) {
             toast.error('Password must be at least 8 characters');
             return;
         }
+        if (inviteData.password !== inviteData.confirmPassword) {
+            toast.error('Passwords do not match');
+            return;
+        }
         setInviting(true);
         try {
-            const payload = { ...inviteData };
+            const payload = {
+                name,
+                email: inviteData.email,
+                username: inviteData.username || undefined,
+                role: inviteData.role,
+                phone: inviteData.phone,
+                password: inviteData.password,
+                active: inviteData.active,
+                departmentIds: inviteData.departmentIds,
+            };
             // If no departments selected, clear the array so backend treats it as global
             if (payload.departmentIds.length === 0) {
                 delete payload.departmentId;
@@ -100,12 +130,98 @@ export default function ManageAdmins() {
             await usersAPI.inviteAdmin(payload);
             toast.success(`Admin account created for ${inviteData.email}`);
             setIsModalOpen(false);
-            setInviteData({ name: '', email: '', role: 'ADMIN', phone: '', password: '', departmentIds: [] });
+            setInviteData({ firstName: '', lastName: '', email: '', username: '', role: 'ADMIN', phone: '', password: '', confirmPassword: '', departmentIds: [], active: true });
             reload();
         } catch (err) {
             toast.error(err.message || 'Failed to create admin');
         } finally {
             setInviting(false);
+        }
+    };
+
+    // Split a full name into first/last parts for the edit form (best-effort).
+    const splitName = (full) => {
+        const parts = (full || '').trim().split(/\s+/);
+        if (parts.length <= 1) return { firstName: parts[0] || '', lastName: '' };
+        return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+    };
+
+    const openEditAdmin = (admin) => {
+        const { firstName, lastName } = splitName(admin.name);
+        setEditForm({
+            firstName,
+            lastName,
+            email: admin.email || '',
+            username: admin.username || '',
+            phone: admin.phone || '',
+            active: admin.active !== false,
+        });
+        setEditingAdmin(admin);
+    };
+
+    const handleEditAdmin = async (e) => {
+        e.preventDefault();
+        const name = [editForm.firstName, editForm.lastName].map(s => s.trim()).filter(Boolean).join(' ');
+        if (!name) { toast.error('First name is required'); return; }
+        if (!editForm.email.trim()) { toast.error('Email is required'); return; }
+        setSavingEdit(true);
+        try {
+            await usersAPI.updateUser(editingAdmin.id, {
+                name,
+                email: editForm.email.trim(),
+                username: editForm.username || null,
+                phone: editForm.phone,
+                active: editForm.active,
+            });
+            toast.success(`Admin "${name}" updated`);
+            setEditingAdmin(null);
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Failed to update admin');
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const openChangePassword = (admin) => {
+        setPwAdmin(admin);
+        setPwForm({ password: '', confirm: '' });
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (!pwForm.password || pwForm.password.length < 8) {
+            toast.error('Password must be at least 8 characters');
+            return;
+        }
+        if (pwForm.password !== pwForm.confirm) {
+            toast.error('Passwords do not match');
+            return;
+        }
+        setChangingPw(true);
+        try {
+            await usersAPI.resetPassword(pwAdmin.id, pwForm.password);
+            toast.success(`Password changed for ${pwAdmin.name}`);
+            setPwAdmin(null);
+        } catch (err) {
+            toast.error(err.message || 'Failed to change password');
+        } finally {
+            setChangingPw(false);
+        }
+    };
+
+    const handleDeleteAdmin = async () => {
+        if (!deletingAdmin) return;
+        setDeletingAdminBusy(true);
+        try {
+            await usersAPI.delete(deletingAdmin.id);
+            toast.success(`Admin "${deletingAdmin.name}" deleted`);
+            setDeletingAdmin(null);
+            reload();
+        } catch (err) {
+            toast.error(err.message || 'Failed to delete admin');
+        } finally {
+            setDeletingAdminBusy(false);
         }
     };
 
@@ -126,6 +242,31 @@ export default function ManageAdmins() {
                 } catch { /* ignore */ }
             }));
             setAdminDepts(result);
+        };
+        fetchIt();
+    }, [allUsers]);
+
+    // Permission badges per admin: fetch each admin's effective permission list
+    // (role matrix + per-user overrides) so "what they can do" shows at a glance.
+    // SUPER_ADMIN rows are synthesized client-side (they hold everything).
+    const [permsMap, setPermsMap] = useState({});
+    useEffect(() => {
+        if (!allUsers?.length || Object.keys(permsMap).length > 0) return;
+        const fetchIt = async () => {
+            const result = {};
+            const admins = allUsers.filter(u => u.role === 'ADMIN').slice(0, 20);
+            await Promise.all(admins.map(async (u) => {
+                try {
+                    const data = await usersAPI.getPermissions(u.id);
+                    const overrides = data.overrides || {};
+                    result[u.id] = {
+                        effective: data.effective || [],
+                        granted: Object.entries(overrides).filter(([, v]) => v === true).map(([p]) => p),
+                        revoked: Object.entries(overrides).filter(([, v]) => v === false).map(([p]) => p),
+                    };
+                } catch { /* ignore */ }
+            }));
+            setPermsMap(result);
         };
         fetchIt();
     }, [allUsers]);
@@ -153,6 +294,7 @@ export default function ManageAdmins() {
             setDeptModal(null);
             reload();
             setAdminDepts({});
+            setPermsMap({});
         } catch (err) {
             toast.error(err.message || 'Failed to update departments');
         } finally {
@@ -220,69 +362,122 @@ export default function ManageAdmins() {
             {/* Invite Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-card w-full max-w-xl border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
                             <h3 className="text-xl font-extrabold text-foreground tracking-tight">Add New Admin</h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
                                 <X size={20} className="text-muted-foreground" />
                             </button>
                         </div>
-                        <form onSubmit={handleInvite} className="p-8 space-y-5">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Full Name *</label>
-                                <div className="relative">
-                                    <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                        <form onSubmit={handleInvite} className="p-6 sm:p-8 space-y-5">
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">First Name *</label>
                                     <input
                                         required
                                         type="text"
-                                        placeholder="Alex Rivera"
-                                        value={inviteData.name}
-                                        onChange={e => setInviteData({ ...inviteData, name: e.target.value })}
-                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        placeholder="Alex"
+                                        value={inviteData.firstName}
+                                        onChange={e => setInviteData({ ...inviteData, firstName: e.target.value })}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Last Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Rivera"
+                                        value={inviteData.lastName}
+                                        onChange={e => setInviteData({ ...inviteData, lastName: e.target.value })}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
-                                <div className="relative">
-                                    <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                                    <input
-                                        required
-                                        type="email"
-                                        placeholder="alex@edunexus.com"
-                                        value={inviteData.email}
-                                        onChange={e => setInviteData({ ...inviteData, email: e.target.value })}
-                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
-                                    />
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
+                                    <div className="relative">
+                                        <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                        <input
+                                            required
+                                            type="email"
+                                            placeholder="alex@edunexus.com"
+                                            value={inviteData.email}
+                                            onChange={e => setInviteData({ ...inviteData, email: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Username</label>
+                                    <div className="relative">
+                                        <AtSign size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                        <input
+                                            type="text"
+                                            placeholder="alexrivera"
+                                            value={inviteData.username}
+                                            onChange={e => setInviteData({ ...inviteData, username: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">Optional · letters, numbers, dots, dashes, underscores.</p>
                                 </div>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Phone Number</label>
-                                <div className="relative">
-                                    <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                                    <input
-                                        type="tel"
-                                        placeholder="+91 98765 43210"
-                                        value={inviteData.phone}
-                                        onChange={e => setInviteData({ ...inviteData, phone: e.target.value })}
-                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
-                                    />
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Phone Number</label>
+                                    <div className="relative">
+                                        <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                        <input
+                                            type="tel"
+                                            placeholder="+91 98765 43210"
+                                            value={inviteData.phone}
+                                            onChange={e => setInviteData({ ...inviteData, phone: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Status</label>
+                                    <select
+                                        value={inviteData.active ? 'active' : 'inactive'}
+                                        onChange={e => setInviteData({ ...inviteData, active: e.target.value === 'active' })}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium appearance-none cursor-pointer"
+                                    >
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Password *</label>
-                                <div className="relative">
-                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                                    <input
-                                        required
-                                        type="password"
-                                        placeholder="Min. 8 characters"
-                                        value={inviteData.password}
-                                        onChange={e => setInviteData({ ...inviteData, password: e.target.value })}
-                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
-                                    />
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Password *</label>
+                                    <div className="relative">
+                                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                        <input
+                                            required
+                                            type="password"
+                                            placeholder="Min. 8 characters"
+                                            value={inviteData.password}
+                                            onChange={e => setInviteData({ ...inviteData, password: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        />
+                                    </div>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground/70 font-medium ml-1">The admin can change this password after first login.</p>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Confirm Password *</label>
+                                    <div className="relative">
+                                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                        <input
+                                            required
+                                            type="password"
+                                            placeholder="Repeat password"
+                                            value={inviteData.confirmPassword}
+                                            onChange={e => setInviteData({ ...inviteData, confirmPassword: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Admin Role</label>
@@ -314,10 +509,21 @@ export default function ManageAdmins() {
                                                     className="w-4 h-4 rounded accent-indigo-600"
                                                 />
                                                 <Building2 size={16} className={`text-muted-foreground shrink-0 ${isSelected ? 'text-indigo-600' : ''}`} strokeWidth={2.5} />
-                                                <span className="flex-1 text-sm font-bold text-foreground">{d.name}</span>
-                                                {isSelected && inviteData.departmentIds.indexOf(d.id) === 0 && (
-                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700">Primary</span>
-                                                )}
+                                                <span className="flex-1 min-w-0">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="text-sm font-bold text-foreground truncate">{d.name}</span>
+                                                        {isSelected && inviteData.departmentIds.indexOf(d.id) === 0 && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700 shrink-0">Primary</span>
+                                                        )}
+                                                    </span>
+                                                    {(d.hod || d.contactEmail || d.contactNumber) && (
+                                                        <span className="block text-[10px] text-muted-foreground/70 font-semibold truncate mt-0.5">
+                                                            HOD {d.hod || '—'}
+                                                            {d.contactEmail && <> · {d.contactEmail}</>}
+                                                            {d.contactNumber && <> · {d.contactNumber}</>}
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </label>
                                         );
                                     })}
@@ -414,6 +620,9 @@ export default function ManageAdmins() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-foreground font-extrabold text-[15px] mb-0.5 group-hover:text-indigo-600 transition-colors">{user.name}</p>
                                         <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-tight truncate">{user.email}</p>
+                                        {user.username && (
+                                            <p className="text-muted-foreground/60 text-[10px] font-bold truncate">@{user.username}</p>
+                                        )}
                                         <div className="flex items-center gap-2 mt-2">
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${user.role === 'SUPER_ADMIN' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                                                 {user.role.replace('_', ' ')}
@@ -432,18 +641,63 @@ export default function ManageAdmins() {
                                                 </span>
                                             )}
                                         </div>
+                                        {/* Permission badges — what this admin can do at a glance */}
+                                        {user.role === 'SUPER_ADMIN' ? (
+                                            <span className="mt-2.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                                <Crown size={10} /> Full platform access
+                                            </span>
+                                        ) : permsMap[user.id] ? (
+                                            <PermissionBadges
+                                                permissions={permsMap[user.id].effective}
+                                                granted={permsMap[user.id].granted}
+                                                revoked={permsMap[user.id].revoked}
+                                                max={4}
+                                                className="mt-2.5"
+                                            />
+                                        ) : null}
+                                        {(() => {
+                                            const dept = (departments || []).find(d => d.id === user.departmentId);
+                                            const hasInfo = dept && (dept.hod || dept.contactEmail || dept.contactNumber);
+                                            if (!hasInfo) return null;
+                                            const summary = [dept.hod && `HOD: ${dept.hod}`, dept.contactEmail, dept.contactNumber].filter(Boolean).join(' · ');
+                                            return (
+                                                <p className="text-[10px] text-muted-foreground/70 font-semibold mt-1.5 truncate" title={summary}>
+                                                    <span className="font-black uppercase tracking-wider text-muted-foreground/50">HOD</span> {dept.hod || '—'}
+                                                    {dept.contactEmail && <> · {dept.contactEmail}</>}
+                                                    {dept.contactNumber && <> · {dept.contactNumber}</>}
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                     </Link>
-                                    <div className="text-right hidden sm:block px-4 border-l border-border h-10 flex flex-col justify-center">
-                                        <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none mb-1">Joined</p>
-                                        <p className="text-foreground font-extrabold text-xs">{new Date(user.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
+                                    <div className="text-right hidden sm:block px-4 border-l border-border space-y-1.5">
+                                        <div>
+                                            <p className="text-muted-foreground text-[9px] font-black uppercase tracking-widest leading-none mb-0.5">Last Login</p>
+                                            <p className="text-foreground font-bold text-[11px] whitespace-nowrap">
+                                                {user.lastLogin
+                                                    ? new Date(user.lastLogin).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                    : '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-muted-foreground text-[9px] font-black uppercase tracking-widest leading-none mb-0.5">Created</p>
+                                            <p className="text-foreground font-bold text-[11px] whitespace-nowrap">{new Date(user.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0 pl-4 border-l border-border">
+                                    <div className="flex items-center gap-1 flex-shrink-0 pl-4 border-l border-border">
+                                        <button onClick={() => openEditAdmin(user)} title="Edit admin"
+                                            className="p-2.5 text-cyan-600 hover:bg-cyan-50 rounded-xl transition-all">
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <button onClick={() => openChangePassword(user)} title="Change password"
+                                            className="p-2.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                                            <PenLine size={18} />
+                                        </button>
                                         <button onClick={() => handleToggleStatus(user.id)} title={user.active !== false ? 'Suspend Admin' : 'Activate Admin'}
                                             className={`p-2.5 rounded-xl transition-all ${user.active !== false ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`}>
                                             {user.active !== false ? <UserX size={18} /> : <UserCheck size={18} />}
                                         </button>
-                                        <button onClick={() => handleResetPassword(user)} title="Reset password"
+                                        <button onClick={() => handleResetPassword(user)} title="Reset password (generate temp)"
                                             className="p-2.5 text-violet-600 hover:bg-violet-50 rounded-xl transition-all">
                                             <KeyRound size={18} />
                                         </button>
@@ -465,6 +719,10 @@ export default function ManageAdmins() {
                                                 <UserMinus size={18} />
                                             </button>
                                         )}
+                                        <button onClick={() => setDeletingAdmin(user)} title="Delete admin"
+                                            className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                                            <Trash2 size={18} />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -597,10 +855,21 @@ export default function ManageAdmins() {
                                                 className="w-4 h-4 rounded accent-indigo-600"
                                             />
                                             <Building2 size={18} className={`shrink-0 ${isSelected ? 'text-indigo-600' : 'text-muted-foreground'}`} strokeWidth={2.5} />
-                                            <span className="flex-1 text-sm font-bold text-foreground">{d.name}</span>
-                                            {isSelected && selectedDeptIds.indexOf(d.id) === 0 && (
-                                                <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700">Primary</span>
-                                            )}
+                                            <span className="flex-1 min-w-0">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold text-foreground truncate">{d.name}</span>
+                                                    {isSelected && selectedDeptIds.indexOf(d.id) === 0 && (
+                                                        <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter bg-indigo-100 text-indigo-700 shrink-0">Primary</span>
+                                                    )}
+                                                </span>
+                                                {(d.hod || d.contactEmail || d.contactNumber) && (
+                                                    <span className="block text-[10px] text-muted-foreground/70 font-semibold truncate mt-0.5">
+                                                        HOD {d.hod || '—'}
+                                                        {d.contactEmail && <> · {d.contactEmail}</>}
+                                                        {d.contactNumber && <> · {d.contactNumber}</>}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </label>
                                     );
                                 })}
@@ -622,6 +891,153 @@ export default function ManageAdmins() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Admin Modal */}
+            {editingAdmin && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEditingAdmin(null)}>
+                    <div className="bg-card w-full max-w-lg border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <Edit2 size={20} className="text-cyan-600" /> Edit Admin
+                            </h3>
+                            <button onClick={() => setEditingAdmin(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditAdmin} className="p-6 sm:p-8 space-y-5">
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">First Name *</label>
+                                    <input required type="text" value={editForm.firstName}
+                                        onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Last Name</label>
+                                    <input type="text" value={editForm.lastName}
+                                        onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                            </div>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Email Address *</label>
+                                    <input required type="email" value={editForm.email}
+                                        onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Username</label>
+                                    <input type="text" placeholder="alexrivera" value={editForm.username}
+                                        onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                            </div>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Phone</label>
+                                    <input type="tel" value={editForm.phone}
+                                        onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Status</label>
+                                    <select value={editForm.active ? 'active' : 'inactive'}
+                                        onChange={e => setEditForm(f => ({ ...f, active: e.target.value === 'active' }))}
+                                        className="w-full px-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium appearance-none cursor-pointer">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground/70 font-medium">Use "Assign Departments" to change department scope. Use the key buttons to change the password.</p>
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setEditingAdmin(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">Cancel</button>
+                                <button type="submit" disabled={savingEdit}
+                                    className="flex-1 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98]">
+                                    {savingEdit ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Change Password Modal */}
+            {pwAdmin && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setPwAdmin(null)}>
+                    <div className="bg-card w-full max-w-md border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+                            <h3 className="text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
+                                <PenLine size={20} className="text-indigo-600" /> Change Password
+                            </h3>
+                            <button onClick={() => setPwAdmin(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                                <X size={20} className="text-muted-foreground" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleChangePassword} className="p-6 sm:p-8 space-y-5">
+                            <p className="text-sm text-muted-foreground font-medium">
+                                Set a new password for <span className="font-bold text-foreground">{pwAdmin.name}</span>.
+                            </p>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">New Password *</label>
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="password" placeholder="Min. 8 characters" value={pwForm.password}
+                                        onChange={e => setPwForm(f => ({ ...f, password: e.target.value }))}
+                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground ml-1">Confirm New Password *</label>
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input required type="password" placeholder="Repeat new password" value={pwForm.confirm}
+                                        onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                                        className="w-full pl-11 pr-4 py-3 bg-muted/40 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                                </div>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setPwAdmin(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">Cancel</button>
+                                <button type="submit" disabled={changingPw}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98]">
+                                    {changingPw ? 'Saving...' : 'Change Password'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Admin Modal */}
+            {deletingAdmin && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setDeletingAdmin(null)}>
+                    <div className="bg-card w-full max-w-sm border border-border shadow-2xl rounded-3xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="p-8 text-center space-y-4">
+                            <div className="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <Trash2 size={24} className="text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-extrabold text-foreground tracking-tight">Delete Admin?</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Are you sure you want to delete <strong className="text-foreground">{deletingAdmin.name}</strong>?
+                                    This removes their admin access permanently.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setDeletingAdmin(null)}
+                                    className="flex-1 px-6 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors">Cancel</button>
+                                <button type="button" onClick={handleDeleteAdmin} disabled={deletingAdminBusy}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                                    <Trash2 size={14} /> {deletingAdminBusy ? 'Deleting...' : 'Delete'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

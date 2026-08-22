@@ -1,10 +1,11 @@
+import React from 'react';
 import { BookOpen, Clock, Users, Heart, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { ProgressBar } from './ProgressBar';
 import { RatingDisplay } from './RatingStars';
 import { useAuth } from '../../contexts/AuthContext';
-import { wishlistAPI } from '../../services/api';
+import { wishlistAPI, enrollmentsAPI } from '../../services/api';
 import { CourseThumbnail } from './CourseThumbnail';
 import toast from 'react-hot-toast';
 
@@ -14,11 +15,12 @@ const LEVEL_COLORS = {
     Advanced: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
 };
 
-export function CourseCard({ course, enrollment }) {
+export const CourseCard = React.memo(function CourseCard({ course, enrollment }) {
     const navigate = useNavigate();
     const { user, updateUser } = useAuth();
     const [wishlisted, setWishlisted] = useState(user?.wishlist?.includes(course.id) || false);
     const [hearting, setHearting] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
 
     const isEnrolled = !!enrollment;
 
@@ -39,6 +41,21 @@ export function CourseCard({ course, enrollment }) {
             navigate(`/courses/${course.id}/learn`);
         } else {
             navigate(`/courses/${course.id}?tab=preview`);
+        }
+    };
+
+    const handleEnroll = async (e) => {
+        e.stopPropagation();
+        if (!user) { toast.error('Login to enroll'); navigate('/login'); return; }
+        setEnrolling(true);
+        try {
+            await enrollmentsAPI.enroll(user.id, course.id);
+            toast.success('Enrolled! 🎉');
+            navigate(`/courses/${course.id}/learn`);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setEnrolling(false);
         }
     };
 
@@ -128,15 +145,31 @@ export function CourseCard({ course, enrollment }) {
                     </div>
                 )}
 
-                {isEnrolled && (
-                    <button className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm py-2 rounded-lg text-sm font-semibold transition-colors">
+                {isEnrolled ? (
+                    <button onClick={handleClick} className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm py-2 rounded-lg text-sm font-semibold transition-colors">
                         {enrollment.progress === 100 ? 'Review Course' : 'Continue Learning'}
                     </button>
+                ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/courses/${course.id}?tab=preview`); }}
+                            className="px-3 py-2 rounded-lg text-sm font-semibold border border-border text-muted-foreground hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
+                        >
+                            View Course
+                        </button>
+                        <button
+                            onClick={handleEnroll}
+                            disabled={enrolling}
+                            className="px-3 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors"
+                        >
+                            {enrolling ? 'Enrolling…' : 'Enroll'}
+                        </button>
+                    </div>
                 )}
             </div>
         </div>
     );
-}
+});
 
 export function SkeletonCard() {
     return (

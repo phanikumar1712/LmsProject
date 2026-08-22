@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coursesAPI } from '../../../services/api';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { Clock, GitBranch, Plus, MessageSquare, CheckCircle, Loader2, History, BookOpen } from 'lucide-react';
+import { Clock, GitBranch, Plus, MessageSquare, CheckCircle, Loader2, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function InstructorChangelog() {
@@ -17,16 +17,7 @@ export default function InstructorChangelog() {
     const [publishForm, setPublishForm] = useState({ changelog: '', versionLabel: '' });
     const [editingChangelog, setEditingChangelog] = useState(null);
 
-    useEffect(() => {
-        loadCourses();
-    }, []);
-
-    useEffect(() => {
-        if (selectedCourseId) loadVersions();
-        else setVersions([]);
-    }, [selectedCourseId]);
-
-    const loadCourses = async () => {
+    const loadCourses = useCallback(async () => {
         setLoadingCourses(true);
         try {
             const data = await coursesAPI.getByInstructor(user.id);
@@ -37,9 +28,13 @@ export default function InstructorChangelog() {
         } finally {
             setLoadingCourses(false);
         }
-    };
+    }, [user]);
 
-    const loadVersions = async () => {
+    useEffect(() => {
+        loadCourses();
+    }, [loadCourses]);
+
+    const loadVersions = useCallback(async () => {
         setLoadingVersions(true);
         try {
             const data = await coursesAPI.getVersions(selectedCourseId);
@@ -49,7 +44,15 @@ export default function InstructorChangelog() {
         } finally {
             setLoadingVersions(false);
         }
-    };
+    }, [selectedCourseId]);
+
+    useEffect(() => {
+        if (selectedCourseId) loadVersions();
+        else {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setVersions([]);
+        }
+    }, [selectedCourseId, loadVersions]);
 
     const selectedCourse = courses.find(c => c.id === selectedCourseId);
 

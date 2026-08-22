@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
 import {
     LayoutDashboard, BookOpen, Award, BarChart2, Users, Settings,
     ShieldCheck, Layers, GraduationCap, PlusCircle, Star, Activity, Database,
     ChevronLeft, LogOut, ClipboardList, MessageSquare, BarChart3, Heart, User,
-    Building2, Zap, Megaphone, UserPlus, TrendingUp,
+    Building2, Zap, Megaphone, TrendingUp, Presentation, Upload, ListOrdered, CalendarRange, CalendarCheck, FileText, FileSpreadsheet, ListChecks, Bell,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,23 +14,32 @@ const STUDENT_NAV = [
         label: 'Overview',
         items: [
             { to: '/student', icon: LayoutDashboard, label: 'Dashboard', end: true },
+            { to: '/courses', icon: GraduationCap, label: 'Course Catalog' },
             { to: '/student/courses', icon: BookOpen, label: 'My Courses' },
-            { to: '/student/wishlist', icon: Heart, label: 'Wishlist' },
         ],
     },
     {
         label: 'Learning',
         items: [
-            { to: '/student/exams', icon: ClipboardList, label: 'Write Exam' },
-            { to: '/student/quizzes', icon: BarChart3, label: 'My Results' },
+            { to: '/student/assignments', icon: FileText, label: 'Assignments' },
+            { to: '/student/quizzes', icon: BarChart3, label: 'Quizzes' },
+            { to: '/student/grades', icon: Award, label: 'Grades' },
             { to: '/student/certificates', icon: Award, label: 'Certificates' },
         ],
     },
     {
-        label: 'Explore',
+        label: 'Account',
         items: [
+            { to: '/notifications', icon: Bell, label: 'Notifications' },
+            { to: '/student/settings', icon: Settings, label: 'Settings' },
+        ],
+    },
+    {
+        label: 'More',
+        items: [
+            { to: '/student/wishlist', icon: Heart, label: 'Wishlist' },
+            { to: '/student/exams', icon: ClipboardList, label: 'Write Exam' },
             { to: '/announcements', icon: Megaphone, label: 'Announcements' },
-            { to: '/courses', icon: GraduationCap, label: 'Browse Courses' },
             { to: '/become-instructor', icon: Star, label: 'Become Instructor' },
         ],
     },
@@ -41,22 +51,31 @@ const INSTRUCTOR_NAV = [
         items: [
             { to: '/instructor', icon: LayoutDashboard, label: 'Dashboard', end: true },
             { to: '/instructor/courses', icon: BookOpen, label: 'My Courses' },
-            { to: '/instructor/create-course', icon: PlusCircle, label: 'Create Course' },
+            { to: '/instructor/create-course', icon: PlusCircle, label: 'Course Builder' },
         ],
     },
     {
         label: 'Manage',
         items: [
             { to: '/instructor/students', icon: Users, label: 'Students' },
-            { to: '/instructor/reviews', icon: Star, label: 'Reviews' },
-            { to: '/instructor/assessments', icon: ClipboardList, label: 'Assessments' },
+            { to: '/instructor/assessments', icon: ClipboardList, label: 'Assessments & Grades' },
+            { to: '/instructor/quiz-builder', icon: ListChecks, label: 'Quizzes' },
+            { to: '/instructor/live-sessions', icon: CalendarCheck, label: 'Attendance' },
         ],
     },
     {
         label: 'Insights',
         items: [
-            { to: '/instructor/analytics', icon: BarChart2, label: 'Analytics' },
             { to: '/announcements', icon: Megaphone, label: 'Announcements' },
+            { to: '/instructor/analytics', icon: BarChart2, label: 'Analytics' },
+        ],
+    },
+    {
+        label: 'More',
+        items: [
+            { to: '/instructor/reviews', icon: Star, label: 'Reviews' },
+            { to: '/instructor/content-order', icon: ListOrdered, label: 'Content Order' },
+            { to: '/notifications', icon: Bell, label: 'Notifications' },
         ],
     },
 ];
@@ -66,25 +85,44 @@ const ADMIN_NAV = [
         label: 'Overview',
         items: [
             { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-            { to: '/admin/users', icon: Users, label: 'Manage Users' },
-            { to: '/admin/courses', icon: BookOpen, label: 'Manage Courses' },
+            { to: '/admin/students', icon: GraduationCap, label: 'Students' },
+            { to: '/admin/instructors', icon: Presentation, label: 'Instructors' },
+            { to: '/admin/courses', icon: BookOpen, label: 'Courses' },
+            { to: '/admin/enrollments', icon: Upload, label: 'Enrollments' },
         ],
     },
     {
-        label: 'Content',
+        label: 'Assessments',
         items: [
+            { to: '/admin/assignments', icon: FileText, label: 'Assignments' },
+            { to: '/instructor/quiz-builder', icon: ListChecks, label: 'Quizzes' },
+            { to: '/admin/attendance', icon: CalendarCheck, label: 'Attendance' },
+        ],
+    },
+    {
+        label: 'Account',
+        items: [
+            { to: '/admin/reports', icon: TrendingUp, label: 'Reports' },
+            { to: '/notifications', icon: Bell, label: 'Notifications' },
+            { to: '/admin/settings', icon: Settings, label: 'Settings' },
+        ],
+    },
+    {
+        label: 'More',
+        items: [
+            { to: '/admin/users', icon: Users, label: 'Manage Users' },
             { to: '/courses', icon: GraduationCap, label: 'Browse & Preview' },
             { to: '/admin/categories', icon: Layers, label: 'Categories' },
             { to: '/admin/announcements', icon: Megaphone, label: 'Announcements' },
-        ],
-    },
-    {
-        label: 'Operations',
-        items: [
-            { to: '/admin/bulk-enroll', icon: UserPlus, label: 'Bulk Enrollment' },
+            { to: '/admin/timetable', icon: CalendarRange, label: 'Timetable' },
+            { to: '/admin/assign-sections', icon: Layers, label: 'Assign Sections (Drag)' },
+            { to: '/admin/assign-categories', icon: Layers, label: 'Categories (Drag)' },
+            { to: '/admin/assign-semesters', icon: CalendarRange, label: 'Semesters (Drag)' },
+            { to: '/admin/assign-years', icon: CalendarRange, label: 'Years (Drag)' },
+            { to: '/admin/bulk-import', icon: FileSpreadsheet, label: 'Bulk Import' },
             { to: '/admin/student-progress', icon: BarChart3, label: 'Student Progress' },
             { to: '/admin/reviews', icon: MessageSquare, label: 'Moderate Reviews' },
-            { to: '/admin/reports', icon: TrendingUp, label: 'Reports' },
+            { to: '/admin/audit-logs', icon: Database, label: 'Audit Logs', perm: 'audit.view' },
         ],
     },
 ];
@@ -94,34 +132,41 @@ const SUPER_ADMIN_NAV = [
         label: 'Overview',
         items: [
             { to: '/super-admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-            { to: '/super-admin/analytics', icon: BarChart2, label: 'Analytics' },
         ],
     },
     {
         label: 'Platform',
         items: [
             { to: '/super-admin/departments', icon: Building2, label: 'Departments' },
-            { to: '/super-admin/admins', icon: ShieldCheck, label: 'Manage Admins' },
-            { to: '/super-admin/admins/create', icon: PlusCircle, label: 'Create Admin' },
-            { to: '/super-admin/categories', icon: Layers, label: 'Categories' },
+            { to: '/super-admin/admins', icon: ShieldCheck, label: 'Department Admins' },
+            { to: '/super-admin/students', icon: Users, label: 'Students' },
+            { to: '/super-admin/instructors', icon: GraduationCap, label: 'Instructors' },
+            { to: '/super-admin/courses', icon: BookOpen, label: 'Courses' },
+            { to: '/admin/enrollments', icon: Upload, label: 'Enrollments' },
         ],
     },
     {
-        label: 'Admin Tools',
+        label: 'Reporting',
         items: [
-            { to: '/admin/users', icon: Users, label: 'Manage Users' },
-            { to: '/admin/courses', icon: BookOpen, label: 'Manage Courses' },
-            { to: '/admin/announcements', icon: Megaphone, label: 'Announcements' },
-            { to: '/admin/categories', icon: Layers, label: 'Categories' },
-            { to: '/admin/bulk-enroll', icon: UserPlus, label: 'Bulk Enrollment' },
-            { to: '/admin/reports', icon: TrendingUp, label: 'Reports' },
+            { to: '/super-admin/reports', icon: TrendingUp, label: 'Reports' },
+            { to: '/super-admin/analytics', icon: BarChart2, label: 'Analytics' },
         ],
     },
     {
         label: 'System',
         items: [
-            { to: '/super-admin/settings', icon: Settings, label: 'Platform Settings' },
-            { to: '/super-admin/audit-logs', icon: Database, label: 'Audit Logs' },
+            { to: '/notifications', icon: Bell, label: 'Notifications' },
+            { to: '/super-admin/audit-logs', icon: Database, label: 'Audit Logs', perm: 'audit.view' },
+            { to: '/super-admin/settings', icon: Settings, label: 'Settings' },
+        ],
+    },
+    {
+        label: 'More',
+        items: [
+            { to: '/super-admin/admins/create', icon: PlusCircle, label: 'Create Admin' },
+            { to: '/super-admin/categories', icon: Layers, label: 'Categories' },
+            { to: '/admin/announcements', icon: Megaphone, label: 'Announcements' },
+            { to: '/super-admin/permissions', icon: ShieldCheck, label: 'Permissions', perm: 'permission.manage' },
             { to: '/super-admin/ai-analytics', icon: Zap, label: 'AI Reports' },
             { to: '/super-admin/system', icon: Activity, label: 'System Health' },
         ],
@@ -143,9 +188,13 @@ const ROLE_COLORS = {
 };
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
-    const { user, logout } = useAuth();
+    const { user, logout, can } = useAuth();
     const navigate = useNavigate();
-    const navSections = ROLE_NAVS[user?.role] || STUDENT_NAV;
+    const navSections = useMemo(() =>
+        (ROLE_NAVS[user?.role] || STUDENT_NAV)
+            .map(section => ({ ...section, items: section.items.filter(item => !item.perm || can(item.perm)) }))
+            .filter(section => section.items.length > 0)
+    , [user?.role, can]);
 
     const handleLogout = () => { logout(); navigate('/'); };
 
@@ -217,12 +266,20 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
             {/* Bottom actions */}
             <div className="p-3 border-t border-border space-y-1">
                 <button
+                    onClick={() => navigate('/profile')}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
+                    title={collapsed ? 'My Profile & Security' : ''}
+                >
+                    <User size={18} className="flex-shrink-0" />
+                    {!collapsed && 'Profile & Security'}
+                </button>
+                <button
                     onClick={handleLogout}
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-colors ${collapsed ? 'justify-center px-0' : ''}`}
                     title={collapsed ? 'Logout' : ''}
                 >
                     <LogOut size={18} className="flex-shrink-0" />
-                    {!collapsed && 'Sign Out'}
+                    {!collapsed && 'Logout'}
                 </button>
                 <button
                     onClick={onToggle}

@@ -1,0 +1,4 @@
+title,instructor,department,category,level,duration,description
+Dummy Python for Beginners,cse.instructor@demo.com,CSE,Programming,Beginner,6 weeks,Dummy course: Python fundamentals with hands-on exercises.
+Dummy Database Design,cse.instructor@demo.com,CSE,Databases,Intermediate,8 weeks,"Dummy course: relational design, SQL, and normalization."
+Dummy AI Fundamentals,cse.instructor@demo.com,CSE,Artificial Intelligence,Advanced,10 weeks,Dummy course: ML basics and neural networks.

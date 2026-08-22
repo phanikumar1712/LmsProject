@@ -1,7 +1,7 @@
 import { TrendingUp, Users, BookOpen, Star, CheckCircle, AlertTriangle, Layers, Building2 } from 'lucide-react';
 import { statsAPI } from '../../../services/api';
 import {
-    AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    AreaChart, Area, XAxis, YAxis, CartesianGrid,
     ResponsiveContainer, Tooltip, PieChart, Pie, Cell
 } from 'recharts';
 import { StatCard, StatCardGrid } from '../../../components/ui/StatCard';

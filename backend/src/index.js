@@ -37,6 +37,9 @@ const certificatesRoutes = require('./routes/certificates');
 const discussionsRoutes = require('./routes/discussions');
 const versionsRoutes = require('./routes/versions');
 const attendanceRoutes = require('./routes/attendance');
+const notesRoutes = require('./routes/notes');
+const bookmarksRoutes = require('./routes/bookmarks');
+const gradesRoutes = require('./routes/grades');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -96,6 +99,9 @@ app.use('/api/certificates', certificatesRoutes);
 app.use('/api/discussions', discussionsRoutes);
 app.use('/api/courses', versionsRoutes);  // course versioning & drip
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/notes', notesRoutes);
+app.use('/api/bookmarks', bookmarksRoutes);
+app.use('/api/grades', gradesRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

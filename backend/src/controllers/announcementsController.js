@@ -1,6 +1,7 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
 const { getDepartmentScope } = require('../utils/scope');
+const { writeAudit } = require('../utils/audit');
 
 // GET /api/announcements — list announcements (department-scoped admin sees their dept)
 const list = async (req, res) => {
@@ -94,18 +95,26 @@ const create = async (req, res) => {
             [validTargets]
         );
     }
+    // Batch-insert notifications for all targets in a single statement instead
+    // of one round-trip per user (was N+1 for large departments).
     const announcementLink = `/announcements?focus=${result.rows[0].id}`;
-    for (const user of targetUsers.rows) {
+    const targetIds = targetUsers.rows.map(u => u.id);
+    if (targetIds.length) {
         await query(
-            `INSERT INTO notifications (user_id, message, type, link) VALUES ($1, $2, $3, $4)`,
-            [user.id, `📢 New announcement: ${title}`, 'announcement', announcementLink]
+            `INSERT INTO notifications (user_id, message, type, link)
+             SELECT t.id, $1, $2, $3
+             FROM unnest($4::uuid[]) AS t(id)`,
+            [`📢 New announcement: ${title}`, 'announcement', announcementLink, targetIds]
         ).catch(() => {});
     }
 
-    await query(
-        `INSERT INTO audit_logs (user_id, action, resource, resource_id) VALUES ($1,$2,$3,$4)`,
-        [req.user.id, 'ANNOUNCEMENT_CREATED', 'announcements', result.rows[0].id]
-    ).catch(() => {});
+    await writeAudit(req, {
+        action: 'ANNOUNCEMENT_CREATED',
+        resource: 'announcements',
+        resourceId: result.rows[0].id,
+        newValue: { title, priority, pinned, targetRoles, departmentId: scoped ? departmentId : null },
+        details: { title, targetCount: targetIds.length, departmentId: scoped ? departmentId : null },
+    });
 
     res.status(201).json(result.rows[0]);
 };
@@ -133,11 +142,13 @@ const remove = async (req, res) => {
     const result = await query('DELETE FROM announcements WHERE id = $1 RETURNING id, title', [req.params.id]);
     if (!result.rows.length) throw createError('Announcement not found', 404);
 
-    await query(
-        `INSERT INTO audit_logs (user_id, action, resource, resource_id, details) VALUES ($1,$2,$3,$4,$5)`,
-        [req.user.id, 'ANNOUNCEMENT_DELETED', 'announcements', req.params.id,
-         JSON.stringify({ title: result.rows[0].title })]
-    ).catch(() => {});
+    await writeAudit(req, {
+        action: 'ANNOUNCEMENT_DELETED',
+        resource: 'announcements',
+        resourceId: req.params.id,
+        oldValue: { title: result.rows[0].title },
+        details: { title: result.rows[0].title },
+    });
 
     res.json({ success: true });
 };

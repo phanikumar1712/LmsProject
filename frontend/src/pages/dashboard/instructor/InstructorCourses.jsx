@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users, AlertTriangle, Info } from 'lucide-react';
+import { PlusCircle, Search, Eye, Edit, Trash2, Clock, Users, AlertTriangle, Info, Send, Layers, BarChart3 } from 'lucide-react';
 import { coursesAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SkeletonCard } from '../../../components/ui/CourseCard';
@@ -35,6 +35,16 @@ export default function InstructorCourses() {
             } catch {
                 toast.error('Failed to delete course');
             }
+        }
+    };
+
+    const handleSubmitForApproval = async (course) => {
+        try {
+            await coursesAPI.update(course.id, { status: 'PENDING' });
+            toast.success('Course submitted for approval — the department admin has been notified.');
+            fetchCourses();
+        } catch (err) {
+            toast.error(err.message || 'Failed to submit course');
         }
     };
 
@@ -136,12 +146,29 @@ export default function InstructorCourses() {
                                         <span>{course.lessonsCount} Lessons</span>
                                     </div>
                                 </div>
+                                {(course.status === 'DRAFT' || course.status === 'REJECTED') && (
+                                    <button
+                                        onClick={() => handleSubmitForApproval(course)}
+                                        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm"
+                                    >
+                                        <Send size={14} /> {course.status === 'REJECTED' ? 'Resubmit for Approval' : 'Submit for Approval'}
+                                    </button>
+                                )}
                                 <div className="grid grid-cols-3 gap-2 mt-4">
                                     <button onClick={() => navigate(`/courses/${course.id}`)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-muted-foreground hover:text-indigo-600 bg-muted rounded-xl hover:bg-muted/80 transition-colors">
                                         <Eye size={16} /> View
                                     </button>
                                     <button onClick={() => navigate(`/instructor/create-course?edit=${course.id}`)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-indigo-600 hover:text-white bg-indigo-50 dark:bg-indigo-900/20 rounded-xl hover:bg-indigo-600 transition-colors">
                                         <Edit size={16} /> Edit
+                                    </button>
+                                    <button onClick={() => navigate(`/instructor/content-order?course=${course.id}`)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-cyan-600 hover:text-white bg-cyan-50 dark:bg-cyan-900/20 rounded-xl hover:bg-cyan-600 transition-colors">
+                                        <Layers size={16} /> Content
+                                    </button>
+                                    <button onClick={() => navigate(`/instructor/students?course=${course.id}`)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-violet-600 hover:text-white bg-violet-50 dark:bg-violet-900/20 rounded-xl hover:bg-violet-600 transition-colors">
+                                        <Users size={16} /> Students
+                                    </button>
+                                    <button onClick={() => navigate(`/instructor/students?course=${course.id}`)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-emerald-600 hover:text-white bg-emerald-50 dark:bg-emerald-900/20 rounded-xl hover:bg-emerald-600 transition-colors">
+                                        <BarChart3 size={16} /> Progress
                                     </button>
                                     <button onClick={() => handleDelete(course)} className="flex flex-col items-center gap-1.5 py-2 text-xs font-bold text-rose-600 hover:text-white bg-rose-50 dark:bg-rose-900/20 rounded-xl hover:bg-rose-600 transition-colors">
                                         <Trash2 size={16} /> Delete

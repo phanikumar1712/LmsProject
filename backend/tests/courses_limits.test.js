@@ -52,10 +52,7 @@ const limitReachedQueryImpl = () => (sql) => {
     if (sql.includes("c.status NOT IN ('REJECTED', 'ARCHIVED')")) {
         return { rows: [{ c: 2 }] }; // already at the 2-course limit
     }
-    if (sql.includes('SELECT cat.department_id FROM courses c')) {
-        return { rows: [{ department_id: 'dept-1' }] };
-    }
-    if (sql.includes('SELECT COALESCE(cat.department_id, u.department_id)')) {
+    if (sql.includes('SELECT department_id FROM courses WHERE id = $1')) {
         return { rows: [{ department_id: 'dept-1' }] };
     }
     if (sql.includes("role = 'ADMIN' AND active = true")) {
@@ -81,17 +78,19 @@ test('approve blocks a department that has reached its course limit with 409', a
         () => controller.approve(req, {}),
         (err) => {
             assert.equal(err.statusCode, 409);
-            assert.match(err.message, /Course limit reached for this department/);
+            assert.match(err.message, /Course limit reached: this department has 2 courses and the limit is 2/);
             return true;
         }
     );
 
     // The course was never published.
     assert.equal(calls.some(c => c.sql.includes("UPDATE courses SET status = 'PUBLISHED'")), false);
-    // Dept admin + super admin were notified for a limit-review discussion.
+    // Dept admin + super admin are notified via a single batched INSERT ... SELECT
+    // (params[0] = message, params[3] = target ids).
     const notifInserts = calls.filter(c => c.sql.includes('INSERT INTO notifications'));
-    assert.ok(notifInserts.length >= 2);
-    assert.ok(notifInserts.every(c => c.params[1].includes('course limit reached')));
+    assert.ok(notifInserts.length >= 1);
+    assert.ok(notifInserts.every(c => /course limit reached/i.test(c.params[0])));
+    assert.ok(notifInserts.every(c => Array.isArray(c.params[3]) && c.params[3].length === 2));
 });
 
 test('approve succeeds when the department is under its course limit', async () => {
@@ -108,10 +107,7 @@ test('approve succeeds when the department is under its course limit', async () 
         if (sql.includes("c.status NOT IN ('REJECTED', 'ARCHIVED')")) {
             return { rows: [{ c: 1 }] }; // 1 of 5 used — plenty of headroom
         }
-        if (sql.includes('SELECT cat.department_id FROM courses c')) {
-            return { rows: [{ department_id: 'dept-1' }] };
-        }
-        if (sql.includes('SELECT COALESCE(cat.department_id, u.department_id)')) {
+        if (sql.includes('SELECT department_id FROM courses WHERE id = $1')) {
             return { rows: [{ department_id: 'dept-1' }] };
         }
         if (sql.includes("UPDATE courses SET status = 'PUBLISHED'")) {

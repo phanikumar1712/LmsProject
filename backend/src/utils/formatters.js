@@ -15,12 +15,25 @@ const mapUser = (u) => {
         departmentId: u.department_id ?? u.departmentId ?? null,
         departmentName: u.department_name ?? u.departmentName ?? null,
         rollNo: u.roll_no ?? u.rollNo ?? null,
+        username: u.username ?? null,
+        lastLogin: u.last_login ?? u.lastLogin ?? null,
+        designation: u.designation ?? null,
+        qualification: u.qualification ?? null,
+        specialization: u.specialization ?? null,
+        year: u.year ?? null,
+        semester: u.semester ?? null,
+        section: u.section ?? null,
+        batch: u.batch ?? null,
+        mustChangePassword: u.must_change_password ?? u.mustChangePassword ?? false,
         createdAt: u.created_at || u.createdAt,
     };
 };
 
 const mapDepartment = (d) => ({
     ...d,
+    hod: d.hod ?? '',
+    contactEmail: d.contact_email ?? d.contactEmail ?? '',
+    contactNumber: d.contact_number ?? d.contactNumber ?? '',
     createdAt: d.created_at || d.createdAt,
 });
 
@@ -44,6 +57,9 @@ const mapCourse = (c) => ({
     instructorBio: c.instructorBio,
     instructorRole: c.instructorRole,
     instructorJoined: c.instructorJoined,
+    // Many-to-many bucket assignments (may contain several values each).
+    semesters: Array.isArray(c.semesters) ? c.semesters.map(Number).sort((a, b) => a - b) : (c.semester != null ? [Number(c.semester)] : []),
+    years: Array.isArray(c.years) ? c.years.map(Number).sort((a, b) => a - b) : [],
 });
 
 const mapCategory = (cat) => ({

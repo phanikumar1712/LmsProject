@@ -5,30 +5,9 @@ import {
     LayoutDashboard, BookOpen, ChevronDown, Bell, Flame, Moon, Sun
 } from 'lucide-react';
 
-// ── Dark mode hook ────────────────────────────────────────────────────────────
-function useDarkMode() {
-    const [dark, setDark] = useState(() => {
-        try {
-            const saved = localStorage.getItem('lms_dark_mode');
-            if (saved !== null) return saved === 'true';
-        } catch { /* noop */ }
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    });
-
-    useEffect(() => {
-        const root = document.documentElement;
-        if (dark) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-        try { localStorage.setItem('lms_dark_mode', String(dark)); } catch { /* noop */ }
-    }, [dark]);
-
-    return [dark, () => setDark(d => !d)];
-}
 import { useAuth } from '../../contexts/AuthContext';
 import { notificationsAPI, statsAPI } from '../../services/api';
+import useDarkMode from '../../hooks/useDarkMode';
 
 const ROLE_DASHBOARDS = {
     STUDENT: '/student',
@@ -270,8 +249,9 @@ export function Navbar({ onMobileMenuClick }) {
                                                 )}
                                             </div>
                                             {notifications.length > 0 && (
-                                                <div className="border-t border-border pt-2 pb-1 bg-muted/30">
-                                                    <button onClick={handleMarkAllRead} className="w-full text-center text-indigo-600 dark:text-indigo-400 text-xs font-bold py-1 hover:text-indigo-800 transition-colors">Clear all notifications</button>
+                                                <div className="border-t border-border pt-2 pb-1 bg-muted/30 flex items-center justify-between px-3">
+                                                    <button onClick={handleMarkAllRead} className="text-center text-indigo-600 dark:text-indigo-400 text-xs font-bold py-1 hover:text-indigo-800 transition-colors">Clear all</button>
+                                                    <button onClick={() => { setNotifOpen(false); navigate('/notifications'); }} className="text-center text-indigo-600 dark:text-indigo-400 text-xs font-bold py-1 hover:text-indigo-800 transition-colors">View all →</button>
                                                 </div>
                                             )}
                                         </div>

@@ -6,6 +6,12 @@ const bcrypt = require('bcryptjs');
 // unit-tested with a fake client — no DB, no full migration run.
 const { seedSuperAdmin, SUPER_ADMIN_NAME, SUPER_ADMIN_EMAIL } = require('../src/db/seedSuperAdmin');
 
+// Pin the environment so results are deterministic regardless of the ambient
+// shell env. With NODE_ENV=production and no SUPER_ADMIN_PASSWORD the seed
+// throws by design, which would break these dev-behavior tests.
+delete process.env.NODE_ENV;
+delete process.env.SUPER_ADMIN_PASSWORD;
+
 // A fake client that mimics Postgres ON CONFLICT(email) DO UPDATE semantics:
 //   - no existing row  → INSERT (record the new row)
 //   - existing row     → UPDATE name to EXCLUDED.name, keep everything else
@@ -22,9 +28,13 @@ const makeFakeClient = () => {
             const existing = rows.find(r => r.email === email);
             if (isInsert && hasConflict) {
                 if (existing) {
-                    // ON CONFLICT ... DO UPDATE SET name = EXCLUDED.name
+                    // ON CONFLICT ... DO UPDATE SET name = EXCLUDED.name[, password = EXCLUDED.password]
                     const idx = rows.indexOf(existing);
-                    rows[idx] = { ...existing, name: params[0] };
+                    const updated = { ...existing, name: params[0] };
+                    if (/password\s*=\s*EXCLUDED\.password/.test(sql)) {
+                        updated.password = params[2];
+                    }
+                    rows[idx] = updated;
                     return { rows: [rows[idx]] };
                 }
                 // role/avatar are SQL literals in the INSERT ('SUPER_ADMIN', ''),
@@ -92,4 +102,58 @@ test('seedSuperAdmin returns the super-admin email', async () => {
     const { client } = makeFakeClient();
     const email = await seedSuperAdmin(client, { rounds: 4 });
     assert.equal(email, SUPER_ADMIN_EMAIL);
+});
+
+test('seedSuperAdmin throws in production when SUPER_ADMIN_PASSWORD is missing', async () => {
+    const { client, rows } = makeFakeClient();
+    const prevEnv = process.env.NODE_ENV;
+    const prevPass = process.env.SUPER_ADMIN_PASSWORD;
+    process.env.NODE_ENV = 'production';
+    delete process.env.SUPER_ADMIN_PASSWORD;
+    try {
+        await assert.rejects(
+            () => seedSuperAdmin(client, { rounds: 4 }),
+            /SUPER_ADMIN_PASSWORD is not set/
+        );
+        assert.equal(rows.length, 0); // never seeds a known default password
+    } finally {
+        if (prevEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = prevEnv;
+        if (prevPass === undefined) delete process.env.SUPER_ADMIN_PASSWORD;
+        else process.env.SUPER_ADMIN_PASSWORD = prevPass;
+    }
+});
+
+test('seedSuperAdmin in production uses SUPER_ADMIN_PASSWORD and rotates it on conflict', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    const prevPass = process.env.SUPER_ADMIN_PASSWORD;
+    process.env.NODE_ENV = 'production';
+    process.env.SUPER_ADMIN_PASSWORD = 'hunter2-rotated'; // known test value
+
+    try {
+        // Fresh DB: inserts with the env-var password (conflict clause also carries
+        // the rotation, but a fresh insert just uses the param password).
+        const fresh = makeFakeClient();
+        await seedSuperAdmin(fresh.client, { rounds: 4 });
+        assert.equal(fresh.rows.length, 1);
+        assert.ok(await bcrypt.compare('hunter2-rotated', fresh.rows[0].password));
+
+        // Pre-existing account (e.g. legacy 'superadmin' default): password is rotated.
+        const stale = makeFakeClient();
+        stale.rows.push({
+            name: 'Super Admin',
+            email: SUPER_ADMIN_EMAIL,
+            password: await bcrypt.hash('superadmin', 4),
+            role: 'SUPER_ADMIN',
+            avatar: '',
+        });
+        await seedSuperAdmin(stale.client, { rounds: 4 });
+        assert.ok(await bcrypt.compare('hunter2-rotated', stale.rows[0].password));
+        assert.match(stale.calls[0].sql, /DO UPDATE SET name = EXCLUDED\.name, password = EXCLUDED\.password/);
+    } finally {
+        if (prevEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = prevEnv;
+        if (prevPass === undefined) delete process.env.SUPER_ADMIN_PASSWORD;
+        else process.env.SUPER_ADMIN_PASSWORD = prevPass;
+    }
 });

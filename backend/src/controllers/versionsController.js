@@ -1,5 +1,6 @@
 const { query } = require('../db/pool');
 const { createError } = require('../middleware/errorHandler');
+const { assertCourseEditable, assertChildEditable } = require('../utils/courseAuth');
 
 // Helper: Build a full course snapshot (sections + lessons + quizzes)
 const buildCourseSnapshot = async (courseId) => {
@@ -35,15 +36,13 @@ const createVersion = async (req, res) => {
     const { id } = req.params;
     const { changelog = '', versionLabel = '' } = req.body;
 
-    // Verify ownership
-    const course = await query(
-        'SELECT instructor_id, status FROM courses WHERE id = $1',
-        [id]
-    );
+    // Verify ownership (instructor) or department scope (admin). Snapshots
+    // contain quiz answers, so only course editors may create them.
+    // (assertCourseEditable already 404s when the course is missing — the
+    // second lookup below only needs the status.)
+    await assertCourseEditable(req, id);
+    const course = await query('SELECT status FROM courses WHERE id = $1', [id]);
     if (!course.rows.length) throw createError('Course not found', 404);
-    if (req.user.role === 'INSTRUCTOR' && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Not authorized', 403);
-    }
     if (course.rows[0].status !== 'PUBLISHED') {
         throw createError('Only published courses can have versions', 400);
     }
@@ -91,9 +90,30 @@ const createVersion = async (req, res) => {
     res.status(201).json(result.rows[0]);
 };
 
+// Gate: who may read a course's version list. Editors always pass; students
+// must be enrolled in the course.
+const assertVersionsReadable = async (req, courseId) => {
+    if (req.user.role === 'STUDENT') {
+        const enrolled = await query(
+            'SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2',
+            [req.user.id, courseId]
+        );
+        if (!enrolled.rows.length) throw createError('Not enrolled in this course', 403);
+        return;
+    }
+    // Instructors may only list versions of their own courses; scoped admins
+    // only of in-department courses. (Also 404s when the course is missing.)
+    await assertCourseEditable(req, courseId);
+};
+
 // GET /api/courses/:id/versions — List all versions
 const getVersions = async (req, res) => {
     const { id } = req.params;
+    // The list only exposes metadata (labels + changelogs), so enrolled
+    // students may view it; editors get the same list. Non-enrolled users
+    // (and students outside the course) are blocked.
+    await assertVersionsReadable(req, id);
+
     const result = await query(
         `SELECT id, version_number, version_label, changelog, created_at
          FROM course_versions WHERE course_id = $1
@@ -106,6 +126,11 @@ const getVersions = async (req, res) => {
 // GET /api/courses/:id/versions/:versionId — Get a specific version's snapshot
 const getVersionById = async (req, res) => {
     const { id, versionId } = req.params;
+    // Snapshots embed full quiz question banks INCLUDING correct answers —
+    // only course editors (instructor / in-scope admin / SUPER_ADMIN) may read
+    // them. Students never receive answer keys.
+    await assertCourseEditable(req, id);
+
     const result = await query(
         `SELECT * FROM course_versions WHERE id = $1 AND course_id = $2`,
         [versionId, id]
@@ -119,11 +144,7 @@ const updateChangelog = async (req, res) => {
     const { id, versionId } = req.params;
     const { changelog, versionLabel } = req.body;
 
-    const course = await query('SELECT instructor_id FROM courses WHERE id = $1', [id]);
-    if (!course.rows.length) throw createError('Course not found', 404);
-    if (req.user.role === 'INSTRUCTOR' && course.rows[0].instructor_id !== req.user.id) {
-        throw createError('Not authorized', 403);
-    }
+    await assertCourseEditable(req, id);
 
     const updates = [];
     const values = [];
@@ -133,10 +154,11 @@ const updateChangelog = async (req, res) => {
     if (!updates.length) throw createError('No fields to update', 400);
     values.push(versionId, id);
 
-    await query(
-        `UPDATE course_versions SET ${updates.join(', ')} WHERE id = $${i++} AND course_id = $${i}`,
+    const result = await query(
+        `UPDATE course_versions SET ${updates.join(', ')} WHERE id = $${i++} AND course_id = $${i} RETURNING id`,
         values
     );
+    if (!result.rows.length) throw createError('Version not found', 404);
     res.json({ success: true });
 };
 

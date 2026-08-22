@@ -1,0 +1,6 @@
+name,email,roll_no,phone,year,semester,department
+Dummy Student 1,dummy.student1@demo.com,DMYSTU2201,9876543210,2,3,CSE
+Dummy Student 2,dummy.student2@demo.com,DMYSTU2202,9876543220,2,3,CSE
+Dummy Student 3,dummy.student3@demo.com,DMYSTU2203,9876543230,2,3,CSE
+Dummy Student 4,dummy.student4@demo.com,DMYSTU2204,9876543240,2,3,CSE
+Dummy Student 5,dummy.student5@demo.com,DMYSTU2205,9876543250,2,3,CSE

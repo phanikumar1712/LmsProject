@@ -34,6 +34,23 @@ export default function CoursesPage() {
         sort: 'popular',
     });
 
+    // Search input is typed locally and debounced before it hits `filters`,
+    // so the course fetch only fires after the user pauses (~400ms).
+    const [searchInput, setSearchInput] = useState(params.get('search') || '');
+    const [debouncedSearch, setDebouncedSearch] = useState(searchInput);
+
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(searchInput), 400);
+        return () => clearTimeout(t);
+    }, [searchInput]);
+
+    useEffect(() => {
+        // Commit the debounced value into filters (guard avoids a redundant
+        // fetch when the value is already current).
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setFilters(f => (f.search === debouncedSearch ? f : { ...f, search: debouncedSearch }));
+    }, [debouncedSearch]);
+
     useEffect(() => {
         statsAPI.getCategories().then(cats => setCategories([{ id: '', name: 'All Categories', icon: '📚' }, ...cats]));
         if (user) {
@@ -64,7 +81,13 @@ export default function CoursesPage() {
             f.departmentId = filters.department;
             if (isAdmin) f.admin = true;
         }
-        coursesAPI.getAll(f).then(setCourses).finally(() => setLoading(false));
+        // `cancelled` guards against an older, slower response overwriting a
+        // newer one (and against setState after unmount).
+        let cancelled = false;
+        coursesAPI.getAll(f)
+            .then(courses => { if (!cancelled) setCourses(courses); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
     }, [filters]);
 
     const updateFilter = (key, val) => {
@@ -74,12 +97,29 @@ export default function CoursesPage() {
         setParams(newParams, { replace: true });
     };
 
+    // Search uses a local input + debounce; the URL is kept in sync immediately
+    // but the fetch is deferred until the debounced value commits.
+    const setSearchValue = (val) => {
+        setSearchInput(val);
+        if (val === '') {
+            // Clearing is immediate: commit now, don't wait for the debounce.
+            setDebouncedSearch('');
+            setFilters(f => ({ ...f, search: '' }));
+        }
+        const newParams = new URLSearchParams(params);
+        if (val) newParams.set('search', val); else newParams.delete('search');
+        setParams(newParams, { replace: true });
+    };
+
     const clearFilters = () => {
+        setSearchInput('');
+        setDebouncedSearch('');
         setFilters({ search: '', category: '', department: '', level: 'All', sort: 'popular' });
         setParams({}, { replace: true });
     };
 
-    const hasActiveFilters = filters.search || filters.category || filters.department || filters.level !== 'All';
+    // Reflect typed (but not yet debounced) input so the indicator is instant.
+    const hasActiveFilters = searchInput.trim() || filters.category || filters.department || filters.level !== 'All';
 
     const getEnrollment = (courseId) => enrollments.find(e => e.courseId === courseId);
 
@@ -98,13 +138,13 @@ export default function CoursesPage() {
                     <input
                         type="text"
                         placeholder="Search courses, instructors..."
-                        value={filters.search}
-                        onChange={e => updateFilter('search', e.target.value)}
+                        value={searchInput}
+                        onChange={e => setSearchValue(e.target.value)}
                         className="w-full bg-muted border-none outline-none text-foreground placeholder:text-muted-foreground rounded-xl py-3.5 pl-11 pr-10 focus:ring-2 focus:ring-indigo-100 transition-shadow"
                         id="course-search"
                     />
-                    {filters.search && (
-                        <button onClick={() => updateFilter('search', '')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground/80 bg-card rounded-full p-0.5 shadow-sm">
+                    {searchInput && (
+                        <button onClick={() => setSearchValue('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground/80 bg-card rounded-full p-0.5 shadow-sm">
                             <X size={14} />
                         </button>
                     )}

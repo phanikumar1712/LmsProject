@@ -46,7 +46,7 @@ function useSwipeGesture({ onSwipeLeft, onSwipeRight, enabled }) {
 }
 
 export function DashboardLayout() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const location = useLocation();
@@ -68,22 +68,29 @@ export function DashboardLayout() {
         onSwipeRight: () => {},
     });
 
-    // Close sidebar on route change (navigation)
+    // Close sidebar on route change (navigation) — intentional external-system
+    // sync (location), so the direct state write is fine here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         setMobileOpen(false);
     }, [location.pathname]);
+
+    const handleMobileMenuClick = useCallback(() => setMobileOpen(true), []);
+    const handleOverlayClose = useCallback(() => setMobileOpen(false), []);
+    const handleToggleCollapse = useCallback(() => setCollapsed(c => !c), []);
+    const handleSidebarMobileClose = useCallback(() => setMobileOpen(false), []);
 
     if (!isAuthenticated) return null;
 
     return (
         <div className="min-h-screen bg-background transition-colors duration-300">
-            <Navbar onMobileMenuClick={() => setMobileOpen(true)} />
+            <Navbar onMobileMenuClick={handleMobileMenuClick} />
 
             {/* Overlay backdrop — also supports swipe to close */}
             {mobileOpen && (
                 <div
                     className="fixed inset-0 bg-slate-900/50 z-30 md:hidden backdrop-blur-sm transition-all duration-300 animate-in fade-in"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={handleOverlayClose}
                     onTouchStart={closeSwipe.handleTouchStart}
                     onTouchEnd={closeSwipe.handleTouchEnd}
                 />
@@ -91,15 +98,28 @@ export function DashboardLayout() {
 
             <Sidebar
                 collapsed={collapsed}
-                onToggle={() => setCollapsed(c => !c)}
+                onToggle={handleToggleCollapse}
                 mobileOpen={mobileOpen}
-                onMobileClose={() => setMobileOpen(false)}
+                onMobileClose={handleSidebarMobileClose}
             />
+
+            {/* Forced password change banner — set when an admin force-resets
+                the account password (must_change_password flag). */}
+            {user?.mustChangePassword && location.pathname !== '/profile' && (
+                <div
+                    className={`fixed z-30 bg-amber-500 text-white text-sm font-bold shadow-lg ${collapsed ? 'md:ml-16' : 'md:ml-64'} ml-0 right-0 left-0 top-16`}
+                >
+                    <a href="/profile" className="flex items-center justify-center gap-2 px-4 py-2.5 hover:bg-amber-600 transition-colors">
+                        🔒 An administrator reset your password — please set a new one to continue.
+                        <span className="underline underline-offset-2">Change password now</span>
+                    </a>
+                </div>
+            )}
 
             <main
                 onTouchStart={edgeSwipe.handleTouchStart}
                 onTouchEnd={edgeSwipe.handleTouchEnd}
-                className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'md:ml-16' : 'md:ml-64'}`}
+                className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'md:ml-16' : 'md:ml-64'} ${user?.mustChangePassword ? 'pt-24' : ''}`}
             >
                 <div className="p-4 sm:p-5 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
                     <AnimatePresence mode="wait">

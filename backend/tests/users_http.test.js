@@ -62,7 +62,7 @@ const makeQueryImpl = ({ actor = actorRow(), oldRole = 'ADMIN', adminHash = ADMI
         if (sql.includes('SELECT id, role, department_id FROM users WHERE id = $1')) {
             return { rows: [{ id: 'target-user-id', role: oldRole, department_id: 'dept-1' }] };
         }
-        if (sql.includes('SELECT id, name, email, role, avatar, bio, active, department_id, created_at FROM users WHERE id = $1')) {
+        if (sql.includes('SELECT id, name, email, role, avatar, bio, active, department_id, created_at, must_change_password FROM users WHERE id = $1')) {
             return { rows: [actor] };
         }
         if (sql.includes('UPDATE users SET role')) {

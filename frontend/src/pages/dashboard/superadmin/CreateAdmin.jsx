@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Building2, Users, ShieldCheck, Plus, X, Mail, User, Lock, Phone, CheckCircle2, Search, RefreshCw } from 'lucide-react';
+import { Building2, ShieldCheck, Plus, X, Mail, User, Lock, Phone, CheckCircle2, Search, RefreshCw } from 'lucide-react';
 import { usersAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
-import { useAuth } from '../../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 function StatusBadge({ hasAdmin, userCount }) {
@@ -21,7 +20,6 @@ function StatusBadge({ hasAdmin, userCount }) {
 }
 
 export default function CreateAdmin() {
-    const { user } = useAuth();
     const { data: departments, loading, reload } = useAsyncData(() => departmentsAPI.list(), []);
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -178,6 +176,30 @@ export default function CreateAdmin() {
                                     </div>
                                 </div>
 
+                                {(dept.hod || dept.contactEmail || dept.contactNumber) && (
+                                    <div className="space-y-1.5 mb-4 border-t border-border/60 pt-3">
+                                        {dept.hod && (
+                                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-semibold truncate">
+                                                <User size={12} className="text-indigo-500/70 shrink-0" />
+                                                <span className="font-black uppercase tracking-wider text-muted-foreground/50 shrink-0">HOD</span>
+                                                <span className="font-bold text-foreground/90 truncate">{dept.hod}</span>
+                                            </p>
+                                        )}
+                                        {dept.contactEmail && (
+                                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-semibold truncate">
+                                                <Mail size={12} className="text-indigo-500/70 shrink-0" />
+                                                <span className="truncate">{dept.contactEmail}</span>
+                                            </p>
+                                        )}
+                                        {dept.contactNumber && (
+                                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-semibold">
+                                                <Phone size={12} className="text-indigo-500/70 shrink-0" />
+                                                <span className="truncate">{dept.contactNumber}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="flex items-center justify-between">
                                     <StatusBadge hasAdmin={hasAdmin} userCount={count} />
                                     <button
@@ -277,8 +299,17 @@ export default function CreateAdmin() {
                                 </h4>
                                 <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 rounded-2xl">
                                     <Building2 size={20} className="text-emerald-600" />
-                                    <div>
-                                        <p className="text-sm font-bold text-foreground">{selectedDept.name}</p>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-foreground truncate">{selectedDept.name}</p>
+                                        {(selectedDept.hod || selectedDept.contactEmail || selectedDept.contactNumber) && (
+                                            <p className="text-[11px] text-muted-foreground font-medium truncate mt-0.5">
+                                                {selectedDept.hod && <span>HOD: {selectedDept.hod}</span>}
+                                                {selectedDept.hod && (selectedDept.contactEmail || selectedDept.contactNumber) && ' · '}
+                                                {selectedDept.contactEmail && <span>{selectedDept.contactEmail}</span>}
+                                                {selectedDept.contactEmail && selectedDept.contactNumber && ' · '}
+                                                {selectedDept.contactNumber && <span>{selectedDept.contactNumber}</span>}
+                                            </p>
+                                        )}
                                         <p className="text-[11px] text-muted-foreground font-medium">Primary department for this admin</p>
                                     </div>
                                 </div>

@@ -3,13 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     User, Mail, Shield, Building2, Calendar, Hash, Phone, Award, BookOpen,
     RotateCcw, Ban, CheckCircle, Trash2, Plus, X, Search,
-    ChevronLeft, Star, BarChart3, Layers, Trophy, Target, Activity,
+    ChevronLeft, Star, Layers, Trophy, Target, Activity,
     Crown, Swords, Copy, ExternalLink, GraduationCap, Users, Megaphone
 } from 'lucide-react';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
+import PermissionBadges from '../../../components/ui/PermissionBadges';
 import toast from 'react-hot-toast';
-import { usersAPI, coursesAPI, departmentsAPI, enrollmentsAPI, notificationsAPI, statsAPI } from '../../../services/api';
+import { usersAPI, coursesAPI, notificationsAPI, statsAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ROLE_PERMISSIONS } from '../../../data/permissions';
 
 const ROLE_BADGES = {
     STUDENT: { color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300', icon: GraduationCap },
@@ -117,6 +119,35 @@ export default function UserDetail() {
     const backTimerRef = useRef(null);
     useEffect(() => () => clearTimeout(backTimerRef.current), []);
 
+    // Permission badges: every role has a default matrix; a SUPER_ADMIN viewer
+    // also sees per-user overrides (explicit grants/revocations) via the API.
+    const [permData, setPermData] = useState(null);
+    useEffect(() => {
+        if (!user?.id || !canManage || user.role === 'SUPER_ADMIN') {
+            setPermData(null);
+            return;
+        }
+        if (isSuperAdmin()) {
+            let cancelled = false;
+            usersAPI.getPermissions(user.id)
+                .then(data => {
+                    if (cancelled) return;
+                    const overrides = data.overrides || {};
+                    setPermData({
+                        effective: data.effective || ROLE_PERMISSIONS[user.role] || [],
+                        granted: Object.entries(overrides).filter(([, v]) => v === true).map(([p]) => p),
+                        revoked: Object.entries(overrides).filter(([, v]) => v === false).map(([p]) => p),
+                    });
+                })
+                .catch(() => {
+                    if (!cancelled) setPermData({ effective: ROLE_PERMISSIONS[user.role] || [], granted: [], revoked: [] });
+                });
+            return () => { cancelled = true; };
+        }
+        // Department-scoped admin: role matrix only (overrides are super-admin managed).
+        setPermData({ effective: ROLE_PERMISSIONS[user.role] || [], granted: [], revoked: [] });
+    }, [user?.id, user?.role, canManage, isSuperAdmin]);
+
     const fetchUser = useCallback(async () => {
         clearTimeout(backTimerRef.current);
         setLoading(true);
@@ -147,14 +178,16 @@ export default function UserDetail() {
         try {
             const data = await coursesAPI.getAll({ limit: 100 });
             setAllCourses(Array.isArray(data) ? data : []);
-        } catch (err) {
+        } catch {
             toast.error('Failed to load courses');
         } finally {
             setCoursesLoading(false);
         }
     }, [showAssignCourse]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchUser(); }, [fetchUser]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
     const handleRoleChange = async (newRole) => {
@@ -399,7 +432,8 @@ export default function UserDetail() {
                             <button
                                 onClick={handleResetPassword}
                                 disabled={user.id === currentUser?.id}
-                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 transition-colors disabled:opacity-50"
+                                title={user.id === currentUser?.id ? 'Admin passwords are managed by the Super Admin' : undefined}
+                                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-border bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:border-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <RotateCcw size={14} /> Reset Password
                             </button>
@@ -432,6 +466,27 @@ export default function UserDetail() {
                         <DetailRow icon={Target} label="Current Streak" value={`${user.currentStreak || 0} days`} />
                         <DetailRow icon={Trophy} label="Longest Streak" value={`${user.longestStreak || 0} days`} />
                     </div>
+
+                    {/* Permission badges — what this user can do at a glance */}
+                    {canManage && (
+                        <div className="pt-6 mt-6 border-t border-border">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mb-2.5">
+                                Permissions · what this user can do
+                            </p>
+                            {user.role === 'SUPER_ADMIN' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                    <Crown size={12} /> Full platform access
+                                </span>
+                            ) : (
+                                <PermissionBadges
+                                    permissions={permData?.effective || ROLE_PERMISSIONS[user.role] || []}
+                                    granted={permData?.granted || []}
+                                    revoked={permData?.revoked || []}
+                                    max={6}
+                                />
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

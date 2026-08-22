@@ -1,17 +1,10 @@
+// One-off migration helper: add reset_otp columns to users.
+// Uses DATABASE_URL from backend/.env — never hardcode credentials.
+require('dotenv').config();
 const { Client } = require('pg');
 
 async function addOtpColumns() {
-    const config = {
-        host: '54.209.204.248',
-        port: 5432,
-        user: 'neondb_owner',
-        password: 'REDACTED',
-        database: 'neondb',
-        ssl: {
-            rejectUnauthorized: false,
-            servername: 'ep-withered-mode-am2a8xup-pooler.c-5.us-east-1.aws.neon.tech'
-        }
-    };
+    const config = { connectionString: process.env.DATABASE_URL };
 
     let success = false;
     for (let i = 0; i < 15; i++) {
@@ -21,7 +14,7 @@ async function addOtpColumns() {
             console.log(`Connected to database (attempt ${i + 1})...`);
 
             await client.query(`
-                ALTER TABLE users 
+                ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(6),
                 ADD COLUMN IF NOT EXISTS reset_otp_expiry TIMESTAMP;
             `);

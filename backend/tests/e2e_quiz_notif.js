@@ -124,7 +124,9 @@ const check = (label, ok, detail = '') => {
             method: 'POST',
             body: JSON.stringify({ courseId: COURSE_ID })
         });
-        check('Student enrolled in course', enroll.status === 201 || enroll.status === 200,
+        // 201 = freshly enrolled; 200/409 = already enrolled from a previous run
+        // (the student IS enrolled either way — that's all this step needs).
+        check('Student enrolled in course', [200, 201, 409].includes(enroll.status),
             JSON.stringify(enroll.data?.error || enroll.status));
 
         // ── 5. Student views course quizzes (must NOT see answers) ───────

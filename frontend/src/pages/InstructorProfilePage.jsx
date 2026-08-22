@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     BookOpen, Users, Star, ArrowLeft, Mail, Globe,
-    ExternalLink, Play, Award, Calendar, X, Send,
+    Award, Calendar, X, Send,
     Heart, Share2, BadgeCheck, Film
 } from 'lucide-react';
 import { usersAPI, notificationsAPI } from '../services/api';
@@ -86,6 +86,7 @@ export default function InstructorProfilePage() {
     const [sending, setSending] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         usersAPI.getInstructorProfile(id)
             .then(res => {

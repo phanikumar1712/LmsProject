@@ -23,7 +23,7 @@ const EMOJI_OPTIONS = [
     { emoji: '⚡', label: 'Light' },
 ];
 
-export function CourseThumbnail({ thumbnail, title, className = '' }) {
+export const CourseThumbnail = React.memo(function CourseThumbnail({ thumbnail, title, className = '' }) {
     if (!thumbnail) {
         return (
             <div className={`w-full h-full flex items-center justify-center bg-muted ${className}`}>
@@ -49,6 +49,6 @@ export function CourseThumbnail({ thumbnail, title, className = '' }) {
             loading="lazy"
         />
     );
-}
+});
 
 export { EMOJI_OPTIONS };

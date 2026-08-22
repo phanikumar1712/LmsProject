@@ -1,0 +1,5 @@
+Dummy assignment submission #2
+==============================
+
+This file can be uploaded when testing the student "Submit Assignment"
+flow (file upload). Rename to .docx/.pdf if you want a different type.

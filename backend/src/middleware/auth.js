@@ -9,12 +9,14 @@ const authenticate = async (req, res, next) => {
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Pin the algorithm to HS256 (tokens are signed with the symmetric
+        // JWT_SECRET) so an attacker can never replay an alg-confused token.
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         // Support both `userId` (new) and `id` (legacy) JWT payloads
         const userId = decoded.userId || decoded.id;
         if (!userId) return res.status(401).json({ error: 'Invalid token payload' });
         const result = await query(
-            'SELECT id, name, email, role, avatar, bio, active, department_id, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, role, avatar, bio, active, department_id, created_at, must_change_password FROM users WHERE id = $1',
             [userId]
         );
         if (!result.rows.length) {
@@ -47,11 +49,11 @@ const optionalAuth = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         const userId = decoded.userId || decoded.id;
         if (userId) {
             const result = await query(
-                'SELECT id, name, email, role, avatar, bio, active, department_id FROM users WHERE id = $1',
+                'SELECT id, name, email, role, avatar, bio, active, department_id, must_change_password FROM users WHERE id = $1',
                 [userId]
             );
             if (result.rows.length) req.user = result.rows[0];

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, Lock, Camera, Save, Shield, Mail, Calendar, Upload, Loader2, MessageSquare, Star, 
-    Key } from 'lucide-react';
+import { User, Lock, Camera, Save, Shield, Mail, Calendar, Upload, Loader2, MessageSquare, Star, Key, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, uploadAPI, ratingsAPI } from '../services/api';
+import ChangePasswordForm from '../components/ui/ChangePasswordForm';
 import toast from 'react-hot-toast';
 
 const ROLE_COLORS = {
@@ -66,7 +66,7 @@ function ProfileHeader({ user, form, uploadingPhoto, fileInputRef, handlePhotoUp
     );
 }
 
-function PersonalInfoForm({ form, handleChange, handleSave, saving, fileInputRef, uploadingPhoto, handlePhotoUpload, handleRemovePhoto, removingPhoto, user }) {
+function PersonalInfoForm({ form, handleChange, handleSave, saving, fileInputRef, uploadingPhoto, handleRemovePhoto, removingPhoto, user }) {
     const inputCls = 'w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow';
 
     return (
@@ -104,6 +104,33 @@ function PersonalInfoForm({ form, handleChange, handleSave, saving, fileInputRef
                     </div>
                 </div>
                 <div>
+                    <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Phone Number</label>
+                    <input type="tel" name="phone" value={form.phone || ''} onChange={handleChange} className={inputCls} placeholder="e.g. +91 98765 43210" maxLength="30" />
+                </div>
+                {user?.role === 'STUDENT' && (
+                    <div>
+                        <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Academic Information</label>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            {[
+                                { label: 'Student ID / Roll No', value: user?.rollNo || '—' },
+                                { label: 'Department', value: user?.departmentName || '—' },
+                                { label: 'Year', value: user?.year || '—' },
+                                { label: 'Semester', value: user?.semester || '—' },
+                                { label: 'Section', value: user?.section || '—' },
+                            ].map(({ label, value }) => (
+                                <div key={label} className="p-3 bg-muted/40 rounded-xl border border-border">
+                                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">{label}</p>
+                                    <p className="text-foreground font-bold text-sm truncate">{value}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground/60 font-medium mt-2 flex items-center gap-1.5">
+                            <Shield size={12} className="text-amber-500" />
+                            Academic fields are managed by your department admin and cannot be changed here.
+                        </p>
+                    </div>
+                )}
+                <div>
                     <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Bio / About Me</label>
                     <textarea name="bio" value={form.bio} onChange={handleChange} className={`${inputCls} min-h-[100px] resize-y`} placeholder="Tell others a little about yourself..." />
                 </div>
@@ -120,40 +147,26 @@ function PersonalInfoForm({ form, handleChange, handleSave, saving, fileInputRef
     );
 }
 
-function SecurityForm({ changingPwd, setChangingPwd, pwdForm, setPwdForm, handlePasswordChange }) {
-    const inputCls = 'w-full bg-card border border-border text-foreground placeholder:text-muted-foreground/60 rounded-xl py-2.5 px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none shadow-sm transition-shadow';
-
+function SecurityForm({ user }) {
+    const isAdmin = user?.role === 'ADMIN';
     return (
         <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
             <h3 className="text-lg font-extrabold text-foreground mb-6 flex items-center gap-2">
                 <Key size={18} className="text-indigo-600" /> Change Password
             </h3>
-            <form onSubmit={handlePasswordChange} className="space-y-5">
-                <div>
-                    <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Current Password *</label>
-                    <input type="password" value={pwdForm.current} onChange={e => setPwdForm(p => ({ ...p, current: e.target.value }))} className={inputCls} placeholder="Enter current password" />
+            {isAdmin ? (
+                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+                    <Shield size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Password managed by Super Admin</p>
+                        <p className="text-sm text-amber-700/80 dark:text-amber-200/70 mt-1 leading-relaxed">
+                            Admin passwords are managed by the Super Admin for security. Contact the Super Admin to reset your password.
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">New Password *</label>
-                    <input type="password" value={pwdForm.newPwd} onChange={e => setPwdForm(p => ({ ...p, newPwd: e.target.value }))} className={inputCls} placeholder="Min. 8 characters" />
-                </div>
-                <div>
-                    <label className="text-[12px] font-bold text-muted-foreground uppercase tracking-wide block mb-2">Confirm New Password *</label>
-                    <input type="password" value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))}
-                        className={`${inputCls} ${pwdForm.confirm && pwdForm.newPwd !== pwdForm.confirm ? 'border-rose-300 focus:ring-rose-100' : ''}`} placeholder="Repeat new password" />
-                    {pwdForm.confirm && pwdForm.newPwd !== pwdForm.confirm && (
-                        <p className="text-rose-500 text-xs font-medium mt-1.5 flex items-center gap-1"><AlertTriangle size={12} /> Passwords do not match</p>
-                    )}
-                </div>
-                <div className="pt-2 flex justify-end">
-                    <button type="submit" disabled={changingPwd}
-                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm">
-                        {changingPwd
-                            ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Updating...</>
-                            : <><Lock size={16} /> Update Password</>}
-                    </button>
-                </div>
-            </form>
+            ) : (
+                <ChangePasswordForm />
+            )}
         </div>
     );
 }
@@ -252,17 +265,17 @@ function ReviewsTab({ myReviews, loadingReviews }) {
 
 export default function ProfilePage() {
     const { user, updateUser } = useAuth();
-    const [activeTab, setActiveTab] = useState('profile');
+    // When an admin force-reset the password, land directly on the Security tab
+    // so the user changes it before anything else.
+    const [activeTab, setActiveTab] = useState(user?.mustChangePassword ? 'security' : 'profile');
     const [saving, setSaving] = useState(false);
-    const [changingPwd, setChangingPwd] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [removingPhoto, setRemovingPhoto] = useState(false);
     const [myReviews, setMyReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const fileInputRef = useRef(null);
 
-    const [form, setForm] = useState({ name: user?.name || '', bio: user?.bio || '', avatar: user?.avatar || '' });
-    const [pwdForm, setPwdForm] = useState({ current: '', newPwd: '', confirm: '' });
+    const [form, setForm] = useState({ name: user?.name || '', bio: user?.bio || '', avatar: user?.avatar || '', phone: user?.phone || '' });
 
     const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -275,7 +288,7 @@ export default function ProfilePage() {
         try {
             const result = await uploadAPI.uploadProfilePhoto(file);
             setForm(prev => ({ ...prev, avatar: result.url }));
-            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim() || user.name, bio: form.bio?.trim() || user.bio || '', avatar: result.url });
+            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim() || user.name, bio: form.bio?.trim() || user.bio || '', avatar: result.url, phone: form.phone?.trim() || '' });
             updateUser(updated);
             toast.success('Profile photo updated!');
         } catch (err) { toast.error(err.message || 'Failed to upload photo'); }
@@ -287,25 +300,11 @@ export default function ProfilePage() {
         if (!form.name.trim()) { toast.error('Name cannot be empty'); return; }
         setSaving(true);
         try {
-            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim(), bio: form.bio.trim(), avatar: form.avatar });
+            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim(), bio: form.bio.trim(), avatar: form.avatar, phone: form.phone?.trim() || '' });
             updateUser(updated);
             toast.success('Profile updated successfully!');
         } catch (err) { toast.error(err.message || 'Failed to update profile'); }
         finally { setSaving(false); }
-    };
-
-    const handlePasswordChange = async (e) => {
-        e.preventDefault();
-        if (!pwdForm.current || !pwdForm.newPwd || !pwdForm.confirm) { toast.error('Please fill in all password fields'); return; }
-        if (pwdForm.newPwd !== pwdForm.confirm) { toast.error('New passwords do not match'); return; }
-        if (pwdForm.newPwd.length < 8) { toast.error('Password must be at least 8 characters'); return; }
-        setChangingPwd(true);
-        try {
-            await authAPI.changePassword(user.id, pwdForm.current, pwdForm.newPwd);
-            toast.success('Password changed successfully!');
-            setPwdForm({ current: '', newPwd: '', confirm: '' });
-        } catch (err) { toast.error(err.message || 'Failed to change password'); }
-        finally { setChangingPwd(false); }
     };
 
     const handleRemovePhoto = async () => {
@@ -314,7 +313,7 @@ export default function ProfilePage() {
         setRemovingPhoto(true);
         setForm(prev => ({ ...prev, avatar: '' }));
         try {
-            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim() || user.name, bio: form.bio?.trim() || user.bio || '', avatar: '' });
+            const updated = await authAPI.updateProfile(user.id, { name: form.name.trim() || user.name, bio: form.bio?.trim() || user.bio || '', avatar: '', phone: form.phone?.trim() || '' });
             updateUser(updated);
             toast.success('Profile photo removed');
         } catch (err) { setForm(prev => ({ ...prev, avatar: previousAvatar })); toast.error(err.message || 'Failed to remove photo'); }
@@ -360,11 +359,10 @@ export default function ProfilePage() {
             </div>
 
             {activeTab === 'profile' && <PersonalInfoForm form={form} handleChange={handleChange} handleSave={handleSave} saving={saving}
-                fileInputRef={fileInputRef} uploadingPhoto={uploadingPhoto} handlePhotoUpload={handlePhotoUpload}
+                fileInputRef={fileInputRef} uploadingPhoto={uploadingPhoto}
                 handleRemovePhoto={handleRemovePhoto} removingPhoto={removingPhoto} user={user} />}
 
-            {activeTab === 'security' && <SecurityForm changingPwd={changingPwd} setChangingPwd={setChangingPwd}
-                pwdForm={pwdForm} setPwdForm={setPwdForm} handlePasswordChange={handlePasswordChange} />}
+            {activeTab === 'security' && <SecurityForm user={user} />}
 
             {activeTab === 'account' && <AccountInfo user={user} />}
 
