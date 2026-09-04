@@ -1,0 +1,22 @@
+[Unit]
+Description=LMS Backend API (Express)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Node binary from nodesource install (adjust if using nvm or another version)
+ExecStart=/usr/bin/node src/index.js
+WorkingDirectory=/opt/lms/backend
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=5
+# Basic hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+# Timeout for shutdown
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
