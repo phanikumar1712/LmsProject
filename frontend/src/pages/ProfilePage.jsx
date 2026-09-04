@@ -267,7 +267,7 @@ export default function ProfilePage() {
     const { user, updateUser } = useAuth();
     // When an admin force-reset the password, land directly on the Security tab
     // so the user changes it before anything else.
-    const [activeTab, setActiveTab] = useState(user?.mustChangePassword ? 'security' : 'profile');
+    const [activeTab, setActiveTab] = useState(user?.mustChangePassword && user?.role !== 'ADMIN' ? 'security' : 'profile');
     const [saving, setSaving] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [removingPhoto, setRemovingPhoto] = useState(false);

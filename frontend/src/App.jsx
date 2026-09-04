@@ -205,7 +205,7 @@ export default function App() {
               <Route path="/instructor/content-order" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorContentOrder /></ProtectedRoute>} />
               <Route path="/instructor/assessments/:quizId/student/:studentId" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><AssessmentReportPage /></ProtectedRoute>} />
               <Route path="/instructor/versions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorChangelog /></ProtectedRoute>} />
-              <Route path="/instructor/live-sessions" element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']}><InstructorLiveSessions /></ProtectedRoute>} />
+              {/* Attendance feature temporarily disabled */}
 
               {/* Admin */}
               <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
@@ -229,7 +229,7 @@ export default function App() {
               <Route path="/admin/student-progress" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminStudentProgress /></ProtectedRoute>} />
               <Route path="/admin/assignments" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminAssignments /></ProtectedRoute>} />
               <Route path="/admin/timetable" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminTimetable /></ProtectedRoute>} />
-              <Route path="/admin/attendance" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminLiveSessions /></ProtectedRoute>} />
+              {/* Attendance feature temporarily disabled */}
               {/* Department admins see their own department's audit trail */}
               <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AuditLogs /></ProtectedRoute>} />
               <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><SettingsPage /></ProtectedRoute>} />

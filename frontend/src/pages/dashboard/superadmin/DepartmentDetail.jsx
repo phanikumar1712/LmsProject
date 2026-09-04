@@ -4,7 +4,7 @@ import {
     Building2, Users, BookOpen, Star, GraduationCap,
     ShieldCheck, TrendingUp, ArrowLeft, BarChart3, Layers, Save,
     UserCheck, Eye, ExternalLink, Gauge, Plus, X, Mail, Lock, User,
-    Hash, Clock, Phone
+    Hash, Clock, Phone, Filter, Search, ChevronDown, CheckCircle2
 } from 'lucide-react';
 import { statsAPI, usersAPI, coursesAPI, departmentsAPI } from '../../../services/api';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
@@ -22,7 +22,7 @@ const TABS = [
     { key: 'overview', label: 'Overview', icon: BarChart3 },
     { key: 'admins', label: 'Admins', icon: ShieldCheck },
     { key: 'instructors', label: 'Instructors', icon: GraduationCap },
-    { key: 'users', label: 'Users', icon: Users },
+    { key: 'students', label: 'Students', icon: Users },
     { key: 'categories', label: 'Categories', icon: Layers },
     { key: 'courses', label: 'Courses', icon: BookOpen },
     { key: 'reports', label: 'Reports', icon: TrendingUp },
@@ -272,63 +272,236 @@ function OverviewTab({ dept, deptStats }) {
     );
 }
 
-// ─── Users Tab ────────────────────────────────────────────────────────────────
-function UsersTab({ dept }) {
-    const { data: users, loading } = useAsyncData(
-        () => usersAPI.getAll({ departmentId: dept.id, limit: 100 }),
+// ─── Students Tab ──────────────────────────────────────────────────────────────
+function StudentsTab({ dept }) {
+    const [search, setSearch] = useState('');
+    const [year, setYear] = useState('');
+    const [semester, setSemester] = useState('');
+    const [section, setSection] = useState('');
+    const [courseId, setCourseId] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Fetch courses for this department
+    const { data: rawCourses } = useAsyncData(
+        () => coursesAPI.getAll({ admin: true, departmentId: dept.id, limit: 200 }),
         [dept.id]
     );
+    const deptCourses = useMemo(() => {
+        if (!Array.isArray(rawCourses)) return [];
+        return rawCourses;
+    }, [rawCourses]);
 
-    const userList = Array.isArray(users) ? users : users?.data || [];
+    const filters = useMemo(() => {
+        const f = { departmentId: dept.id, role: 'STUDENT', limit: 200 };
+        if (search) f.search = search;
+        if (year) f.year = year;
+        if (semester) f.semester = semester;
+        if (section) f.section = section;
+        if (courseId) f.courseId = courseId;
+        return f;
+    }, [dept.id, search, year, semester, section, courseId]);
 
-    if (loading) return <LoadingContainer height="h-48" />;
+    const { data: students, loading, reload } = useAsyncData(
+        () => usersAPI.getAll(filters),
+        [JSON.stringify(filters)]
+    );
+
+    const studentList = useMemo(() => {
+        const list = Array.isArray(students) ? students : students?.data || [];
+        return list;
+    }, [students]);
+
+    const activeFilterCount = [year, semester, section, courseId].filter(Boolean).length;
+    const clearFilters = () => { setYear(''); setSemester(''); setSection(''); setCourseId(''); setSearch(''); };
+
+    const years = ['', '1', '2', '3', '4'];
+    const semesters = ['', '1', '2', '3', '4', '5', '6', '7', '8'];
+    const sections = ['', 'A', 'B', 'C', 'D', 'E'];
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
-                <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <Users size={16} /> All Users ({userList.length})
-                </h4>
-                <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground font-medium">
-                        {dept.studentCount} students · {dept.instructorCount} instructors · {dept.adminCount} admins
-                    </span>
-                    <Link
-                        to={`/admin/users?departmentId=${dept.id}`}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
-                    >
-                        <ExternalLink size={12} /> Manage
-                    </Link>
-                </div>
-            </div>
-            <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {userList.slice(0, 50).map(user => (
-                    <Link key={user.id} to={`/admin/users/${user.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
-                        {user.avatar ? (
-                            <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-xl object-cover border border-border" />
-                        ) : (
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-sm font-bold">
-                                {user.name?.charAt(0)?.toUpperCase()}
-                            </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">{user.name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+        <div className="space-y-4">
+            {/* Summary + Filters */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border bg-muted/20">
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-bold text-foreground flex items-center gap-2">
+                            <Users size={16} /> Students ({studentList.length})
+                        </h4>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                    showFilters || activeFilterCount > 0
+                                        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                        : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-border'
+                                }`}
+                            >
+                                <Filter size={13} /> Filters
+                                {activeFilterCount > 0 && (
+                                    <span className="ml-1 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-black">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </button>
+                            {activeFilterCount > 0 && (
+                                <button
+                                    onClick={clearFilters}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                                >
+                                    <X size={12} /> Clear
+                                </button>
+                            )}
+                            <Link
+                                to={`/admin/users?role=STUDENT&departmentId=${dept.id}`}
+                                className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
+                            >
+                                <ExternalLink size={12} /> Manage All
+                            </Link>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${
-                            user.role === 'STUDENT' ? 'bg-indigo-100 text-indigo-700' :
-                            user.role === 'INSTRUCTOR' ? 'bg-emerald-100 text-emerald-700' :
-                            'bg-amber-100 text-amber-700'
-                        }`}>{user.role}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${
-                            user.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
-                        }`}>{user.active !== false ? 'Active' : 'Suspended'}</span>
-                    </Link>
-                ))}
-                {userList.length === 0 && (
-                    <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
-                        No users in this department
                     </div>
+                    {/* Search bar */}
+                    <div className="relative">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                        <input
+                            type="text"
+                            placeholder="Search by name, email, or roll number..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-muted-foreground/50"
+                        />
+                    </div>
+                </div>
+                {/* Filter row */}
+                {showFilters && (
+                    <div className="p-4 border-b border-border bg-muted/10">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Year</label>
+                                <select value={year} onChange={e => setYear(e.target.value)}
+                                    className="w-full px-3 py-2 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Years</option>
+                                    {[1,2,3,4].map(y => <option key={y} value={y}>Year {y}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Semester</label>
+                                <select value={semester} onChange={e => setSemester(e.target.value)}
+                                    className="w-full px-3 py-2 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Semesters</option>
+                                    {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Sem {s}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Section</label>
+                                <select value={section} onChange={e => setSection(e.target.value)}
+                                    className="w-full px-3 py-2 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Sections</option>
+                                    {['A','B','C','D','E'].map(s => <option key={s} value={s}>Section {s}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Course</label>
+                                <select value={courseId} onChange={e => setCourseId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Courses</option>
+                                    {deptCourses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Student list */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                {loading ? (
+                    <LoadingContainer height="h-48" />
+                ) : (
+                    <>
+                        {/* Table header */}
+                        <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-muted/20 border-b border-border text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
+                            <div className="col-span-3">Student</div>
+                            <div className="col-span-2">Roll No</div>
+                            <div className="col-span-1 text-center">Year</div>
+                            <div className="col-span-1 text-center">Sem</div>
+                            <div className="col-span-1 text-center">Section</div>
+                            <div className="col-span-2">Email</div>
+                            <div className="col-span-1 text-center">Status</div>
+                            <div className="col-span-1"></div>
+                        </div>
+                        <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
+                            {studentList.map(student => (
+                                <Link key={student.id} to={`/admin/users/${student.id}`}
+                                    className="grid grid-cols-12 gap-2 items-center px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
+                                    <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                        {student.avatar ? (
+                                            <img src={student.avatar} alt={student.name} className="w-9 h-9 rounded-xl object-cover border border-border flex-shrink-0" />
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                                {student.name?.charAt(0)?.toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">{student.name}</p>
+                                            <p className="text-[10px] text-muted-foreground truncate md:hidden">{student.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-xs font-mono font-bold text-muted-foreground/80">
+                                            {student.rollNo || '—'}
+                                        </span>
+                                    </div>
+                                    <div className="col-span-1 text-center">
+                                        {student.year ? (
+                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-black">
+                                                {student.year}
+                                            </span>
+                                        ) : <span className="text-muted-foreground/40 text-xs">—</span>}
+                                    </div>
+                                    <div className="col-span-1 text-center">
+                                        {student.semester ? (
+                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-black">
+                                                {student.semester}
+                                            </span>
+                                        ) : <span className="text-muted-foreground/40 text-xs">—</span>}
+                                    </div>
+                                    <div className="col-span-1 text-center">
+                                        {student.section ? (
+                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-100 text-amber-700 text-xs font-black">
+                                                {student.section}
+                                            </span>
+                                        ) : <span className="text-muted-foreground/40 text-xs">—</span>}
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className="text-[11px] text-muted-foreground truncate">{student.email}</p>
+                                    </div>
+                                    <div className="col-span-1 text-center">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${
+                                            student.active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                        }`}>
+                                            {student.active !== false ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                    <div className="col-span-1 text-right">
+                                        <span className="text-xs font-bold text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            View
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
+                            {studentList.length === 0 && (
+                                <div className="py-16 text-center text-muted-foreground/60">
+                                    <Users size={36} className="opacity-20 mx-auto mb-3" />
+                                    <p className="font-medium text-sm">No students found</p>
+                                    {activeFilterCount > 0 && (
+                                        <button onClick={clearFilters} className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                                            Clear filters
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
             </div>
         </div>
@@ -337,73 +510,165 @@ function UsersTab({ dept }) {
 
 // ─── Courses Tab ───────────────────────────────────────────────────────────────
 function CoursesTab({ dept }) {
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [sortBy, setSortBy] = useState('newest');
+
     const { data: raw, loading } = useAsyncData(
-        () => coursesAPI.getAll({ admin: true, departmentId: dept.id, limit: 100 }),
+        () => coursesAPI.getAll({ admin: true, departmentId: dept.id, limit: 200 }),
         [dept.id]
     );
 
     const courses = useMemo(() => {
-        if (!Array.isArray(raw)) return [];
-        return raw;
-    }, [raw]);
+        let list = Array.isArray(raw) ? raw : [];
+        if (search) {
+            const q = search.toLowerCase();
+            list = list.filter(c => c.title?.toLowerCase().includes(q) || c.instructorName?.toLowerCase().includes(q));
+        }
+        if (statusFilter) list = list.filter(c => c.status === statusFilter);
+        if (sortBy === 'popular') list = [...list].sort((a, b) => (b.enrollmentCount || 0) - (a.enrollmentCount || 0));
+        else if (sortBy === 'rating') list = [...list].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        else list = [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return list;
+    }, [raw, search, statusFilter, sortBy]);
 
     const statusColors = {
-        PUBLISHED: 'bg-emerald-100 text-emerald-700',
-        PENDING: 'bg-amber-100 text-amber-700',
-        DRAFT: 'bg-muted text-muted-foreground',
-        REJECTED: 'bg-rose-100 text-rose-700',
+        PUBLISHED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        PENDING: 'bg-amber-100 text-amber-700 border-amber-200',
+        DRAFT: 'bg-muted text-muted-foreground border-border',
+        REJECTED: 'bg-rose-100 text-rose-700 border-rose-200',
     };
+
+    const statusCounts = useMemo(() => {
+        const list = Array.isArray(raw) ? raw : [];
+        return {
+            PUBLISHED: list.filter(c => c.status === 'PUBLISHED').length,
+            PENDING: list.filter(c => c.status === 'PENDING').length,
+            DRAFT: list.filter(c => c.status === 'DRAFT').length,
+            REJECTED: list.filter(c => c.status === 'REJECTED').length,
+        };
+    }, [raw]);
 
     if (loading) return <LoadingContainer height="h-48" />;
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-border bg-muted/20 flex items-center justify-between">
-                <h4 className="font-bold text-foreground flex items-center gap-2">
-                    <BookOpen size={16} /> Courses ({dept.courseTotal})
-                </h4>
-                <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground font-medium">
-                        {dept.coursePublished} published · {dept.coursePending} pending
-                    </span>
-                    <Link
-                        to={`/admin/courses?departmentId=${dept.id}`}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-bold"
+        <div className="space-y-4">
+            {/* Status summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                    { key: '', label: 'All Courses', count: dept.courseTotal, color: 'text-foreground', bg: 'bg-card', icon: BookOpen },
+                    { key: 'PUBLISHED', label: 'Published', count: statusCounts.PUBLISHED, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: CheckCircle2 },
+                    { key: 'PENDING', label: 'Pending', count: statusCounts.PENDING, color: 'text-amber-600', bg: 'bg-amber-50', icon: Clock },
+                    { key: 'DRAFT', label: 'Drafts', count: statusCounts.DRAFT, color: 'text-muted-foreground', bg: 'bg-muted/40', icon: BookOpen },
+                ].map(card => (
+                    <button
+                        key={card.key}
+                        onClick={() => setStatusFilter(statusFilter === card.key ? '' : card.key)}
+                        className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left ${
+                            statusFilter === card.key
+                                ? 'border-indigo-300 bg-indigo-50 shadow-sm'
+                                : 'border-border bg-card hover:border-indigo-200 shadow-sm'
+                        }`}
                     >
-                        <ExternalLink size={12} /> Manage
-                    </Link>
-                </div>
-            </div>
-            <div className="divide-y divide-border max-h-96 overflow-y-auto">
-                {courses.slice(0, 50).map(course => (
-                    <Link key={course.id} to={`/courses/${course.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group">
-{course.thumbnail ? (
-                                 <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-12 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
-                             ) : (
-                                 <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                     {course.title?.charAt(0)}
-                                 </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">
-                                {course.title}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                                {course.instructorName} · {course.categoryName || 'Uncategorized'}
-                            </p>
+                        <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center`}
+                            style={statusFilter === card.key ? { background: '#eef2ff' } : {}}>
+                            <card.icon size={18} className={statusFilter === card.key ? 'text-indigo-600' : card.color} />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${statusColors[course.status] || 'bg-muted text-muted-foreground'}`}>
-                                {course.status}
-                            </span>
+                        <div>
+                            <p className="text-xl font-black text-foreground">{card.count || 0}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">{card.label}</p>
                         </div>
-                    </Link>
+                    </button>
                 ))}
-                {courses.length === 0 && (
-                    <div className="py-12 text-center text-muted-foreground/60 font-medium text-sm">
-                        No courses found in this department
+            </div>
+
+            {/* Search + Sort bar */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border bg-muted/20">
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                            <input
+                                type="text"
+                                placeholder="Search courses by title or instructor..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-muted-foreground/50"
+                            />
+                        </div>
+                        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                            className="px-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                            <option value="newest">Newest First</option>
+                            <option value="popular">Most Popular</option>
+                            <option value="rating">Highest Rated</option>
+                        </select>
+                        <Link
+                            to={`/admin/courses?departmentId=${dept.id}`}
+                            className="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-bold whitespace-nowrap px-3 py-2.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                        >
+                            <ExternalLink size={13} /> Manage All
+                        </Link>
                     </div>
-                )}
+                </div>
+
+                {/* Course list */}
+                <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
+                    {courses.map(course => (
+                        <Link key={course.id} to={`/courses/${course.id}`}
+                            className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors cursor-pointer group">
+                            {/* Thumbnail */}
+                            <div className="w-20 h-14 rounded-xl overflow-hidden border border-border flex-shrink-0 bg-muted">
+                                {course.thumbnail ? (
+                                    <CourseThumbnail thumbnail={course.thumbnail} title={course.title} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 flex items-center justify-center">
+                                        <BookOpen size={18} className="text-white/80" />
+                                    </div>
+                                )}
+                            </div>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-sm font-bold text-foreground truncate group-hover:text-indigo-600 transition-colors">
+                                        {course.title}
+                                    </p>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter border ${statusColors[course.status] || 'bg-muted text-muted-foreground border-border'}`}>
+                                        {course.status}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                    {course.instructorName || 'Unassigned'} · {course.categoryName || 'Uncategorized'}
+                                </p>
+                                <div className="flex items-center gap-4 mt-1.5">
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground/70">
+                                        <Users size={11} /> {course.enrollmentCount || 0} enrolled
+                                    </span>
+                                    {course.rating > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                                            <Star size={11} /> {Number(course.rating).toFixed(1)}
+                                        </span>
+                                    )}
+                                    {course.level && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-muted/60 text-muted-foreground">
+                                            {course.level}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                    {courses.length === 0 && (
+                        <div className="py-16 text-center text-muted-foreground/60">
+                            <BookOpen size={36} className="opacity-20 mx-auto mb-3" />
+                            <p className="font-medium text-sm">No courses found</p>
+                            {(search || statusFilter) && (
+                                <button onClick={() => { setSearch(''); setStatusFilter(''); }} className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                                    Clear filters
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -1038,7 +1303,7 @@ export default function DepartmentDetail() {
                 )}
                 {activeTab === 'admins' && <AdminsTab dept={dept} />}
                 {activeTab === 'instructors' && <InstructorsTab dept={dept} />}
-                {activeTab === 'users' && <UsersTab dept={dept} />}
+                {activeTab === 'students' && <StudentsTab dept={dept} />}
                 {activeTab === 'categories' && <CategoriesTab dept={dept} />}
                 {activeTab === 'courses' && <CoursesTab dept={dept} />}
                 {activeTab === 'reports' && <ReportsTab dept={dept} deptStats={deptStats} />}

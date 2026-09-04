@@ -40,7 +40,7 @@ const inputCls = 'w-full px-4 py-3 bg-muted/30 border border-border rounded-2xl 
 const labelCls = 'text-xs font-black uppercase tracking-wider text-muted-foreground ml-1';
 const selectCls = `${inputCls} appearance-none cursor-pointer`;
 
-const emptyForm = () => ({ name: '', email: '', phone: '', password: '', departmentId: '', rollNo: '' });
+const emptyForm = () => ({ name: '', email: '', phone: '', password: '', departmentId: '', rollNo: '', year: '', semester: '', section: '', batch: '' });
 
 // ─── Export CSV helper ────────────────────────────────────────────────────────
 function downloadCSV(filename, rows) {
@@ -139,6 +139,10 @@ export default function SuperAdminStudents() {
                 password: createForm.password,
                 departmentId: createForm.departmentId || null,
                 rollNo: createForm.rollNo.trim(),
+                year: createForm.year || undefined,
+                semester: createForm.semester || undefined,
+                section: createForm.section || undefined,
+                batch: createForm.batch || undefined,
             });
             toast.success(`Student "${createForm.name.trim()}" created`);
             setCreateResult(res);
@@ -160,6 +164,9 @@ export default function SuperAdminStudents() {
             phone: student.phone || '',
             rollNo: student.rollNo || '',
             departmentId: student.departmentId || '',
+            year: student.year ?? '',
+            semester: student.semester ?? '',
+            section: student.section || '',
         });
         setEditingStudent(student);
     };
@@ -178,6 +185,9 @@ export default function SuperAdminStudents() {
                 phone: editForm.phone.trim(),
                 rollNo: editForm.rollNo.trim(),
                 departmentId: editForm.departmentId || null,
+                year: editForm.year || null,
+                semester: editForm.semester || null,
+                section: editForm.section || null,
             });
             toast.success(`Student "${editForm.name.trim()}" updated`);
             setEditingStudent(null);
@@ -603,6 +613,38 @@ export default function SuperAdminStudents() {
                                     <p className="text-[11px] text-muted-foreground/60 font-medium ml-1">Blank generates a temporary password shown after creation.</p>
                                 </div>
                             </div>
+                            {/* Academic cohort fields */}
+                            <div className="border-t border-border pt-5">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                                    <GraduationCap size={14} className="text-indigo-500" /> Academic Details
+                                </h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Year</label>
+                                        <select value={createForm.year}
+                                            onChange={e => setCreateForm(f => ({ ...f, year: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {[1,2,3,4].map(y => <option key={y} value={y}>Year {y}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Semester</label>
+                                        <select value={createForm.semester}
+                                            onChange={e => setCreateForm(f => ({ ...f, semester: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Section</label>
+                                        <select value={createForm.section}
+                                            onChange={e => setCreateForm(f => ({ ...f, section: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {['A','B','C','D','E'].map(s => <option key={s} value={s}>Section {s}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
 
                             {createResult && (
                                 <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 rounded-2xl space-y-1.5 text-[11px] font-medium text-muted-foreground">
@@ -684,6 +726,38 @@ export default function SuperAdminStudents() {
                                     ))}
                                 </select>
                                 <p className="text-[11px] text-muted-foreground/60 font-medium ml-1">Moving a student changes their department scope. Roll numbers are unique per department.</p>
+                            </div>
+                            {/* Academic cohort fields */}
+                            <div className="border-t border-border pt-5">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                                    <GraduationCap size={14} className="text-indigo-500" /> Academic Details
+                                </h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Year</label>
+                                        <select value={editForm.year}
+                                            onChange={e => setEditForm(f => ({ ...f, year: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {[1,2,3,4].map(y => <option key={y} value={y}>Year {y}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Semester</label>
+                                        <select value={editForm.semester}
+                                            onChange={e => setEditForm(f => ({ ...f, semester: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelCls}>Section</label>
+                                        <select value={editForm.section}
+                                            onChange={e => setEditForm(f => ({ ...f, section: e.target.value }))} className={selectCls}>
+                                            <option value="">— Select —</option>
+                                            {['A','B','C','D','E'].map(s => <option key={s} value={s}>Section {s}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setEditingStudent(null)}

@@ -552,9 +552,24 @@ const runEnrollmentImport = async (req, res, { preview = false }) => {
     const { scoped, departmentId } = getDepartmentScope(req);
     const isUUID = v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v));
 
+    // Optional courseId from query param — when provided, CSV rows don't need a
+    // "Course" column; every row is enrolled in the pre-selected course.
+    const overrideCourseId = req.query.courseId || null;
+    let overrideCourse = null;
+    if (overrideCourseId) {
+        const cRes = await query(
+            `SELECT c.id, c.title, c.enrollment_count, d.name AS "departmentName", c.department_id AS "departmentId"
+             FROM courses c LEFT JOIN departments d ON d.id = c.department_id WHERE c.id = $1`,
+            [overrideCourseId]
+        );
+        if (cRes.rows.length) overrideCourse = cRes.rows[0];
+    }
+
     // 1) Normalize each row (format validation only, no DB).
     const normalized = rows.map((row, index) => {
-        const courseRef = String(pickEnrollCell(row, 'course') || pickEnrollCell(row, 'course id') || pickEnrollCell(row, 'course title') || '').trim();
+        const courseRef = overrideCourse
+            ? overrideCourse.title // auto-fill from pre-selected course
+            : String(pickEnrollCell(row, 'course') || pickEnrollCell(row, 'course id') || pickEnrollCell(row, 'course title') || '').trim();
         const rollNo = String(pickEnrollCell(row, 'student id') || pickEnrollCell(row, 'roll no') || pickEnrollCell(row, 'roll') || '').trim();
         const email = String(pickEnrollCell(row, 'email') || '').trim().toLowerCase();
         let error = null;
@@ -566,6 +581,11 @@ const runEnrollmentImport = async (req, res, { preview = false }) => {
     // 2) Resolve every referenced course in ONE query (id or title).
     const courseRefs = [...new Set(normalized.filter(r => !r.error).map(r => r.courseRef))];
     const courseMap = new Map(); // lower(ref) → course row
+    // Pre-populate with override course if provided
+    if (overrideCourse) {
+        courseMap.set(overrideCourse.id, overrideCourse);
+        courseMap.set(overrideCourse.title.toLowerCase(), overrideCourse);
+    }
     if (courseRefs.length) {
         const ids = courseRefs.filter(isUUID);
         const titles = courseRefs.filter(r => !isUUID(r)).map(r => r.toLowerCase());

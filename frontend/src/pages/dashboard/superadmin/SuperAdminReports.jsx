@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import {
     Users, GraduationCap, Building2, BookOpen, Activity, CheckCircle2,
     TrendingUp, CalendarCheck, ClipboardList, FileQuestion, Award, Download,
-    FileSpreadsheet, RefreshCw, Printer
+    FileSpreadsheet, RefreshCw, Printer, Filter, X, Search
 } from 'lucide-react';
 import { usersAPI, coursesAPI, statsAPI } from '../../../services/api';
 import { DataTable } from '../../../components/ui/DataTable';
@@ -89,15 +89,35 @@ export default function SuperAdminReports() {
     const [reportKey, setReportKey] = useState('students');
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
+    const [deptFilter, setDeptFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [search, setSearch] = useState('');
+
+    const [departments, setDepartments] = useState([]);
+    useEffect(() => { statsAPI.getDepartments().then(d => setDepartments(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+
+    const activeFilterCount = [deptFilter, statusFilter, dateFrom, dateTo, search].filter(Boolean).length;
+    const clearFilters = () => { setDeptFilter(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); setSearch(''); };
 
     const loadReport = async (key) => {
         setLoading(true);
         setData(null);
         try {
+            // Build filter params from current filter state
+            const fParams = {};
+            if (deptFilter) fParams.departmentId = deptFilter;
+            if (statusFilter) fParams.status = statusFilter;
+            if (dateFrom) fParams.from = dateFrom;
+            if (dateTo) fParams.to = dateTo;
+            if (search) fParams.search = search;
+
             let rows = [];
             if (key === 'students') {
                 const [users, progress] = await Promise.all([
-                    usersAPI.getAll({ role: 'STUDENT', limit: 1000 }),
+                    usersAPI.getAll({ role: 'STUDENT', limit: 1000, ...fParams }),
                     statsAPI.getStudentProgress({ limit: 1000 }).catch(() => []),
                 ]);
                 const progById = (Array.isArray(progress) ? progress : progress?.data || []).reduce((m, p) => ({ ...m, [p.id]: p }), {});
@@ -118,7 +138,7 @@ export default function SuperAdminReports() {
                     };
                 });
             } else if (key === 'instructors') {
-                const list = Array.isArray(await usersAPI.getAll({ role: 'INSTRUCTOR', limit: 100 })) ? await usersAPI.getAll({ role: 'INSTRUCTOR', limit: 100 }) : [];
+                const list = Array.isArray(await usersAPI.getAll({ role: 'INSTRUCTOR', limit: 100, ...fParams })) ? await usersAPI.getAll({ role: 'INSTRUCTOR', limit: 100, ...fParams }) : [];
                 const enriched = await Promise.all(list.map(async u => {
                     try { return { user: u, stats: await statsAPI.getInstructor(u.id) }; } catch { return { user: u, stats: null }; }
                 }));
@@ -149,7 +169,7 @@ export default function SuperAdminReports() {
                     'Status': d.active === false ? 'Inactive' : 'Active',
                 }));
             } else if (key === 'courses') {
-                const list = await coursesAPI.getAll({ admin: true, limit: 1000 });
+                const list = await coursesAPI.getAll({ admin: true, limit: 1000, departmentId: deptFilter || undefined, status: statusFilter || undefined, search: search || undefined });
                 rows = (Array.isArray(list) ? list : []).map(c => ({
                     'Course ID': shortId(c.id),
                     'Title': c.title,
@@ -252,7 +272,7 @@ export default function SuperAdminReports() {
         }
     };
 
-    useEffect(() => { loadReport(reportKey); }, [reportKey]);
+    useEffect(() => { loadReport(reportKey); }, [reportKey, deptFilter, statusFilter, dateFrom, dateTo, search]);
 
     const rows = data?.rows || [];
     const columns = rows.length ? Object.keys(rows[0]) : [];
@@ -312,6 +332,81 @@ export default function SuperAdminReports() {
                         <Printer size={14} className="text-rose-600" /> PDF
                     </button>
                 </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 flex items-center justify-between">
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                            showFilters || activeFilterCount > 0
+                                ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-border'
+                        }`}
+                    >
+                        <Filter size={15} /> Filters
+                        {activeFilterCount > 0 && (
+                            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-black">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </button>
+                    {activeFilterCount > 0 && (
+                        <button onClick={clearFilters}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors">
+                            <X size={12} /> Clear all
+                        </button>
+                    )}
+                </div>
+                {showFilters && (
+                    <div className="px-4 pb-4 pt-0 border-t border-border">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Department</label>
+                                <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Departments</option>
+                                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Status</label>
+                                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="suspended">Suspended</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">From Date</label>
+                                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">To Date</label>
+                                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground ml-1">Search</label>
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                    <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                                        placeholder="Name, email..."
+                                        className="w-full pl-9 pr-3 py-2.5 bg-muted/40 border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-muted-foreground/50" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end mt-3">
+                            <button onClick={() => loadReport(reportKey)}
+                                className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm">
+                                Apply Filters
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="grid lg:grid-cols-4 gap-6">

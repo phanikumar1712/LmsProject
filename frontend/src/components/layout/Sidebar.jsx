@@ -60,7 +60,7 @@ const INSTRUCTOR_NAV = [
             { to: '/instructor/students', icon: Users, label: 'Students' },
             { to: '/instructor/assessments', icon: ClipboardList, label: 'Assessments & Grades' },
             { to: '/instructor/quiz-builder', icon: ListChecks, label: 'Quizzes' },
-            { to: '/instructor/live-sessions', icon: CalendarCheck, label: 'Attendance' },
+            // Attendance feature temporarily disabled
         ],
     },
     {
@@ -96,7 +96,7 @@ const ADMIN_NAV = [
         items: [
             { to: '/admin/assignments', icon: FileText, label: 'Assignments' },
             { to: '/instructor/quiz-builder', icon: ListChecks, label: 'Quizzes' },
-            { to: '/admin/attendance', icon: CalendarCheck, label: 'Attendance' },
+            // Attendance feature temporarily disabled
         ],
     },
     {

@@ -287,6 +287,24 @@ const createTables = async () => {
             );
         `);
 
+        // ── SUPPORT REQUESTS ─────────────────────────────────────────────────
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS support_requests (
+                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id         UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+                request_type    VARCHAR(50) NOT NULL CHECK (request_type IN ('password_reset', 'permission_request', 'account_issue', 'general', 'bug_report')),
+                subject         VARCHAR(255) NOT NULL,
+                message         TEXT NOT NULL,
+                status          VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')),
+                priority        VARCHAR(10) NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+                admin_response  TEXT,
+                responded_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+                responded_at    TIMESTAMPTZ,
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+
         // ── INDEXES ───────────────────────────────────────────────────────────
         await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category_id); `);
@@ -307,6 +325,9 @@ const createTables = async () => {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(user_id, action, created_at DESC); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role); `);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_at ON enrollments(enrolled_at); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_support_requests_user ON support_requests(user_id); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status); `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_support_requests_created ON support_requests(created_at DESC); `);
 
         // ── PERFORMANCE INDEXES (batch 2) ─────────────────────────────────────
         // Trigram indexes for ILIKE text search on courses and users.
@@ -1214,18 +1235,46 @@ const createTables = async () => {
         // Declared at function scope so the post-commit demo-account summary
         // (printed after COMMIT) can read it — it's populated in the seed block.
         const deptUsers = {};
+
+        // ── SEED DEPARTMENT ADMINS (always — both dev & production) ──────────
+        // Every department gets a dedicated admin account. These are the real
+        // operational accounts that show up on the Manage Admins page.
+        const bcrypt = require('bcryptjs');
+        const adminPass = isProduction
+            ? await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@123', 12)
+            : await bcrypt.hash('demo1234', 12);
+
+        Object.assign(deptUsers, {
+            CSE:       { admin: { name: 'CSE Admin',       email: 'cse.admin@lms.com' } },
+            ECE:       { admin: { name: 'ECE Admin',       email: 'ece.admin@lms.com' } },
+            EEE:       { admin: { name: 'EEE Admin',       email: 'eee.admin@lms.com' } },
+            Mechanical:{ admin: { name: 'Mech Admin',       email: 'mech.admin@lms.com' } },
+            Civil:     { admin: { name: 'Civil Admin',      email: 'civil.admin@lms.com' } },
+        });
+
+        for (const [deptName, users] of Object.entries(deptUsers)) {
+            const deptRes = await client.query('SELECT id FROM departments WHERE name = $1', [deptName]);
+            if (!deptRes.rows.length) {
+                console.warn(`⚠️  Department "${deptName}" not found — skipping.`);
+                continue;
+            }
+            const deptId = deptRes.rows[0].id;
+            await client.query(
+                `INSERT INTO users(name, email, password, role, department_id, avatar)
+                 VALUES($1, $2, $3, 'ADMIN', $4, '')
+                 ON CONFLICT(email) DO NOTHING;`,
+                [users.admin.name, users.admin.email, adminPass, deptId]
+            );
+        }
+
         if (!isProduction) {
         // ── CLEANUP: Remove dummy / departmentless users ──────────────────────
-        // Delete any existing STUDENT or INSTRUCTOR that has no department_id.
-        // These are legacy seeded rows (student@demo.com, instructor@demo.com)
-        // or any manually created orphans that should belong to a department.
         await client.query(`
             DELETE FROM users
             WHERE role IN ('STUDENT', 'INSTRUCTOR')
               AND department_id IS NULL
               AND email != 'superadmin@lms.com';
         `);
-        // Remove the old single CSE admin mapping — we seed per-dept admins below.
         await client.query(`
             UPDATE users SET department_id = NULL
             WHERE email = 'admin@demo.com' AND department_id IS NOT NULL;
@@ -1234,96 +1283,56 @@ const createTables = async () => {
             DELETE FROM users WHERE email = 'admin@demo.com' AND role = 'ADMIN';
         `);
 
-        // ── SEED USERS PER DEPARTMENT ─────────────────────────────────────────
-        // Each academic department gets its own admin, instructor, and students.
-        // All share the same demo password for easy testing.
-        const bcrypt = require('bcryptjs');
-        const demoPass = await bcrypt.hash('demo123', 12);
+        // ── SEED INSTRUCTORS & STUDENTS (dev/test only) ──────────────────────
+        // Admins are already seeded above (runs in both dev & production).
+        const demoPass = await bcrypt.hash('demo1234', 12);
+        const devInstructors = {
+            CSE:        { name: 'Dr. Arjun Patel',      email: 'cse.instructor@lms.com' },
+            ECE:        { name: 'Prof. Meera Nair',     email: 'ece.instructor@lms.com' },
+            EEE:        { name: 'Dr. Vikram Singh',     email: 'eee.instructor@lms.com' },
+            Mechanical: { name: 'Prof. Anand Joshi',    email: 'mech.instructor@lms.com' },
+            Civil:      { name: 'Dr. Sunita Rao',       email: 'civil.instructor@lms.com' },
+        };
+        const devStudents = [
+            { dept: 'CSE', name: 'Riya Sharma',   email: 'cse.student1@lms.com',    rollNo: 'CS22001' },
+            { dept: 'CSE', name: 'Amit Verma',    email: 'cse.student2@lms.com',    rollNo: 'CS22002' },
+            { dept: 'ECE', name: 'Karthik Reddy', email: 'ece.student1@lms.com',    rollNo: 'EC22001' },
+            { dept: 'ECE', name: 'Sneha Gupta',   email: 'ece.student2@lms.com',    rollNo: 'EC22002' },
+            { dept: 'EEE', name: 'Priya Deshmukh', email: 'eee.student1@lms.com',   rollNo: 'EE22001' },
+            { dept: 'Mechanical', name: 'Rohit Kadam', email: 'mech.student1@lms.com', rollNo: 'ME22001' },
+            { dept: 'Civil', name: 'Anjali Mehta', email: 'civil.student1@lms.com',  rollNo: 'CE22001' },
+        ];
 
-        Object.assign(deptUsers, {
-            CSE: {
-                admin:   { name: 'CSE Admin',       email: 'cse.admin@demo.com' },
-                instructor: { name: 'Dr. Arjun Patel', email: 'cse.instructor@demo.com' },
-                students: [
-                    { name: 'Riya Sharma', email: 'cse.student1@demo.com', rollNo: 'CS22001' },
-                    { name: 'Amit Verma',  email: 'cse.student2@demo.com', rollNo: 'CS22002' },
-                ],
-            },
-            ECE: {
-                admin:   { name: 'ECE Admin',       email: 'ece.admin@demo.com' },
-                instructor: { name: 'Prof. Meera Nair', email: 'ece.instructor@demo.com' },
-                students: [
-                    { name: 'Karthik Reddy', email: 'ece.student1@demo.com', rollNo: 'EC22001' },
-                    { name: 'Sneha Gupta',   email: 'ece.student2@demo.com', rollNo: 'EC22002' },
-                ],
-            },
-            EEE: {
-                admin:   { name: 'EEE Admin',           email: 'eee.admin@demo.com' },
-                instructor: { name: 'Dr. Vikram Singh', email: 'eee.instructor@demo.com' },
-                students: [
-                    { name: 'Priya Deshmukh', email: 'eee.student1@demo.com', rollNo: 'EE22001' },
-                ],
-            },
-            Mechanical: {
-                admin:   { name: 'Mech Admin',                email: 'mech.admin@demo.com' },
-                instructor: { name: 'Prof. Anand Joshi',      email: 'mech.instructor@demo.com' },
-                students: [
-                    { name: 'Rohit Kadam', email: 'mech.student1@demo.com', rollNo: 'ME22001' },
-                ],
-            },
-            Civil: {
-                admin:   { name: 'Civil Admin',          email: 'civil.admin@demo.com' },
-                instructor: { name: 'Dr. Sunita Rao',    email: 'civil.instructor@demo.com' },
-                students: [
-                    { name: 'Anjali Mehta', email: 'civil.student1@demo.com', rollNo: 'CE22001' },
-                ],
-            },
-        });
-
-        for (const [deptName, users] of Object.entries(deptUsers)) {
-            // Fetch the department ID (seeded already above)
+        // Seed instructors
+        for (const [deptName, inst] of Object.entries(devInstructors)) {
             const deptRes = await client.query('SELECT id FROM departments WHERE name = $1', [deptName]);
-            if (!deptRes.rows.length) {
-                console.warn(`⚠️  Department "${deptName}" not found — skipping its users.`);
-                continue;
-            }
-            const deptId = deptRes.rows[0].id;
-
-            // Admin (one per department)
-            await client.query(
-                `INSERT INTO users(name, email, password, role, department_id, avatar)
-                 VALUES($1, $2, $3, 'ADMIN', $4, '')
-                 ON CONFLICT(email) DO NOTHING;`,
-                [users.admin.name, users.admin.email, demoPass, deptId]
-            );
-
-            // Instructor (one per department)
+            if (!deptRes.rows.length) continue;
             await client.query(
                 `INSERT INTO users(name, email, password, role, department_id, avatar)
                  VALUES($1, $2, $3, 'INSTRUCTOR', $4, '')
                  ON CONFLICT(email) DO NOTHING;`,
-                [users.instructor.name, users.instructor.email, demoPass, deptId]
+                [inst.name, inst.email, demoPass, deptRes.rows[0].id]
             );
-
-            // Students
-            for (const student of users.students) {
-                await client.query(
-                    `INSERT INTO users(name, email, password, role, department_id, roll_no, avatar)
-                     VALUES($1, $2, $3, 'STUDENT', $4, $5, '')
-                     ON CONFLICT(email) DO NOTHING;`,
-                    [student.name, student.email, demoPass, deptId, student.rollNo || null]
-                );
-            }
         }
-        } // end if (!isProduction) — demo user seeding
+
+        // Seed students
+        for (const s of devStudents) {
+            const deptRes = await client.query('SELECT id FROM departments WHERE name = $1', [s.dept]);
+            if (!deptRes.rows.length) continue;
+            await client.query(
+                `INSERT INTO users(name, email, password, role, department_id, roll_no, avatar)
+                 VALUES($1, $2, $3, 'STUDENT', $4, $5, '')
+                 ON CONFLICT(email) DO NOTHING;`,
+                [s.name, s.email, demoPass, deptRes.rows[0].id, s.rollNo]
+            );
+        }
+        } // end if (!isProduction) — dev user seeding
 
         // ── PRODUCTION CLEANUP: purge pre-existing demo accounts ─────────────
         // A database migrated BEFORE this security fix may still contain the
-        // hardcoded demo accounts (all *@demo.com users with password 'demo123').
-        // In production those known credentials remain usable via normal login,
-        // so remove them on the next migrate run. Narrowly scoped to the demo
-        // email pattern — never touches real users. The super admin is handled
-        // separately by seedSuperAdmin above (re-seeded from SUPER_ADMIN_PASSWORD).
+        // Production cleanup: purge pre-existing legacy demo accounts with
+        // known default passwords. Only the super admin is retained (re-seeded
+        // from SUPER_ADMIN_PASSWORD by seedSuperAdmin).
         if (isProduction) {
             await client.query(`DELETE FROM users WHERE email LIKE '%@demo.com';`);
         }
@@ -1336,7 +1345,7 @@ const createTables = async () => {
         if (!isProduction) {
             console.log('');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('📋  DEMO ACCOUNTS — Password: demo123');
+            console.log('📋  DEMO ACCOUNTS — Password: demo1234');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             console.log('');
             console.log('👑 SUPER ADMIN');
@@ -1344,19 +1353,19 @@ const createTables = async () => {
             console.log('');
             console.log('🏛️  DEPARTMENT ADMINS (1 per dept)');
             for (const deptName of Object.keys(deptUsers)) {
-                console.log(`   ${deptName}: ${deptUsers[deptName].admin.email} / demo123`);
+                console.log(`   ${deptName}: ${deptUsers[deptName].admin.email} / demo1234`);
             }
             console.log('');
             console.log('👨‍🏫  INSTRUCTORS (1 per dept)');
             for (const deptName of Object.keys(deptUsers)) {
                 const inst = deptUsers[deptName].instructor;
-                console.log(`   ${deptName}: ${inst.email} / demo123  (${inst.name})`);
+                console.log(`   ${deptName}: ${inst.email} / demo1234  (${inst.name})`);
             }
             console.log('');
             console.log('🎓  STUDENTS');
             for (const deptName of Object.keys(deptUsers)) {
                 for (const s of deptUsers[deptName].students) {
-                    console.log(`   ${deptName}: ${s.email} / demo123  roll:${s.rollNo}`);
+                    console.log(`   ${deptName}: ${s.email} / demo1234  roll:${s.rollNo}`);
                 }
             }
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

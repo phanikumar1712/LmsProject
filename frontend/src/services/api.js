@@ -341,11 +341,12 @@ export const enrollmentsAPI = {
     },
 
     // Bulk enrollment import — validate → preview → confirm (CSV/XLSX)
-    previewEnrollmentImport: async (file, { signal, timeoutMs = 120000 } = {}) =>
-        uploadImportFile('/enrollments/import/preview', file, { signal, timeoutMs }),
+    // courseId is optional: when provided, CSV rows don't need a "Course" column.
+    previewEnrollmentImport: async (file, courseId, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile(`/enrollments/import/preview${courseId ? `?courseId=${courseId}` : ''}`, file, { signal, timeoutMs }),
 
-    importEnrollments: async (file, { signal, timeoutMs = 120000 } = {}) =>
-        uploadImportFile('/enrollments/import', file, { signal, timeoutMs }),
+    importEnrollments: async (file, courseId, { signal, timeoutMs = 120000 } = {}) =>
+        uploadImportFile(`/enrollments/import${courseId ? `?courseId=${courseId}` : ''}`, file, { signal, timeoutMs }),
 
     downloadEnrollmentTemplate: async () => {
         const token = getToken();
@@ -447,6 +448,10 @@ export const usersAPI = {
         if (filters.to) params.set('to', filters.to);
         if (filters.departmentId) params.set('departmentId', filters.departmentId);
         if (filters.limit) params.set('limit', filters.limit);
+        if (filters.year) params.set('year', filters.year);
+        if (filters.semester) params.set('semester', filters.semester);
+        if (filters.section) params.set('section', filters.section);
+        if (filters.courseId) params.set('courseId', filters.courseId);
         const qs = params.toString();
         const res = await http('GET', `/users${qs ? `?${qs}` : ''}`, null, getToken());
         return res.data || res; // handle both wrapped and plain
@@ -784,6 +789,33 @@ export const statsAPI = {
 
     updateSettings: async (settings) =>
         http('PUT', '/stats/settings', settings, getToken()),
+};
+
+// ─── SUPPORT REQUESTS ─────────────────────────────────────────────────────
+export const supportAPI = {
+    createRequest: async (data) =>
+        http('POST', '/support/requests', data, getToken()),
+
+    getMyRequests: async (status) => {
+        const qs = status ? `?status=${status}` : '';
+        const res = await http('GET', `/support/requests${qs}`, null, getToken());
+        return res.data || [];
+    },
+
+    getAllRequests: async (status) => {
+        const qs = status ? `?status=${status}` : '';
+        const res = await http('GET', `/support/requests${qs}`, null, getToken());
+        return res.data || [];
+    },
+
+    getRequest: async (id) =>
+        http('GET', `/support/requests/${id}`, null, getToken()),
+
+    respond: async (id, data) =>
+        http('PUT', `/support/requests/${id}/respond`, data, getToken()),
+
+    getStats: async () =>
+        http('GET', '/support/stats', null, getToken()),
 };
 
 // ─── NOTES (student lesson notes) ────────────────────────────────────────────

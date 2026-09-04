@@ -118,6 +118,11 @@ const ROLE_PERMISSIONS = {
         'attendance.manage',
         'audit.view',
         'reports.view',
+        // Department admins can manage assignments and grading within
+        // their department (mirrors INSTRUCTOR minus course.create).
+        'assignment.create',
+        'assignment.update',
+        'grade.update',
     ],
     SUPER_ADMIN: [], // implicit: everything (see ALL_PERMISSIONS / hasPermission)
 };

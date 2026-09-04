@@ -4,7 +4,8 @@ import {
     User, Mail, Shield, Building2, Calendar, Hash, Phone, Award, BookOpen,
     RotateCcw, Ban, CheckCircle, Trash2, Plus, X, Search,
     ChevronLeft, Star, Layers, Trophy, Target, Activity,
-    Crown, Swords, Copy, ExternalLink, GraduationCap, Users, Megaphone
+    Crown, Swords, Copy, ExternalLink, GraduationCap, Users, Megaphone,
+    Clock, Bookmark, TrendingUp, BarChart3
 } from 'lucide-react';
 import { CourseThumbnail } from '../../../components/ui/CourseThumbnail';
 import PermissionBadges from '../../../components/ui/PermissionBadges';
@@ -458,13 +459,34 @@ export default function UserDetail() {
                     </div>
 
                     {/* Detail grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-2 pt-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-1 pt-6">
                         <DetailRow icon={Building2} label="Department" value={user.departmentName || '—'} />
                         <DetailRow icon={Hash} label="Roll No" value={user.rollNo || '—'} />
                         <DetailRow icon={Phone} label="Phone" value={user.phone || '—'} />
                         <DetailRow icon={Calendar} label="Joined" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'} />
-                        <DetailRow icon={Target} label="Current Streak" value={`${user.currentStreak || 0} days`} />
-                        <DetailRow icon={Trophy} label="Longest Streak" value={`${user.longestStreak || 0} days`} />
+                        {user.role === 'STUDENT' && (
+                            <>
+                                <DetailRow icon={BarChart3} label="Year" value={user.year ? `Year ${user.year}` : '—'} />
+                                <DetailRow icon={Bookmark} label="Semester" value={user.semester ? `Semester ${user.semester}` : '—'} />
+                                <DetailRow icon={Layers} label="Section" value={user.section || '—'} />
+                                <DetailRow icon={Clock} label="Last Login" value={user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'} />
+                            </>
+                        )}
+                        {user.role === 'INSTRUCTOR' && (
+                            <>
+                                <DetailRow icon={Award} label="Designation" value={user.designation || '—'} />
+                                <DetailRow icon={GraduationCap} label="Qualification" value={user.qualification || '—'} />
+                                <DetailRow icon={Star} label="Specialization" value={user.specialization || '—'} />
+                                <DetailRow icon={Clock} label="Last Login" value={user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'} />
+                            </>
+                        )}
+                        {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
+                            <>
+                                <DetailRow icon={Clock} label="Last Login" value={user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'} />
+                                <DetailRow icon={Target} label="Current Streak" value={`${user.currentStreak || 0} days`} />
+                                <DetailRow icon={Trophy} label="Longest Streak" value={`${user.longestStreak || 0} days`} />
+                            </>
+                        )}
                     </div>
 
                     {/* Permission badges — what this user can do at a glance */}
@@ -492,32 +514,50 @@ export default function UserDetail() {
 
             {/* ── Stats Grid ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard icon={BookOpen} label="Enrolled Courses" value={user.enrollments?.length || 0} color="indigo" />
-                <StatCard icon={Award} label="Certificates" value={user.certificates?.length || 0} color="emerald" />
-                <StatCard icon={Star} label="Reviews Given" value={user.reviews?.length || 0} color="amber" />
-                <StatCard icon={Swords} label="Quiz Attempts" value={user.quizStats?.totalAttempts || 0}
-                    sub={user.quizStats?.totalAttempts > 0 ? `Passed: ${user.quizStats?.passedAttempts || 0} · Avg: ${Number(user.quizStats?.avgScore || 0).toFixed(0)}%` : 'No attempts'}
-                    color="violet" />
+                {user.role === 'STUDENT' && (
+                    <>
+                        <StatCard icon={BookOpen} label="Enrolled Courses" value={user.enrollments?.length || 0} color="indigo" sub="Active enrollments" />
+                        <StatCard icon={Award} label="Certificates" value={user.certificates?.length || 0} color="emerald" sub="Courses completed" />
+                        <StatCard icon={Star} label="Reviews Given" value={user.reviews?.length || 0} color="amber" sub="Course ratings" />
+                        <StatCard icon={Swords} label="Quiz Attempts" value={user.quizStats?.totalAttempts || 0}
+                            sub={user.quizStats?.totalAttempts > 0 ? `Passed: ${user.quizStats?.passedAttempts || 0} · Avg: ${Number(user.quizStats?.avgScore || 0).toFixed(0)}%` : 'No attempts yet'}
+                            color="violet" />
+                    </>
+                )}
                 {user.role === 'INSTRUCTOR' && (
                     <>
-                        <StatCard icon={Users} label="Followers" value={user.followerCount || 0} color="sky" />
-                        <StatCard icon={Layers} label="Courses Created" value={user.coursesCreated || 0} color="rose" />
+                        <StatCard icon={Layers} label="Courses Created" value={user.coursesCreated || 0} color="indigo" sub="Published courses" />
+                        <StatCard icon={Users} label="Followers" value={user.followerCount || 0} color="emerald" sub="Students following" />
+                        <StatCard icon={Star} label="Avg Rating" value={user.avgRating ? Number(user.avgRating).toFixed(1) : '—'} color="amber" sub="Course ratings" />
+                        <StatCard icon={TrendingUp} label="Total Enrollments" value={user.totalEnrollments || 0} color="violet" sub="Across all courses" />
+                    </>
+                )}
+                {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
+                    <>
+                        <StatCard icon={Users} label="Students Managed" value={user.studentCount || 0} color="indigo" sub="In department" />
+                        <StatCard icon={GraduationCap} label="Instructors" value={user.instructorCount || 0} color="emerald" sub="In department" />
+                        <StatCard icon={BookOpen} label="Courses" value={user.courseCount || 0} color="amber" sub="Department courses" />
+                        <StatCard icon={Activity} label="Activity Streak" value={`${user.currentStreak || 0} days`} sub={`Best: ${user.longestStreak || 0} days`} color="violet" />
                     </>
                 )}
             </div>
 
             {/* ── Tabs ── */}
-            <div className="flex border-b border-border gap-6">
-                {['overview', 'courses', 'certificates', 'reviews'].filter(tab => {
-                    if (tab === 'courses' && user.role !== 'STUDENT') return false;
-                    if (tab === 'certificates' && user.role !== 'STUDENT') return false;
-                    if (tab === 'reviews' && user.role === 'SUPER_ADMIN') return false;
-                    return true;
-                }).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                        className={`pb-4 text-sm font-bold border-b-2 capitalize transition-colors ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                    >
-                        {tab === 'overview' ? 'Activity' : tab}
+            <div className="flex border-b border-border gap-1 bg-muted/10 rounded-t-2xl px-2">
+                {[
+                    { key: 'overview', label: 'Activity', icon: Activity },
+                    { key: 'courses', label: 'Courses', icon: BookOpen, hide: user.role !== 'STUDENT' },
+                    { key: 'certificates', label: 'Certificates', icon: Award, hide: user.role !== 'STUDENT' },
+                    { key: 'reviews', label: 'Reviews', icon: Star, hide: user.role === 'SUPER_ADMIN' },
+                ].filter(tab => !tab.hide).map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                        className={`flex items-center gap-2 px-5 py-4 text-sm font-bold border-b-2 transition-all ${
+                            activeTab === tab.key
+                                ? 'border-indigo-500 text-indigo-600'
+                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
+                        }`}>
+                        <tab.icon size={15} />
+                        {tab.label}
                     </button>
                 ))}
             </div>
@@ -527,31 +567,52 @@ export default function UserDetail() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Enrolled courses preview */}
                     <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                        <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
                             <h3 className="font-bold text-foreground flex items-center gap-2">
                                 <BookOpen size={18} className="text-indigo-600" /> Enrolled Courses
+                                <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                    {user.enrollments?.length || 0}
+                                </span>
                             </h3>
-                            {user.role === 'STUDENT' && (
+                            {user.role === 'STUDENT' && (user.enrollments?.length || 0) > 5 && (
                                 <button onClick={() => setActiveTab('courses')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                                    View All
+                                    View All →
                                 </button>
                             )}
                         </div>
                         <div className="divide-y divide-border max-h-80 overflow-y-auto">
                             {(user.enrollments || []).length === 0 ? (
-                                <div className="px-6 py-8 text-center text-muted-foreground text-sm font-medium">
-                                    <BookOpen size={32} className="mx-auto mb-2 opacity-30" />
-                                    No courses enrolled yet
+                                <div className="px-6 py-10 text-center text-muted-foreground">
+                                    <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                                        <BookOpen size={24} className="opacity-40" />
+                                    </div>
+                                    <p className="text-sm font-medium">No courses enrolled yet</p>
+                                    {canManage && (
+                                        <button onClick={() => setShowAssignCourse(true)}
+                                            className="mt-3 text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                                            + Enroll in a course
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 (user.enrollments || []).slice(0, 5).map(enrollment => (
                                     <div key={enrollment.id || enrollment.courseId} className="px-6 py-3.5 hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <p className="text-sm font-bold text-foreground truncate mr-2">
-                                                {enrollment.course?.title || enrollment.title || 'Untitled'}
-                                            </p>
-                                            {enrollment.completedAt && (
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="w-10 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                                                <BookOpen size={14} className="text-white/80" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-foreground truncate">
+                                                    {enrollment.course?.title || enrollment.title || 'Untitled'}
+                                                </p>
+                                                {enrollment.course?.instructorName && (
+                                                    <p className="text-[10px] text-muted-foreground truncate">by {enrollment.course.instructorName}</p>
+                                                )}
+                                            </div>
+                                            {enrollment.completedAt ? (
                                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full flex-shrink-0">Completed</span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full flex-shrink-0">In Progress</span>
                                             )}
                                         </div>
                                         <ProgressBar value={enrollment.progress || 0} size="sm" />
@@ -563,7 +624,7 @@ export default function UserDetail() {
 
                     {/* Quiz stats */}
                     <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-border">
+                        <div className="px-6 py-4 border-b border-border bg-muted/20">
                             <h3 className="font-bold text-foreground flex items-center gap-2">
                                 <Swords size={18} className="text-violet-600" /> Quiz Performance
                             </h3>
@@ -571,20 +632,36 @@ export default function UserDetail() {
                         <div className="p-6 space-y-5">
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="text-center p-4 bg-muted/40 rounded-xl border border-border">
-                                    <p className="text-2xl font-black text-foreground">{user.quizStats?.totalAttempts || 0}</p>
-                                    <p className="text-xs text-muted-foreground font-medium mt-1">Total</p>
+                                    <p className="text-3xl font-black text-foreground">{user.quizStats?.totalAttempts || 0}</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1.5">Total Attempts</p>
                                 </div>
                                 <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-700">
-                                    <p className="text-2xl font-black text-emerald-600">{user.quizStats?.passedAttempts || 0}</p>
-                                    <p className="text-xs text-emerald-600 font-medium mt-1">Passed</p>
+                                    <p className="text-3xl font-black text-emerald-600">{user.quizStats?.passedAttempts || 0}</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/60 mt-1.5">Passed</p>
                                 </div>
                                 <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700">
-                                    <p className={`text-2xl font-black ${Number(user.quizStats?.avgScore || 0) >= 50 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    <p className={`text-3xl font-black ${Number(user.quizStats?.avgScore || 0) >= 50 ? 'text-emerald-600' : 'text-amber-600'}`}>
                                         {Number(user.quizStats?.avgScore || 0).toFixed(0)}%
                                     </p>
-                                    <p className="text-xs text-amber-600 font-medium mt-1">Avg Score</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600/60 mt-1.5">Avg Score</p>
                                 </div>
                             </div>
+                            {/* Pass rate bar */}
+                            {user.quizStats?.totalAttempts > 0 && (
+                                <div className="p-4 bg-muted/30 rounded-xl border border-border">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-muted-foreground">Pass Rate</span>
+                                        <span className="text-xs font-black text-foreground">
+                                            {Math.round(((user.quizStats?.passedAttempts || 0) / user.quizStats.totalAttempts) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{
+                                            width: `${Math.round(((user.quizStats?.passedAttempts || 0) / user.quizStats.totalAttempts) * 100)}%`
+                                        }} />
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex items-center justify-center gap-2 p-4 bg-muted/30 rounded-xl border border-border">
                                 <Activity size={16} className="text-muted-foreground" />
                                 <span className="text-sm font-medium text-muted-foreground">
@@ -598,24 +675,33 @@ export default function UserDetail() {
                     {/* Certificates preview */}
                     {(user.certificates || []).length > 0 && (
                         <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                            <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <Award size={18} className="text-emerald-600" /> Certificates
+                                    <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                        {user.certificates.length}
+                                    </span>
                                 </h3>
-                                {user.role === 'STUDENT' && (
+                                {user.role === 'STUDENT' && (user.certificates.length > 4) && (
                                     <button onClick={() => setActiveTab('certificates')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                                        View All
+                                        View All →
                                     </button>
                                 )}
                             </div>
                             <div className="divide-y divide-border max-h-72 overflow-y-auto">
                                 {(user.certificates || []).slice(0, 4).map(cert => (
-                                    <div key={cert.id} className="px-6 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                                        <div>
-                                            <p className="text-sm font-bold text-foreground">{cert.course_title}</p>
-                                            <p className="text-xs text-muted-foreground">Issued {new Date(cert.issue_date).toLocaleDateString()}</p>
+                                    <div key={cert.id} className="px-6 py-3.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                                            <Award size={18} className="text-emerald-600" />
                                         </div>
-                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full">Verified</span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-foreground truncate">{cert.course_title}</p>
+                                            <p className="text-[10px] text-muted-foreground">Issued {new Date(cert.issue_date).toLocaleDateString()}</p>
+                                        </div>
+                                        <a href={`/verify/${cert.cert_id}`} target="_blank" rel="noopener noreferrer"
+                                            className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full hover:bg-emerald-100 transition-colors">
+                                            Verified ✓
+                                        </a>
                                     </div>
                                 ))}
                             </div>
@@ -625,28 +711,36 @@ export default function UserDetail() {
                     {/* Reviews preview */}
                     {(user.reviews || []).length > 0 && (
                         <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                            <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <Star size={18} className="text-amber-500" /> Recent Reviews
+                                    <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                        {user.reviews.length}
+                                    </span>
                                 </h3>
                                 {user.reviews?.length > 4 && (
                                     <button onClick={() => setActiveTab('reviews')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                                        View All
+                                        View All →
                                     </button>
                                 )}
                             </div>
                             <div className="divide-y divide-border max-h-72 overflow-y-auto">
                                 {(user.reviews || []).slice(0, 4).map(review => (
-                                    <div key={review.id} className="px-6 py-3 hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <p className="text-sm font-bold text-foreground">{review.course?.title}</p>
-                                            <div className="flex items-center gap-0.5">
+                                    <div key={review.id} className="px-6 py-3.5 hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <p className="text-sm font-bold text-foreground truncate">{review.course?.title}</p>
+                                            <div className="flex items-center gap-0.5 flex-shrink-0">
                                                 {Array.from({ length: 5 }).map((_, i) => (
                                                     <Star key={i} size={12} className={i < review.stars ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/20'} />
                                                 ))}
                                             </div>
                                         </div>
-                                        {review.comment && <p className="text-xs text-muted-foreground line-clamp-2">{review.comment}</p>}
+                                        {review.comment && (
+                                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{review.comment}</p>
+                                        )}
+                                        <p className="text-[10px] text-muted-foreground/50 mt-1.5">
+                                            {new Date(review.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        </p>
                                     </div>
                                 ))}
                             </div>

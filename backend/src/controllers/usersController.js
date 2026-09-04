@@ -34,7 +34,7 @@ const assertUserInScope = async (req, userId) => {
 
 // GET /api/users
 const getAll = async (req, res) => {
-    const { limit = 20, offset = 0, search, role, status, from, to, departmentId: qDepartmentId } = req.query;
+    const { limit = 20, offset = 0, search, role, status, from, to, departmentId: qDepartmentId, year, semester, section, courseId } = req.query;
     const { getPagination } = require('../utils/pagination');
 
     let conditions = [];
@@ -66,6 +66,15 @@ const getAll = async (req, res) => {
     }
     if (from) { conditions.push(`u.created_at >= $${i++}`); values.push(from); }
     if (to) { conditions.push(`u.created_at <= $${i++}`); values.push(to); }
+
+    if (year) { conditions.push(`u.year = $${i++}`); values.push(Number(year)); }
+    if (semester) { conditions.push(`u.semester = $${i++}`); values.push(Number(semester)); }
+    if (section) { conditions.push(`UPPER(u.section) = UPPER($${i++})`); values.push(section); }
+    // courseId filter: only return students enrolled in a specific course
+    if (courseId) {
+        conditions.push(`u.id IN (SELECT student_id FROM enrollments WHERE course_id = $${i++})`);
+        values.push(courseId);
+    }
 
     if (scoped) {
         conditions.push(`u.department_id = $${i++} AND u.role IN ('STUDENT','INSTRUCTOR')`);
@@ -1166,11 +1175,12 @@ const downloadInstructorTemplate = async (req, res) => {
     const xlsx = require('xlsx');
     const wb = xlsx.utils.book_new();
     const data = [
-        { name: 'John Doe', email: 'john.doe@example.com', phone: '9876543210' },
+        { name: 'Dr. Smith', email: 'smith@example.com', phone: '9876543210', department: 'CSE', designation: 'Professor', qualification: 'Ph.D.', specialization: 'Computer Science' },
+        { name: 'Prof. Johnson', email: 'johnson@example.com', phone: '9876543211', department: 'ECE', designation: 'Assistant Professor', qualification: 'M.Tech', specialization: 'Electronics' },
     ];
     const ws = xlsx.utils.json_to_sheet(data);
     // Set column widths
-    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 18 }, { wch: 15 }, { wch: 22 }, { wch: 20 }, { wch: 25 }];
     xlsx.utils.book_append_sheet(wb, ws, 'Instructors');
     const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Disposition', 'attachment; filename="Instructor_Import_Template.xlsx"');
@@ -1183,11 +1193,12 @@ const downloadStudentTemplate = async (req, res) => {
     const xlsx = require('xlsx');
     const wb = xlsx.utils.book_new();
     const data = [
-        { name: 'Jane Doe', email: 'jane.doe@example.com', roll_no: 'CS22001', phone: '9876543210' },
+        { name: 'Jane Doe', email: 'jane.doe@example.com', roll_no: 'CS22001', phone: '9876543210', department: 'CSE', year: 2, semester: 3, section: 'A', batch: '2024' },
+        { name: 'John Smith', email: 'john.smith@example.com', roll_no: 'CS22002', phone: '9876543211', department: 'CSE', year: 1, semester: 1, section: 'B', batch: '2025' },
     ];
     const ws = xlsx.utils.json_to_sheet(data);
     // Set column widths
-    ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 16 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 16 }, { wch: 18 }, { wch: 15 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 8 }];
     xlsx.utils.book_append_sheet(wb, ws, 'Students');
     const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Disposition', 'attachment; filename="Student_Import_Template.xlsx"');

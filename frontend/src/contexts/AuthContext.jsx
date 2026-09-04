@@ -110,7 +110,7 @@ export function AuthProvider({ children }) {
         const roleDefaults = {
             STUDENT: ['course.view', 'course.enroll', 'assignment.submit', 'quiz.attempt'],
             INSTRUCTOR: ['course.view', 'course.create', 'course.update', 'assignment.create', 'assignment.update', 'grade.update', 'quiz.create', 'attendance.manage', 'announcement.create'],
-            ADMIN: ['department.view', 'user.view', 'student.create', 'student.update', 'student.delete', 'instructor.create', 'instructor.update', 'instructor.delete', 'user.status.update', 'user.password.reset', 'user.role.change', 'course.view', 'course.update', 'course.delete', 'course.approve', 'enrollment.manage', 'import.users', 'category.manage', 'announcement.create', 'attendance.manage', 'audit.view', 'reports.view'],
+            ADMIN: ['department.view', 'user.view', 'student.create', 'student.update', 'student.delete', 'instructor.create', 'instructor.update', 'instructor.delete', 'user.status.update', 'user.password.reset', 'user.role.change', 'course.view', 'course.update', 'course.delete', 'course.approve', 'enrollment.manage', 'import.users', 'category.manage', 'announcement.create', 'attendance.manage', 'audit.view', 'reports.view', 'assignment.create', 'assignment.update', 'grade.update'],
         };
         if (userRole === 'SUPER_ADMIN') return true;
         return (roleDefaults[userRole] || []).some(p => permissions.includes(p));

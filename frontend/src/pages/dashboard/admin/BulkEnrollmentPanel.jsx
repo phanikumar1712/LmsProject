@@ -8,8 +8,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const SAMPLE_CSV = `Course,Student ID,Email
-Java Programming,CSE001,
-Java Programming,CSE002,
+Java Programming,CSE001,student1@example.com
+Java Programming,CSE002,student2@example.com
 `;
 
 /**
@@ -18,10 +18,10 @@ Java Programming,CSE002,
  * Designed to be embedded anywhere (standalone page or the Enrollment Management
  * module's Bulk tab); it renders no page header of its own.
  */
-export default function BulkEnrollmentPanel() {
+export default function BulkEnrollmentPanel({ initialCourseId } = {}) {
     const { can } = useAuth();
     const [step, setStep] = useState('select'); // select | review | done
-    const [selectedCourse, setSelectedCourse] = useState('');
+    const [selectedCourse, setSelectedCourse] = useState(initialCourseId || '');
     const [enrollMethod, setEnrollMethod] = useState('students'); // students | rolls | import
     const [selectedStudents, setSelectedStudents] = useState([]);
     const [rollNoInput, setRollNoInput] = useState('');
@@ -118,7 +118,7 @@ export default function BulkEnrollmentPanel() {
         if (!file) { toast.error('Choose a file first'); return; }
         setBusy(true);
         try {
-            const res = await enrollmentsAPI.previewEnrollmentImport(file);
+            const res = await enrollmentsAPI.previewEnrollmentImport(file, selectedCourse || undefined);
             setPreview(res);
             toast.success(`Previewed ${res.total} rows — ${res.ok} valid, ${res.failed} with errors`);
         } catch (err) {
@@ -132,7 +132,7 @@ export default function BulkEnrollmentPanel() {
         if (!file) { toast.error('Choose a file first'); return; }
         setBusy(true);
         try {
-            const res = await enrollmentsAPI.importEnrollments(file);
+            const res = await enrollmentsAPI.importEnrollments(file, selectedCourse || undefined);
             setResults(res);
             setStep('done');
             toast.success(`Enrolled ${res.created} student${res.created !== 1 ? 's' : ''}!`);
@@ -290,6 +290,28 @@ export default function BulkEnrollmentPanel() {
                         </div>
                     ) : (
                         <div className="space-y-5">
+                            {/* Course hint when selected */}
+                            {selectedCourse && course && (
+                                <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
+                                    <BookOpen size={16} className="text-indigo-600 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                                            Enrolling into: <span className="font-extrabold">{course.title}</span>
+                                        </p>
+                                        <p className="text-[11px] text-indigo-600/70 font-medium">CSV rows will be enrolled in this course. You can skip the "Course" column in your CSV.</p>
+                                    </div>
+                                </div>
+                            )}
+                            {!selectedCourse && (
+                                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+                                    <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-xs font-bold text-amber-700 dark:text-amber-300">No course selected</p>
+                                        <p className="text-[11px] text-amber-600/80 font-medium">Your CSV must include a "Course" column with the course name or ID for each row.</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Upload */}
                             <div className="flex flex-wrap items-center gap-3">
                                 <button onClick={() => fileInputRef.current?.click()}
@@ -432,7 +454,11 @@ export default function BulkEnrollmentPanel() {
                                     <AlertTriangle size={12} /> Expected columns
                                 </p>
                                 <ul className="text-xs text-muted-foreground font-medium space-y-1">
-                                    <li><span className="font-mono font-extrabold text-foreground">Course</span> — course ID or title (case-insensitive), required per row</li>
+                                    {selectedCourse ? (
+                                        <li><span className="font-mono font-extrabold text-emerald-600">Course</span> — optional (pre-selected above, all rows enroll in that course)</li>
+                                    ) : (
+                                        <li><span className="font-mono font-extrabold text-foreground">Course</span> — course ID or title (case-insensitive), <b>required</b> per row</li>
+                                    )}
                                     <li><span className="font-mono font-extrabold text-foreground">Student ID</span> — roll number, or</li>
                                     <li><span className="font-mono font-extrabold text-foreground">Email</span> — student email (either one is required)</li>
                                 </ul>

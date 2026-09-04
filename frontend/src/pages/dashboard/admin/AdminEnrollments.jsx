@@ -181,7 +181,7 @@ export default function AdminEnrollments() {
                 </>
             ) : (
                 <div className="max-w-4xl mx-auto">
-                    <BulkEnrollmentPanel />
+                    <BulkEnrollmentPanel initialCourseId={courseId} />
                 </div>
             )}
         </div>
