@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import {
     User, Moon, Sun, Bell, Save, Camera, Loader2, Mail, Shield,
     GraduationCap, Building2, CheckCheck, Trash2, AlertTriangle, Inbox, ArrowRight, Palette, Lock, Key,
+    MessageSquare, Send, ChevronDown, ChevronUp, Clock, CircleDot, CheckCircle, XCircle, Headphones,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { authAPI, uploadAPI, notificationsAPI } from '../../services/api';
+import { authAPI, uploadAPI, notificationsAPI, supportAPI } from '../../services/api';
 import useDarkMode from '../../hooks/useDarkMode';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { LoadingContainer } from '../../components/ui/Feedback';
@@ -127,9 +128,68 @@ export default function SettingsPage() {
         return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
+    // ── Support Requests state (ADMIN / INSTRUCTOR only) ──
+    const [supportRequests, setSupportRequests] = useState([]);
+    const [loadingSupport, setLoadingSupport] = useState(false);
+    const [showNewRequest, setShowNewRequest] = useState(false);
+    const [supportForm, setSupportForm] = useState({ requestType: 'general', subject: '', message: '', priority: 'medium' });
+    const [submittingSupport, setSubmittingSupport] = useState(false);
+    const [supportFilter, setSupportFilter] = useState('');
+    const [expandedRequest, setExpandedRequest] = useState(null);
+
+    const loadSupportRequests = async (status) => {
+        setLoadingSupport(true);
+        try {
+            const data = await supportAPI.getMyRequests(status || undefined);
+            setSupportRequests(Array.isArray(data) ? data : []);
+        } catch (err) { toast.error('Failed to load support requests'); }
+        finally { setLoadingSupport(false); }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'support') loadSupportRequests(supportFilter);
+    }, [activeTab, supportFilter]);
+
+    const handleSupportSubmit = async (e) => {
+        e.preventDefault();
+        if (!supportForm.subject.trim() || !supportForm.message.trim()) { toast.error('Subject and message are required'); return; }
+        setSubmittingSupport(true);
+        try {
+            await supportAPI.createRequest(supportForm);
+            toast.success('Request sent to Super Admin! You will be notified when they respond.');
+            setShowNewRequest(false);
+            setSupportForm({ requestType: 'general', subject: '', message: '', priority: 'medium' });
+            loadSupportRequests(supportFilter);
+        } catch (err) { toast.error(err.message || 'Failed to send request'); }
+        finally { setSubmittingSupport(false); }
+    };
+
+    const SUPPORT_TYPES = [
+        { value: 'password_reset', label: 'Password Reset', desc: 'Request a password reset (admin accounts)' },
+        { value: 'permission_request', label: 'Permission Request', desc: 'Request additional permissions or access' },
+        { value: 'account_issue', label: 'Account Issue', desc: 'Account-related problems or concerns' },
+        { value: 'bug_report', label: 'Bug Report', desc: 'Report a bug or technical issue' },
+        { value: 'general', label: 'General Inquiry', desc: 'General questions or support needs' },
+    ];
+
+    const PRIORITY_OPTIONS = [
+        { value: 'low', label: 'Low', color: 'text-muted-foreground bg-muted' },
+        { value: 'medium', label: 'Medium', color: 'text-amber-600 bg-amber-50' },
+        { value: 'high', label: 'High', color: 'text-orange-600 bg-orange-50' },
+        { value: 'urgent', label: 'Urgent', color: 'text-rose-600 bg-rose-50' },
+    ];
+
+    const STATUS_CONFIG = {
+        OPEN: { icon: CircleDot, color: 'text-blue-600 bg-blue-50', label: 'Open' },
+        IN_PROGRESS: { icon: Clock, color: 'text-amber-600 bg-amber-50', label: 'In Progress' },
+        RESOLVED: { icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50', label: 'Resolved' },
+        CLOSED: { icon: XCircle, color: 'text-muted-foreground bg-muted', label: 'Closed' },
+    };
+
     const TABS = [
         { id: 'profile', label: 'Profile', icon: User },
         { id: 'security', label: 'Security', icon: Lock },
+        ...(role === 'ADMIN' || role === 'INSTRUCTOR' ? [{ id: 'support', label: 'Support', icon: Headphones }] : []),
         { id: 'preferences', label: 'Preferences', icon: Palette },
         { id: 'notifications', label: 'Notifications', icon: Bell },
     ];
@@ -322,6 +382,187 @@ export default function SettingsPage() {
                             className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 transition-colors">
                             Open Notifications Center <ArrowRight size={14} />
                         </Link>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Support Requests (ADMIN / INSTRUCTOR) ────────────────────── */}
+            {activeTab === 'support' && (
+                <div className="space-y-6">
+                    <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
+                        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                            <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+                                <Headphones size={18} className="text-indigo-600" /> Contact Super Admin
+                            </h3>
+                            <button
+                                onClick={() => setShowNewRequest(!showNewRequest)}
+                                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors"
+                            >
+                                <Send size={14} /> New Request
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-muted-foreground font-medium mb-6">
+                            Submit requests to the Super Admin for password resets, permission changes, account issues, or general support.
+                        </p>
+
+                        {/* New Request Form */}
+                        {showNewRequest && (
+                            <form onSubmit={handleSupportSubmit} className="mb-6 bg-indigo-50/30 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 space-y-5">
+                                <h4 className="font-extrabold text-sm flex items-center gap-2">
+                                    <MessageSquare size={15} className="text-indigo-600" /> New Support Request
+                                </h4>
+
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground block mb-2">Request Type</label>
+                                        <select
+                                            value={supportForm.requestType}
+                                            onChange={e => setSupportForm(p => ({ ...p, requestType: e.target.value }))}
+                                            className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                        >
+                                            {SUPPORT_TYPES.map(t => (
+                                                <option key={t.value} value={t.value}>{t.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground block mb-2">Priority</label>
+                                        <div className="flex gap-2">
+                                            {PRIORITY_OPTIONS.map(p => (
+                                                <button
+                                                    key={p.value}
+                                                    type="button"
+                                                    onClick={() => setSupportForm(prev => ({ ...prev, priority: p.value }))}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                        supportForm.priority === p.value
+                                                            ? `${p.color} ring-2 ring-offset-1 ring-indigo-500/20`
+                                                            : 'bg-muted/40 text-muted-foreground hover:bg-muted'
+                                                    }`}
+                                                >
+                                                    {p.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground block mb-2">Subject *</label>
+                                    <input
+                                        type="text"
+                                        value={supportForm.subject}
+                                        onChange={e => setSupportForm(p => ({ ...p, subject: e.target.value }))}
+                                        placeholder="Brief summary of your request"
+                                        className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground block mb-2">Message *</label>
+                                    <textarea
+                                        rows={4}
+                                        value={supportForm.message}
+                                        onChange={e => setSupportForm(p => ({ ...p, message: e.target.value }))}
+                                        placeholder="Describe your request in detail. Include any relevant information that will help the Super Admin assist you."
+                                        className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2">
+                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                        Your request will be sent to all Super Admins. You'll receive a notification when they respond.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={() => setShowNewRequest(false)} className="px-5 py-2.5 rounded-xl border border-border text-sm font-bold hover:bg-muted transition-colors">Cancel</button>
+                                        <button type="submit" disabled={submittingSupport}
+                                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors">
+                                            {submittingSupport ? <><Loader2 size={14} className="animate-spin" /> Sending...</> : <><Send size={14} /> Send Request</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Filter */}
+                        <div className="flex gap-2 flex-wrap mb-5">
+                            {[{ value: '', label: 'All' }, { value: 'OPEN', label: 'Open' }, { value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'RESOLVED', label: 'Resolved' }].map(f => (
+                                <button
+                                    key={f.value}
+                                    onClick={() => setSupportFilter(f.value)}
+                                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        supportFilter === f.value
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                    }`}
+                                >
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Request List */}
+                        {loadingSupport ? (
+                            <LoadingContainer height="h-40" />
+                        ) : supportRequests.length === 0 ? (
+                            <div className="py-12 text-center bg-muted/40 border border-dashed border-border rounded-2xl">
+                                <Headphones size={36} className="mx-auto mb-3 text-muted-foreground/30" />
+                                <p className="text-muted-foreground font-medium">No support requests yet</p>
+                                <p className="text-xs text-muted-foreground/60 mt-1">Click "New Request" to contact the Super Admin</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {supportRequests.map(req => {
+                                    const statusConf = STATUS_CONFIG[req.status] || STATUS_CONFIG.OPEN;
+                                    const StatusIcon = statusConf.icon;
+                                    const isExpanded = expandedRequest === req.id;
+                                    return (
+                                        <div key={req.id} className="border border-border rounded-2xl overflow-hidden bg-card">
+                                            <button
+                                                onClick={() => setExpandedRequest(isExpanded ? null : req.id)}
+                                                className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted/30 transition-colors"
+                                            >
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConf.color}`}>
+                                                    <StatusIcon size={15} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-sm text-foreground truncate">{req.subject}</p>
+                                                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                                                        {SUPPORT_TYPES.find(t => t.value === req.requestType)?.label || req.requestType} · {new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusConf.color}`}>{statusConf.label}</span>
+                                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${PRIORITY_OPTIONS.find(p => p.value === req.priority)?.color || 'bg-muted'}`}>{req.priority}</span>
+                                                {isExpanded ? <ChevronUp size={15} className="text-muted-foreground" /> : <ChevronDown size={15} className="text-muted-foreground" />}
+                                            </button>
+                                            {isExpanded && (
+                                                <div className="px-5 pb-5 border-t border-border pt-4 space-y-4">
+                                                    <div>
+                                                        <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">Your Message</p>
+                                                        <p className="text-sm text-foreground font-medium whitespace-pre-wrap bg-muted/30 rounded-xl p-4">{req.message}</p>
+                                                    </div>
+                                                    {req.adminResponse && (
+                                                        <div className="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+                                                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600 mb-1">
+                                                                Response from {req.responderName || 'Super Admin'}
+                                                            </p>
+                                                            <p className="text-sm text-foreground font-medium whitespace-pre-wrap">{req.adminResponse}</p>
+                                                            {req.respondedAt && (
+                                                                <p className="text-[11px] text-muted-foreground mt-2 font-medium">
+                                                                    Responded {new Date(req.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -726,9 +726,14 @@ const getCategories = async (req, res) => {
     const where = scoped ? 'WHERE cat.department_id = $1' : '';
     const values = scoped ? [departmentId] : [];
     const result = await query(`
-        SELECT cat.*, COUNT(c.id) as course_count
+        SELECT cat.*,
+            COUNT(DISTINCT c.id) as course_count,
+            COUNT(DISTINCT e.student_id) as student_count,
+            COUNT(DISTINCT e.id) as enrollment_count,
+            ROUND(AVG(c.rating)::numeric, 1) as avg_rating
         FROM categories cat
         LEFT JOIN courses c ON c.category_id = cat.id AND c.status = 'PUBLISHED'
+        LEFT JOIN enrollments e ON e.course_id = c.id
         ${where}
         GROUP BY cat.id
         ORDER BY cat.name ASC

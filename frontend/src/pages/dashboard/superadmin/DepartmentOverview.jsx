@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Building2, Users, BookOpen, GraduationCap, ShieldCheck, Search, Plus,
-    X, Edit2, Trash2, Eye, Power, Hash, Mail, Phone, User, Activity, Clock, Layers
+    X, Edit2, Trash2, Eye, Power, Hash, Mail, Phone, User, Activity, Clock, Layers, Star, TrendingUp
 } from 'lucide-react';
 import { statsAPI, departmentsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
@@ -160,14 +160,18 @@ export default function DepartmentOverview() {
     }, [departments, searchTerm]);
 
     const totals = useMemo(() => {
-        if (!departments) return { students: 0, instructors: 0, admins: 0, courses: 0, enrollments: 0 };
-        return departments.reduce((acc, d) => ({
+        if (!departments) return { students: 0, instructors: 0, admins: 0, courses: 0, enrollments: 0, avgRating: '—' };
+        const t = departments.reduce((acc, d) => ({
             students: acc.students + (d.studentCount || 0),
             instructors: acc.instructors + (d.instructorCount || 0),
             admins: acc.admins + (d.adminCount || 0),
             courses: acc.courses + (d.courseTotal || 0),
             enrollments: acc.enrollments + (d.totalEnrollments || 0),
-        }), { students: 0, instructors: 0, admins: 0, courses: 0, enrollments: 0 });
+            ratingSum: acc.ratingSum + (d.avgRating || 0),
+            ratingCount: acc.ratingCount + (d.avgRating ? 1 : 0),
+        }), { students: 0, instructors: 0, admins: 0, courses: 0, enrollments: 0, ratingSum: 0, ratingCount: 0 });
+        t.avgRating = t.ratingCount > 0 ? (t.ratingSum / t.ratingCount).toFixed(1) : '—';
+        return t;
     }, [departments]);
 
     if (loading) {
@@ -194,13 +198,14 @@ export default function DepartmentOverview() {
             />
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
                     { label: 'Students', value: totals.students.toLocaleString(), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200/50' },
                     { label: 'Instructors', value: totals.instructors.toLocaleString(), icon: GraduationCap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200/50' },
                     { label: 'Admins', value: totals.admins.toLocaleString(), icon: ShieldCheck, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200/50' },
                     { label: 'Courses', value: totals.courses.toLocaleString(), icon: BookOpen, color: 'text-cyan-600', bg: 'bg-cyan-50', border: 'border-cyan-200/50' },
                     { label: 'Enrollments', value: totals.enrollments.toLocaleString(), icon: Activity, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200/50' },
+                    { label: 'Avg Rating', value: totals.avgRating, icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200/50' },
                 ].map(item => (
                     <div key={item.label} className={`${item.bg} border ${item.border} rounded-2xl p-4 shadow-sm`}>
                         <div className="flex items-center gap-2 mb-1.5">
@@ -225,7 +230,7 @@ export default function DepartmentOverview() {
 
             {/* Departments Table */}
             <DataTable
-                columns={['ID', 'Department', 'Code', 'HOD', 'Students', 'Instructors', 'Courses', 'Assigned Admin', 'Status', 'Created', 'Actions']}
+                columns={['ID', 'Department', 'Code', 'HOD', 'Students', 'Instructors', 'Courses', 'Enrollments', 'Rating', 'Assigned Admin', 'Status', 'Created', 'Actions']}
                 loading={false}
                 empty={filtered.length === 0}
                 emptyText="No departments found. Create your first department to get started."

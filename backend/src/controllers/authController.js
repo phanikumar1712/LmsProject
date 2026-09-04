@@ -342,8 +342,8 @@ const demoLogin = async (req, res) => {
     // Seeded department accounts (dev/test only). Only NON-privileged demo roles
     // are exposed — admins and super admins must always authenticate normally.
     const demoEmails = {
-        STUDENT: 'cse.student1@demo.com',
-        INSTRUCTOR: 'cse.instructor@demo.com',
+        STUDENT: 'cse.student1@lms.com',
+        INSTRUCTOR: 'cse.instructor@lms.com',
     };
     const email = demoEmails[String(role).toUpperCase()];
     if (!email) throw createError('Invalid demo role', 400);

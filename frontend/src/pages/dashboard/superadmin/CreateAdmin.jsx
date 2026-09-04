@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Building2, ShieldCheck, Plus, X, Mail, User, Lock, Phone, CheckCircle2, Search, RefreshCw } from 'lucide-react';
-import { usersAPI, departmentsAPI } from '../../../services/api';
+import { Building2, ShieldCheck, Plus, X, Mail, User, Lock, Phone, CheckCircle2, Search, RefreshCw, Users, BookOpen, TrendingUp, Star } from 'lucide-react';
+import { usersAPI, departmentsAPI, statsAPI } from '../../../services/api';
 import { useAsyncData } from '../../../hooks/useAsyncData';
 import toast from 'react-hot-toast';
 
@@ -20,7 +20,7 @@ function StatusBadge({ hasAdmin, userCount }) {
 }
 
 export default function CreateAdmin() {
-    const { data: departments, loading, reload } = useAsyncData(() => departmentsAPI.list(), []);
+    const { data: departments, loading, reload } = useAsyncData(() => statsAPI.getDepartments(), []);
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedDept, setSelectedDept] = useState(null);
@@ -171,7 +171,7 @@ export default function CreateAdmin() {
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-extrabold text-foreground text-[15px] truncate">{dept.name}</h3>
                                         <p className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-wider">
-                                            {dept.categoryCount || 0} categories · {dept.coursePublished || 0} courses
+                                            {dept.categoryCount || 0} categories · {dept.courseTotal || 0} courses
                                         </p>
                                     </div>
                                 </div>
@@ -200,6 +200,18 @@ export default function CreateAdmin() {
                                     </div>
                                 )}
 
+                                {/* Stats row */}
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70">
+                                        <Users size={11} className="text-indigo-500" /> {dept.studentCount || 0} students
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70">
+                                        <BookOpen size={11} className="text-cyan-500" /> {dept.coursePublished || 0} published
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70">
+                                        <TrendingUp size={11} className="text-emerald-500" /> {dept.totalEnrollments || 0} enrollments
+                                    </div>
+                                </div>
                                 <div className="flex items-center justify-between">
                                     <StatusBadge hasAdmin={hasAdmin} userCount={count} />
                                     <button

@@ -51,6 +51,8 @@ export function DashboardLayout() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const location = useLocation();
 
+    const [bannerDismissed, setBannerDismissed] = useState(false);
+
     // Swipe from edge to open sidebar on mobile
     const edgeSwipe = useSwipeGesture({
         enabled: !mobileOpen,
@@ -82,6 +84,8 @@ export function DashboardLayout() {
 
     if (!isAuthenticated) return null;
 
+    const showPasswordBanner = !bannerDismissed && user?.mustChangePassword && user?.role !== 'ADMIN' && location.pathname !== '/profile';
+
     return (
         <div className="min-h-screen bg-background transition-colors duration-300">
             <Navbar onMobileMenuClick={handleMobileMenuClick} />
@@ -104,22 +108,34 @@ export function DashboardLayout() {
             />
 
             {/* Forced password change banner — set when an admin force-resets
-                the account password (must_change_password flag). */}
-            {user?.mustChangePassword && location.pathname !== '/profile' && (
+                the account password (must_change_password flag).
+                Admins are excluded: their passwords are managed exclusively by
+                the Super Admin, so this banner is only for students/instructors. */}
+            {showPasswordBanner && (
                 <div
-                    className={`fixed z-30 bg-amber-500 text-white text-sm font-bold shadow-lg ${collapsed ? 'md:ml-16' : 'md:ml-64'} ml-0 right-0 left-0 top-16`}
+                    className={`fixed z-30 bg-amber-500 text-white text-sm font-bold shadow-lg ${collapsed ? 'md:ml-16' : 'md:ml-64'} ml-0 right-0 left-0 top-16 flex items-center justify-between px-4 py-2.5`}
                 >
-                    <a href="/profile" className="flex items-center justify-center gap-2 px-4 py-2.5 hover:bg-amber-600 transition-colors">
-                        🔒 An administrator reset your password — please set a new one to continue.
+                    <a href="/profile" className="flex items-center gap-2 hover:underline">
+                        <span>🔒 An administrator reset your password — please set a new one to continue.</span>
                         <span className="underline underline-offset-2">Change password now</span>
                     </a>
+                    <button
+                        onClick={() => setBannerDismissed(true)}
+                        className="p-1 rounded-full hover:bg-amber-600/80 transition-colors text-white focus:outline-none"
+                        title="Dismiss alert"
+                        aria-label="Close notification"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
             )}
 
             <main
                 onTouchStart={edgeSwipe.handleTouchStart}
                 onTouchEnd={edgeSwipe.handleTouchEnd}
-                className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'md:ml-16' : 'md:ml-64'} ${user?.mustChangePassword ? 'pt-24' : ''}`}
+                className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${collapsed ? 'md:ml-16' : 'md:ml-64'} ${showPasswordBanner ? 'pt-24' : ''}`}
             >
                 <div className="p-4 sm:p-5 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
                     <AnimatePresence mode="wait">

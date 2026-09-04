@@ -69,6 +69,9 @@ const mapCategory = (cat) => ({
     icon: cat.icon,
     departmentId: cat.department_id ?? cat.departmentId ?? null,
     courseCount: parseInt(cat.course_count ?? cat.courseCount ?? 0, 10) || 0,
+    studentCount: parseInt(cat.student_count ?? cat.studentCount ?? 0, 10) || 0,
+    enrollmentCount: parseInt(cat.enrollment_count ?? cat.enrollmentCount ?? 0, 10) || 0,
+    avgRating: cat.avg_rating != null ? parseFloat(cat.avg_rating) : (cat.avgRating ?? null),
     createdAt: cat.created_at || cat.createdAt,
 });
 

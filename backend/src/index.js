@@ -40,6 +40,7 @@ const attendanceRoutes = require('./routes/attendance');
 const notesRoutes = require('./routes/notes');
 const bookmarksRoutes = require('./routes/bookmarks');
 const gradesRoutes = require('./routes/grades');
+const supportRoutes = require('./routes/support');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -81,7 +82,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────
-app.use('/api', apiLimiter);
+// app.use('/api', apiLimiter); // temporarily disabled for dev
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
@@ -102,6 +103,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/grades', gradesRoutes);
+app.use('/api/support', supportRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

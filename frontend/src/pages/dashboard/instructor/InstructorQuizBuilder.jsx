@@ -54,8 +54,27 @@ export default function InstructorQuizBuilder({ redirectTo = '/instructor/course
     }, [questions]);
 
     useEffect(() => {
-        coursesAPI.getByInstructor(user.id).then(setCourses);
-    }, [user.id]);
+        if (!user) return;
+        const load = async () => {
+            try {
+                const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+                let data;
+                if (isAdmin) {
+                    data = await coursesAPI.getAll({ admin: true, limit: 500 });
+                } else if (user.id) {
+                    data = await coursesAPI.getByInstructor(user.id);
+                } else {
+                    data = [];
+                }
+                setCourses(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error('[QuizBuilder] Failed to load courses:', err);
+                toast.error('Failed to load courses: ' + err.message);
+                setCourses([]);
+            }
+        };
+        load();
+    }, [user]);
 
     const handleInfoChange = (e) => {
         setQuizInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
