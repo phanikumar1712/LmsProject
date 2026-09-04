@@ -55,9 +55,11 @@ app.use(cors({
         if (!origin) return callback(null, true);
         // Allow any localhost port in development
         if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-        // Allow configured FRONTEND_URL in production
-        const allowed = process.env.FRONTEND_URL;
-        if (allowed && origin === allowed) return callback(null, true);
+        // Allow IP-address origins (server accessed via http://<server-ip> — no domain yet)
+        if (/^https?:\/\/\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(origin)) return callback(null, true);
+        // Allow configured FRONTEND_URL in production (also supports a comma-separated list)
+        const allowed = (process.env.FRONTEND_URL || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (allowed.length && allowed.includes(origin)) return callback(null, true);
         callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
@@ -82,7 +84,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────
-// app.use('/api', apiLimiter); // temporarily disabled for dev
+app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
