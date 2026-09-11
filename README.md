@@ -461,6 +461,17 @@ cp backend/.env.example backend/.env
 
 Open `backend/.env` and fill in **at minimum**: `DATABASE_URL`, `JWT_SECRET`, `CLOUDINARY_*`, `RESEND_API_KEY`, and `SUPER_ADMIN_PASSWORD` (required for production migrations).
 
+### 🌐 Option C — Deploy to Vercel (Frontend + Backend)
+
+The project is pre-configured to deploy **entirely on Vercel**: the React app is
+served as a static site and the Express API runs as a serverless function under
+`/api/*`, sharing the same domain (no CORS). See
+**[DEPLOY-VERCEL.md](DEPLOY-VERCEL.md)** for the full walkthrough — it covers
+importing the repo, environment variables, the Neon pooled connection string,
+and running migrations.
+
+---
+
 ### 🐳 Option A — Run with Docker (Easiest)
 
 ```bash

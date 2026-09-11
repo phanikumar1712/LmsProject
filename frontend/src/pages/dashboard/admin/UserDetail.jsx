@@ -630,7 +630,7 @@ export default function UserDetail() {
                             </h3>
                         </div>
                         <div className="p-6 space-y-5">
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="text-center p-4 bg-muted/40 rounded-xl border border-border">
                                     <p className="text-3xl font-black text-foreground">{user.quizStats?.totalAttempts || 0}</p>
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1.5">Total Attempts</p>

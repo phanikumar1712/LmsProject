@@ -346,7 +346,7 @@ export default function SuperAdminStudents() {
             />
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                     { label: 'Students', value: totals.total.toLocaleString(), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                     { label: 'Active', value: totals.active.toLocaleString(), icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },

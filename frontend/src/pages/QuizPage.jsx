@@ -317,7 +317,7 @@ export default function QuizPage() {
                         Status: {result.passed ? 'Passed' : 'Failed'}
                     </span>
 
-                    <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                         <div className="bg-muted/40 border border-border rounded-xl p-4">
                             <p className="text-3xl font-black text-indigo-600">{Math.round((result.score / 100) * (quiz?.questionCount || 0))} / {quiz?.questionCount || 0}</p>
                             <p className="text-muted-foreground text-xs font-bold uppercase tracking-wider mt-1">Score</p>

@@ -1,0 +1,21 @@
+{
+  "name": "edunexus-lms",
+  "private": true,
+  "version": "1.0.0",
+  "description": "EduNexus LMS — frontend (React/Vite) + backend (Express) deployed together on Vercel",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspace frontend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "migrate": "npm run migrate --workspace backend",
+    "start:backend": "npm run start --workspace backend",
+    "test:backend": "npm run test --workspace backend"
+  }
+}

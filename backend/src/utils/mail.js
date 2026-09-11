@@ -1,11 +1,21 @@
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init so a missing RESEND_API_KEY fails on the email endpoint with a
+// clear error instead of crashing the whole app at module load (important on
+// serverless where env misconfiguration would otherwise take every route down).
+let resend = null;
+const getResend = () => {
+    if (!process.env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is not configured. Email sending is unavailable.');
+    }
+    if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+    return resend;
+};
 
 const sendOTPEmail = async (email, otp) => {
     console.log(`[DEBUG] OTP for ${email}: ${otp}`);
     try {
-        const { data, error } = await resend.emails.send({
+        const { data, error } = await getResend().emails.send({
             from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
             to: email,
             subject: 'Your Password Reset OTP',
