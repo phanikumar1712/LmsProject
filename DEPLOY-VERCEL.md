@@ -35,7 +35,7 @@ How it works:
 | `backend/src/app.js` | **New** — the full Express app, exported for reuse |
 | `api/index.js` | **New** — Vercel function entry: `module.exports = require('../backend/src/app')` |
 | `package.json` | **New** — npm workspaces so one `npm install` covers both apps |
-| `vercel.json` | **New** — build command, output dir, `/api/*` + SPA rewrites, 60s function timeout |
+| `vercel.json` | **New** — build command, output dir, `/api/*` + SPA rewrites, 300s function timeout |
 | `backend/src/utils/mail.js` | Resend client now lazy-initialized (missing API key no longer crashes the whole app) |
 | `backend/src/app.js` | `dotenv` loads `backend/.env` by file path (works from any working directory) |
 
@@ -138,7 +138,7 @@ Vercel has no one-off runner — run migrations from your machine against the sa
 | Limit | Value | Impact |
 |-------|-------|--------|
 | Request body | **4.5 MB** | Bulk CSV/Excel imports are capped at 5 MB in multer — keep import files under ~4 MB |
-| Function duration | **60 s** (Hobby, max) | Bulk import previews can take up to 120 s client-side; very large imports may time out (500-row caps usually fine) |
+| Function duration | **300 s** (Hobby max with fluid compute) | Bulk import previews (up to 120 s client-side) fit comfortably; imports are no longer timeout-limited |
 | Rate limiting | in-memory | Resets per function instance — still effective per-request, not global |
 | DB connections | Neon pooled cap | Fixed by Step 4 (pooled connection string) |
 
