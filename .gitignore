@@ -40,6 +40,9 @@ dist-ssr/
 build/
 *.local
 
+# Single-service deploy artifact (frontend build copied into backend)
+backend/public/
+
 # ── Logs ───────────────────────────────────────────────────────
 logs/
 *.log

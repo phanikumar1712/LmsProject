@@ -16,6 +16,7 @@
     "dev:backend": "npm run dev --workspace backend",
     "migrate": "npm run migrate --workspace backend",
     "start:backend": "npm run start --workspace backend",
+    "prepare:railway": "node scripts/prepare-railway.cjs",
     "test:backend": "npm run test --workspace backend"
   }
 }

@@ -1,9 +1,12 @@
 // Load backend/.env by path so the app behaves the same whether started from
-// backend/ (npm start) or bundled from the repo root (Vercel function). On
-// Vercel there is no .env file — platform env vars are used as-is.
+// backend/ (npm start) or bundled from the repo root (Vercel function).
+// override is FALSE (dotenv default): real environment variables (platform-
+// injected PORT, DATABASE_URL, …) always win over file values — the file only
+// fills gaps for local development. This keeps Railway/Vercel/Docker env
+// authoritative and prevents a stray .env from breaking platform config.
 require('dotenv').config({
     path: require('path').join(__dirname, '..', '.env'),
-    override: true,
+    override: false,
 });
 const express = require('express');
 const cors = require('cors');
@@ -111,6 +114,33 @@ app.use('/api/notes', notesRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/grades', gradesRoutes);
 app.use('/api/support', supportRoutes);
+
+// ── Static Frontend (single-service deploys: Railway / VPS) ──────────────────
+// If the frontend production bundle was copied to backend/public (see
+// scripts/prepare-railway.cjs + railway.json), Express serves it directly —
+// same-origin API, no CORS, no separate static host. On Vercel this folder
+// doesn't exist and the block is skipped entirely.
+const path = require('path');
+const fs = require('fs');
+const publicDir = path.join(__dirname, '..', 'public');
+if (fs.existsSync(publicDir)) {
+    const indexHtml = path.join(publicDir, 'index.html');
+    app.use(express.static(publicDir, {
+        index: false,
+        maxAge: '1y', // hashed Vite asset filenames are safe to cache hard
+        setHeaders: (res, filePath) => {
+            if (filePath === indexHtml) res.setHeader('Cache-Control', 'no-cache');
+        },
+    }));
+    // SPA fallback — Express 5 safe (no '*' route pattern): any non-API GET
+    // that didn't match a static file serves index.html for React Router.
+    app.use((req, res, next) => {
+        if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+            return res.sendFile(indexHtml);
+        }
+        next();
+    });
+}
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
