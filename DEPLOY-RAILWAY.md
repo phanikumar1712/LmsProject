@@ -16,6 +16,7 @@ Railway service (Railpack build)
 
 | File | Change |
 |------|--------|
+| `railpack.json` | **New** — pins Railpack to the Node provider (a stale `server.py` at the root made Railpack misdetect the project as Python and skip installing Node) |
 | `railway.json` | **New** — Railpack builder, build/pre-deploy/start commands, healthcheck |
 | `scripts/prepare-railway.cjs` | **New** — builds frontend, copies `frontend/dist` → `backend/public` |
 | `backend/src/app.js` | Serves `backend/public` when it exists (static + SPA fallback, Express 5-safe) |
