@@ -55,7 +55,23 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const app = express();
 
 // ── Security & Parsing ────────────────────────────────────────────────────────
-app.use(helmet());
+// Helmet defaults, with only img-src widened: course thumbnails and media live
+// on Cloudinary (res.cloudinary.com) and placeholder imagery on Unsplash, so
+// the default "img-src 'self' data:" makes Chrome block those images. Every
+// other CSP directive stays at Helmet's default; CSP itself remains enforced.
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            "img-src": [
+                "'self'",
+                "data:",
+                "https://res.cloudinary.com",
+                "https://images.unsplash.com",
+            ],
+        },
+    },
+}));
 app.use(compression());
 // CORS via the options-delegate form (per-request access to req.headers).
 // Same-origin must always pass: the SPA and API ship from the same URL
