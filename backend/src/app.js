@@ -140,6 +140,18 @@ if (fs.existsSync(publicDir)) {
         }
         next();
     });
+    // Boot-time proof of what the deployment image actually ships (visible in
+    // Railway deploy logs). If assets are missing here, the image was built
+    // without the frontend bake step; if present but requests still fail, it's
+    // a filesystem permission issue.
+    try {
+        const entries = fs.readdirSync(publicDir, { recursive: true });
+        const assetCount = entries.filter((e) => e.startsWith('assets/')).length;
+        console.log(`[static] backend/public served: ${entries.length} entries, ${assetCount} hashed assets`);
+        if (assetCount === 0) console.warn('[static] WARNING: no assets/ files found in backend/public');
+    } catch (err) {
+        console.error('[static] backend/public exists but is not readable:', err.code);
+    }
 }
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
