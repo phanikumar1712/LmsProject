@@ -5,8 +5,8 @@ as **ONE Railway service**: the Express backend serves both the API (`/api/*`)
 and the built React frontend — same origin, no CORS, no second service.
 
 ```
-Railway service (Railpack build)
-├── build:       node scripts/prepare-railway.cjs → frontend build copied to backend/public
+Railway service (Dockerfile build)
+├── build:       multi-stage Dockerfile → frontend build copied to backend/public
 ├── pre-deploy:  npm run migrate --prefix /app/backend → schema + seed (idempotent)
 ├── start:       npm start --prefix /app/backend → node src/index.js
 └── healthcheck: GET /api/health
@@ -17,7 +17,9 @@ Railway service (Railpack build)
 | File | Change |
 |------|--------|
 | `railpack.json` | **New** — pins Railpack to the Node provider (a stale `server.py` at the root made Railpack misdetect the project as Python and skip installing Node) |
-| `railway.json` | **New** — Railpack builder, build/pre-deploy/start commands, healthcheck |
+| `Dockerfile` | **New** — multi-stage root image (frontend build → `backend/public`, non-root runtime); primary build path |
+| `.dockerignore` | **New** — keeps secrets and dev artifacts out of the image |
+| `railway.json` | **New** — Dockerfile builder, pre-deploy/start commands, healthcheck |
 | `scripts/prepare-railway.cjs` | **New** — builds frontend, copies `frontend/dist` → `backend/public` |
 | `backend/src/app.js` | Serves `backend/public` when it exists (static + SPA fallback, Express 5-safe) |
 | `backend/src/app.js` | dotenv `override: false` — platform env vars (PORT, DATABASE_URL, …) always win over a stray `.env` |

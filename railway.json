@@ -1,8 +1,7 @@
 {
     "$schema": "https://railway.com/railway.schema.json",
     "build": {
-        "builder": "RAILPACK",
-        "buildCommand": "node scripts/prepare-railway.cjs"
+        "builder": "DOCKERFILE"
     },
     "deploy": {
         "startCommand": "npm start --prefix /app/backend",
