@@ -57,20 +57,47 @@ const app = express();
 // ── Security & Parsing ────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(compression());
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (curl, mobile apps, etc.)
-        if (!origin) return callback(null, true);
-        // Allow any localhost port in development
-        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-        // Allow IP-address origins (server accessed via http://<server-ip> — no domain yet)
-        if (/^https?:\/\/\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(origin)) return callback(null, true);
-        // Allow configured FRONTEND_URL in production (also supports a comma-separated list)
-        const allowed = (process.env.FRONTEND_URL || '').split(',').map(s => s.trim()).filter(Boolean);
-        if (allowed.length && allowed.includes(origin)) return callback(null, true);
-        callback(new Error(`CORS: origin ${origin} not allowed`));
-    },
-    credentials: true,
+// CORS via the options-delegate form (per-request access to req.headers).
+// Same-origin must always pass: the SPA and API ship from the same URL
+// (Railway/VPS), and browsers still send Origin on module script/asset
+// requests (<script type="module" crossorigin>), so the deployment's own
+// host has to be allowed even though no cross-origin request is happening.
+app.use(cors((req, callback) => {
+    const origin = req.headers.origin;
+    let allowed = false;
+
+    if (!origin) {
+        // No origin: curl, mobile apps, same-origin navigations
+        allowed = true;
+    } else if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        // Any localhost / 127.0.0.1 port in development
+        allowed = true;
+    } else if (/^https?:\/\/\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(origin)) {
+        // IP-address origins (server accessed via http://<server-ip> — no domain yet)
+        allowed = true;
+    } else {
+        // Same-origin: Origin host matches the request's own Host (or the
+        // proxy-forwarded host behind Railway's edge router).
+        try {
+            const originHost = new URL(origin).host;
+            const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+            if (reqHost && originHost === reqHost) allowed = true;
+        } catch { /* unparseable origin — stays denied */ }
+        // Configured FRONTEND_URL in production (comma-separated list supported)
+        if (!allowed) {
+            const extra = (process.env.FRONTEND_URL || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (extra.includes(origin)) allowed = true;
+        }
+    }
+
+    if (allowed) {
+        // origin: true → cors reflects the request's Origin header
+        callback(null, { origin: true, credentials: true });
+    } else {
+        const err = new Error(`CORS: origin ${origin} not allowed`);
+        err.statusCode = 403;
+        callback(err);
+    }
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
