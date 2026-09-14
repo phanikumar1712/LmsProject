@@ -7,8 +7,8 @@ and the built React frontend — same origin, no CORS, no second service.
 ```
 Railway service (Railpack build)
 ├── build:       node scripts/prepare-railway.cjs → frontend build copied to backend/public
-├── pre-deploy:  npm run migrate                  → schema + seed (idempotent)
-├── start:       npm run start --workspace backend → node src/index.js
+├── pre-deploy:  npm run migrate --prefix /app/backend → schema + seed (idempotent)
+├── start:       npm start --prefix /app/backend → node src/index.js
 └── healthcheck: GET /api/health
 ```
 

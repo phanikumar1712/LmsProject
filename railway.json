@@ -5,8 +5,8 @@
         "buildCommand": "node scripts/prepare-railway.cjs"
     },
     "deploy": {
-        "startCommand": "npm run start --workspace backend",
-        "preDeployCommand": ["npm run migrate --workspace backend"],
+        "startCommand": "npm start --prefix /app/backend",
+        "preDeployCommand": ["npm run migrate --prefix /app/backend"],
         "healthcheckPath": "/api/health",
         "healthcheckTimeout": 300,
         "restartPolicyType": "ON_FAILURE",

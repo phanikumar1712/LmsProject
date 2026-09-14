@@ -1,0 +1,28 @@
+# Never bake secrets or dev artifacts into the image
+**/.env
+**/.env.*
+!**/.env.example
+**/*.bak
+**/*.pem
+**/*.key
+**/*.pem
+**/*.crt
+
+# Dev artifacts
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/logs
+**/*.log
+backend/public
+backend/.env.bak
+.git
+.gitignore
+.claude
+.vscode
+.idea
+
+# Docs & misc (not needed at runtime)
+*.md
+LICENSE
